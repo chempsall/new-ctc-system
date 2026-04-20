@@ -135,8 +135,8 @@ PAR_INDIRECT_ROWS = [
 # ---------------------------------------------------------------------------
 # Scheduler
 # ---------------------------------------------------------------------------
-# Time to run the nightly import (24-hour clock, server local time)
-SCHEDULER_HOUR   = int(os.environ.get("RF_SCHEDULER_HOUR",   "0"))
+# Time to run the daily import (24-hour clock, server local time)
+SCHEDULER_HOUR   = int(os.environ.get("RF_SCHEDULER_HOUR",   "8"))
 SCHEDULER_MINUTE = int(os.environ.get("RF_SCHEDULER_MINUTE", "0"))
 
 # ---------------------------------------------------------------------------
