@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resource Forecast</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+
+<!-- Loading screen — visible until data is ready -->
+<div id="loading">
+  <div class="loading-logo">Resource <span>Forecast</span></div>
+  <div class="loading-bar"><div class="loading-bar__fill"></div></div>
+  <div class="loading-status" id="loading-status">Connecting to server...</div>
+</div>
+
+<div id="app">
+
+  <!-- ===================================================================
+       Top navigation
+       =================================================================== -->
+  <nav class="topnav">
+    <div class="topnav__logo">Resource <span>Forecast</span></div>
+
+    <div class="topnav__tabs">
+      <button class="topnav__tab active" data-view="staff">
+        People
+      </button>
+      <button class="topnav__tab" data-view="projects">
+        Projects
+      </button>
+    </div>
+
+    <div class="topnav__right">
+      <span class="topnav__status" id="status-text">Loading...</span>
+    </div>
+  </nav>
+
+  <!-- ===================================================================
+       Main content
+       =================================================================== -->
+  <main class="main">
+
+    <!-- Conflict banner (hidden if no conflicts) -->
+    <div class="alert-banner hidden" id="conflict-banner">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1L15 14H1L8 1Z" stroke="currentColor" stroke-width="1.5"
+              stroke-linejoin="round"/>
+        <path d="M8 6v4M8 11.5v.5" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round"/>
+      </svg>
+      <span>
+        <span class="alert-banner__count" id="conflict-count">0</span>
+        project files have filename conflicts and need attention
+      </span>
+      <span style="margin-left:auto;font-size:11px">View in admin panel →</span>
+    </div>
+
+    <!-- Metric cards -->
+    <div class="metrics">
+      <div class="metric-card">
+        <div class="metric-card__label">Active staff</div>
+        <div class="metric-card__value" id="metric-staff">—</div>
+        <div class="metric-card__sub">in current filter</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-card__label">Projects</div>
+        <div class="metric-card__value" id="metric-projects">—</div>
+        <div class="metric-card__sub">in current filter</div>
+      </div>
+      <div class="metric-card" id="metric-over-card">
+        <div class="metric-card__label">Over-allocated</div>
+        <div class="metric-card__value" id="metric-over">—</div>
+        <div class="metric-card__sub">people this period</div>
+      </div>
+      <div class="metric-card" id="metric-norec-card">
+        <div class="metric-card__label">No Horizon record</div>
+        <div class="metric-card__value" id="metric-norec">—</div>
+        <div class="metric-card__sub">projects to resolve</div>
+      </div>
+    </div>
+
+    <!-- Month tabs -->
+    <div class="month-tabs" id="month-tabs">
+      <!-- Populated by JavaScript -->
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <span class="filter-bar__label">Filter</span>
+
+      <select id="filter-team">
+        <option value="all">All teams</option>
+      </select>
+
+      <select id="filter-grade">
+        <option value="all">All grades</option>
+      </select>
+
+      <select id="filter-discipline">
+        <option value="all">All disciplines</option>
+      </select>
+
+      <!-- Horizon filter — only shown in Projects view -->
+      <span id="horizon-filter-wrap" style="display:none">
+        <select id="filter-horizon">
+          <option value="all">All Horizon statuses</option>
+          <option value="linked">Linked only</option>
+          <option value="norecord">No record only</option>
+        </select>
+      </span>
+
+      <div class="filter-bar__sep"></div>
+
+      <input type="text" id="filter-search"
+             placeholder="Search name, project..." autocomplete="off">
+    </div>
+
+    <!-- ===================================================================
+         PEOPLE VIEW
+         =================================================================== -->
+    <div id="staff-panel">
+      <div class="card">
+        <div class="card__header">
+          <span class="card__title">Staff allocation</span>
+          <span style="font-size:11px;color:var(--text-tertiary)">
+            Click a row for details
+          </span>
+        </div>
+        <div class="card__body">
+          <table class="staff-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Team</th>
+                <th>Allocated</th>
+                <th class="right">Capacity</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="staff-tbody">
+              <tr><td colspan="5">
+                <div class="empty-state">Loading...</div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         PROJECTS VIEW
+         =================================================================== -->
+    <div id="projects-panel" class="hidden">
+      <div class="card">
+        <div class="card__header">
+          <span class="card__title">Projects</span>
+          <span style="font-size:11px;color:var(--text-tertiary)">
+            Click a row for details &amp; financials
+          </span>
+        </div>
+        <div class="card__body">
+          <table class="project-table">
+            <thead>
+              <tr>
+                <th>Number</th>
+                <th>Project / Task</th>
+                <th>Team</th>
+                <th>Horizon</th>
+                <th>PM</th>
+                <th class="right">Days</th>
+              </tr>
+            </thead>
+            <tbody id="project-tbody">
+              <tr><td colspan="6">
+                <div class="empty-state">Loading...</div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- =========================================================================
+     Detail panel (slides in from right on row click)
+     ========================================================================= -->
+<div class="detail-panel" id="detail-panel">
+
+  <div class="detail-panel__header">
+    <div class="detail-panel__avatar" id="dp-avatar">?</div>
+    <div>
+      <div class="detail-panel__name" id="dp-name">—</div>
+      <div class="detail-panel__role" id="dp-role">—</div>
+    </div>
+    <button class="detail-panel__close" id="dp-close" aria-label="Close">✕</button>
+  </div>
+
+  <!-- Summary stats -->
+  <div class="detail-panel__section">
+    <div class="detail-panel__section-title">This period</div>
+    <div class="detail-stat-grid">
+      <div class="detail-stat">
+        <div class="detail-stat__label">Allocated</div>
+        <div class="detail-stat__value" id="dp-stat-alloc">—</div>
+      </div>
+      <div class="detail-stat">
+        <div class="detail-stat__label">Capacity / Total</div>
+        <div class="detail-stat__value" id="dp-stat-cap">—</div>
+      </div>
+      <div class="detail-stat">
+        <div class="detail-stat__label">Remaining / Fee</div>
+        <div class="detail-stat__value" id="dp-stat-remain">—</div>
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      <span id="dp-kpi" class="kpi kpi--ok">ok</span>
+    </div>
+
+    <!-- No-record warning -->
+    <div class="warn-strip hidden" id="dp-norec-warn">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M7 1L13 12H1L7 1Z" stroke="currentColor"
+              stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M7 5.5v3M7 9.5v.5" stroke="currentColor"
+              stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>
+        <span id="dp-norec-days">0d</span>
+        allocated to projects with no Horizon record
+      </span>
+    </div>
+  </div>
+
+  <!-- Projects / financials section -->
+  <div class="detail-panel__section">
+    <div class="detail-panel__section-title">Details</div>
+    <div id="dp-projects">
+      <!-- Populated by JavaScript -->
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>

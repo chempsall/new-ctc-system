@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin — Resource Forecast</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <style>
+    body { font-family: var(--font-body); background: var(--bg); padding: 32px; }
+    h1   { font-size: 20px; font-weight: 600; margin-bottom: 24px; color: var(--navy-900); }
+    .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .admin-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .admin-card h2 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--navy-700); }
+    .admin-card p  { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+    .btn {
+      display: inline-block; padding: 7px 16px;
+      background: var(--navy-900); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      font-family: var(--font-body); font-size: 12px;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .btn:hover { background: var(--navy-700); }
+    .result { margin-top: 10px; font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono); white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Resource Forecast — Admin</h1>
+  <p style="font-size:12px;color:var(--text-secondary);margin-bottom:24px">
+    All actions require the admin token in the Authorization header.
+    Use the API directly or via the buttons below.
+  </p>
+
+  <div class="admin-grid">
+
+    <div class="admin-card">
+      <h2>Import staff list</h2>
+      <p>Re-reads the staff list Excel file and updates the database. Rebuilds summary cache.</p>
+      <button class="btn" onclick="triggerImport('staff')">Run import</button>
+      <div class="result" id="result-staff"></div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Import Horizon projects</h2>
+      <p>Re-reads the Horizon export and updates project metadata. Does not affect allocations.</p>
+      <button class="btn" onclick="triggerImport('horizon')">Run import</button>
+      <div class="result" id="result-horizon"></div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Import PAR actuals</h2>
+      <p>Re-reads the PAR actuals export and updates inception-to-date figures.</p>
+      <button class="btn" onclick="triggerImport('par')">Run import</button>
+      <div class="result" id="result-par"></div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Rebuild summary cache</h2>
+      <p>Forces a full rebuild of the dashboard summary JSON. Runs automatically after imports.</p>
+      <button class="btn" onclick="rebuildSummary()">Rebuild</button>
+      <div class="result" id="result-rebuild"></div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Conflict flags</h2>
+      <p>Projects flagged due to duplicate filenames with placeholder project numbers.</p>
+      <button class="btn" onclick="loadConflicts()">View conflicts</button>
+      <div class="result" id="result-conflicts"></div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Start date changes</h2>
+      <p>Projects where the CTC start date was changed after initial setup.</p>
+      <button class="btn" onclick="loadStartDateChanges()">View changes</button>
+      <div class="result" id="result-startdates"></div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Import log</h2>
+      <p>Recent import runs with row counts and any errors.</p>
+      <button class="btn" onclick="loadImportLog()">View log</button>
+      <div class="result" id="result-log"></div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Configuration</h2>
+      <p>Current server configuration (non-sensitive settings only).</p>
+      <button class="btn" onclick="loadConfig()">View config</button>
+      <div class="result" id="result-config"></div>
+    </div>
+
+  </div>
+
+  <script>
+    const TOKEN = prompt("Enter admin token:") || "";
+
+    function headers() {
+      return { "Authorization": `Bearer ${TOKEN}`, "Content-Type": "application/json" };
+    }
+
+    async function triggerImport(type) {
+      const el = document.getElementById(`result-${type}`);
+      el.textContent = "Running...";
+      try {
+        const r = await fetch(`/admin/import/${type}`, {
+          method: "POST", headers: headers(), body: JSON.stringify({})
+        });
+        const d = await r.json();
+        el.textContent = r.ok
+          ? `✓ ${d.rows_processed} processed, ${d.rows_inserted} inserted, ${d.rows_updated} updated`
+            + (d.errors?.length ? `\n⚠ ${d.errors.length} errors` : "")
+          : `✗ ${d.error}`;
+      } catch(e) { el.textContent = `✗ ${e.message}`; }
+    }
+
+    async function rebuildSummary() {
+      const el = document.getElementById("result-rebuild");
+      el.textContent = "Rebuilding...";
+      try {
+        const r = await fetch("/admin/rebuild-summary", { method: "POST", headers: headers() });
+        const d = await r.json();
+        el.textContent = r.ok ? `✓ Rebuilt at ${d.rebuilt_at}` : `✗ ${d.error}`;
+      } catch(e) { el.textContent = `✗ ${e.message}`; }
+    }
+
+    async function loadConflicts() {
+      const el = document.getElementById("result-conflicts");
+      el.textContent = "Loading...";
+      try {
+        const r = await fetch("/admin/conflicts", { headers: headers() });
+        const d = await r.json();
+        el.textContent = d.length === 0
+          ? "✓ No conflicts"
+          : d.map(p => `${p.project_number} — ${p.file_path}`).join("\n");
+      } catch(e) { el.textContent = `✗ ${e.message}`; }
+    }
+
+    async function loadStartDateChanges() {
+      const el = document.getElementById("result-startdates");
+      el.textContent = "Loading...";
+      try {
+        const r = await fetch("/admin/start-date-changes", { headers: headers() });
+        const d = await r.json();
+        el.textContent = d.length === 0
+          ? "✓ No pending changes"
+          : d.map(p => `${p.project_name}\n  ${p.previous_ctc_start_date} → ${p.ctc_start_date}`).join("\n\n");
+      } catch(e) { el.textContent = `✗ ${e.message}`; }
+    }
+
+    async function loadImportLog() {
+      const el = document.getElementById("result-log");
+      el.textContent = "Loading...";
+      try {
+        const r = await fetch("/admin/import-log", { headers: headers() });
+        const d = await r.json();
+        el.textContent = d.slice(0, 10).map(row =>
+          `${row.import_type} | ${row.completed_at?.slice(0,16)} | `
+          + `${row.rows_processed} rows | ${row.errors?.length ?? 0} errors`
+        ).join("\n");
+      } catch(e) { el.textContent = `✗ ${e.message}`; }
+    }
+
+    async function loadConfig() {
+      const el = document.getElementById("result-config");
+      el.textContent = "Loading...";
+      try {
+        const r = await fetch("/admin/config", { headers: headers() });
+        const d = await r.json();
+        el.textContent = Object.entries(d)
+          .map(([k, v]) => `${k}: ${v}`).join("\n");
+      } catch(e) { el.textContent = `✗ ${e.message}`; }
+    }
+  </script>
+</body>
+</html>
