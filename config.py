@@ -84,7 +84,7 @@ ADMIN_TOKEN = os.environ.get("RF_ADMIN_TOKEN", "")
 # ---------------------------------------------------------------------------
 STAFF_LIST_PATH = Path(os.environ.get(
     "RF_STAFF_LIST_PATH",
-    r"C:\Users\UKCMH001\Dev\new-ctc-system\source-data\UK010117_Staff_List.xlsx"
+    str(BASE_DIR / "source-data" / "UK010117_Staff_List.xlsx")
 ))
 
 
@@ -94,7 +94,7 @@ STAFF_LIST_PATH = Path(os.environ.get(
 # Toggle between modes with RF_PAR_USE_SHAREPOINT in your .env file.
 PAR_ACTUALS_PATH = Path(os.environ.get(
     "RF_PAR_ACTUALS_PATH",
-    r"C:\Users\UKCMH001\Dev\new-ctc-system\source-data"
+    str(BASE_DIR / "source-data")
 ))
 
 # Set to "true" in .env to fetch PAR directly from SharePoint instead of local file.
