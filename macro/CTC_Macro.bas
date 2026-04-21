@@ -16,27 +16,26 @@ Private Const API_BASE As String = "http://localhost:5000"
 Private Const CELL_START_DATE      As String = "E1"
 Private Const CELL_PROJECT_NUMBER  As String = "B3"
 Private Const CELL_TASK_ORDER      As String = "B4"
-Private Const CELL_OFFICE          As String = "B5"
-Private Const CELL_ORGANISATION    As String = "B6"
-Private Const CELL_CUSTOMER        As String = "B7"
-Private Const CELL_PROJECT_NAME    As String = "B8"
-Private Const CELL_TASK_NAME       As String = "B9"
-Private Const CELL_DIRECTOR        As String = "B10"
-Private Const CELL_MANAGER         As String = "B11"
-Private Const CELL_LAST_UPDATED_BY As String = "B12"
+Private Const CELL_ORGANISATION    As String = "B5"
+Private Const CELL_CUSTOMER        As String = "B6"
+Private Const CELL_PROJECT_NAME    As String = "B7"
+Private Const CELL_TASK_NAME       As String = "B8"
+Private Const CELL_DIRECTOR        As String = "B9"
+Private Const CELL_MANAGER         As String = "B10"
+Private Const CELL_LAST_UPDATED_BY As String = "B11"
 Private Const CELL_FILE_PATH       As String = "A13"   ' Hidden
 
 ' Allocation grid
 Private Const HEADER_ROW       As Long = 16   ' Column header row
-Private Const WORKING_DAYS_ROW As Long = 14
+Private Const WORKING_DAYS_ROW As Long = 15
+Private Const MONTH_HDR_ROW    As Long = 14
 Private Const FIRST_DATA_ROW   As Long = 17
 Private Const LAST_DATA_ROW    As Long = 56
 Private Const COL_HORIZON_ID   As Long = 1    ' A (hidden)
 Private Const COL_NAME         As Long = 2    ' B
-Private Const COL_GRADE        As Long = 3    ' C
-Private Const COL_TEAM         As Long = 4    ' D
-Private Const COL_DISCIPLINE   As Long = 5    ' E
-Private Const ALLOC_FIRST_COL  As Long = 6    ' F = first month
+Private Const COL_JOB_TITLE    As Long = 3    ' C
+Private Const COL_JOB_FUNC     As Long = 4    ' D
+Private Const ALLOC_FIRST_COL  As Long = 5    ' E = first month
 
 
 ' =============================================================================
@@ -73,10 +72,10 @@ Public Sub OnBeforeSave(Cancel As Boolean)
     ' --- Validate required fields -------------------------------------------
 
     Dim officeVal As String
-    officeVal = Trim(GetCell(CELL_OFFICE))
+    officeVal = Trim(GetCell(CELL_ORGANISATION))
     If officeVal = "" Then
         MsgBox "Please select an Office before saving.", vbExclamation, "Save blocked"
-        ws.Range(CELL_OFFICE).Select
+        ws.Range(CELL_ORGANISATION).Select
         Cancel = True
         Exit Sub
     End If
@@ -156,9 +155,9 @@ Public Sub OnNameSelected(ws As Worksheet, changedCell As Range)
 
     If selectedName = "" Then
         ws.Cells(changedCell.Row, COL_HORIZON_ID).Value = ""
-        ws.Cells(changedCell.Row, COL_GRADE).Value      = ""
-        ws.Cells(changedCell.Row, COL_TEAM).Value       = ""
-        ws.Cells(changedCell.Row, COL_DISCIPLINE).Value = ""
+        ws.Cells(changedCell.Row, COL_JOB_TITLE).Value      = ""
+        ws.Cells(changedCell.Row, COL_JOB_FUNC).Value       = ""
+        ws.Cells(changedCell.Row, COL_JOB_FUNC).Value = ""
         GoTo Reprotect
     End If
 
@@ -180,9 +179,9 @@ Public Sub OnNameSelected(ws As Worksheet, changedCell As Range)
     For i = 2 To lastRow  ' Row 1 is headers
         If wsData.Cells(i, 2).Value = selectedName Then
             ws.Cells(changedCell.Row, COL_HORIZON_ID).Value = wsData.Cells(i, 1).Value
-            ws.Cells(changedCell.Row, COL_GRADE).Value      = wsData.Cells(i, 3).Value
-            ws.Cells(changedCell.Row, COL_TEAM).Value       = wsData.Cells(i, 4).Value
-            ws.Cells(changedCell.Row, COL_DISCIPLINE).Value = wsData.Cells(i, 5).Value
+            ws.Cells(changedCell.Row, COL_JOB_TITLE).Value      = wsData.Cells(i, 3).Value
+            ws.Cells(changedCell.Row, COL_JOB_FUNC).Value       = wsData.Cells(i, 4).Value
+            ws.Cells(changedCell.Row, COL_JOB_FUNC).Value = wsData.Cells(i, 5).Value
             Exit For
         End If
     Next i
@@ -263,7 +262,7 @@ Private Sub PopulateOfficeDropdown()
     Set ws = ThisWorkbook.Sheets("Resources")
     ws.Unprotect Password:="Cyberdyne"
 
-    With ws.Range(CELL_OFFICE).Validation
+    With ws.Range(CELL_ORGANISATION).Validation
         .Delete
         .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
              Formula1:="""" & Join(items, ",") & """"
@@ -280,7 +279,7 @@ Private Sub PopulateTeamDropdown()
 
     Dim url As String
     Dim officeVal As String
-    officeVal = Trim(GetCell(CELL_OFFICE))
+    officeVal = Trim(GetCell(CELL_ORGANISATION))
 
     If officeVal <> "" Then
         url = API_BASE & "/api/teams?office=" & URLEncode(officeVal)
@@ -301,7 +300,7 @@ Private Sub PopulateTeamDropdown()
     ws.Unprotect Password:="Cyberdyne"
 
     ' Team dropdown applies to the header office/team row AND each staff row team col
-    With ws.Range(CELL_OFFICE).Offset(0, 0).Validation  ' placeholder - team is in staff rows
+    With ws.Range(CELL_ORGANISATION).Offset(0, 0).Validation  ' placeholder - team is in staff rows
         ' Team in header
     End With
 
@@ -314,7 +313,7 @@ End Sub
 Private Sub PopulateStaffDropdown()
 
     Dim officeVal As String
-    officeVal = Trim(GetCell(CELL_OFFICE))
+    officeVal = Trim(GetCell(CELL_ORGANISATION))
 
     Dim url As String
     If officeVal <> "" Then
@@ -392,7 +391,7 @@ Private Sub HighlightCurrentMonth()
     For col = ALLOC_FIRST_COL To ALLOC_FIRST_COL + 35
         Dim hdr As String
         Dim hdrDate As Variant
-        hdrDate = ws.Cells(15, col).Value
+        hdrDate = ws.Cells(MONTH_HDR_ROW, col).Value
         If IsDate(hdrDate) Then
             hdr = monthNames(Month(hdrDate) - 1) & "-" & Right(CStr(Year(hdrDate)), 2)
             If hdr = today Then
@@ -468,7 +467,7 @@ Private Function BuildPushJSON() As String
 
         For c = ALLOC_FIRST_COL To ALLOC_FIRST_COL + 35
             Dim hdrDate As Variant
-            hdrDate = ws.Cells(15, c).Value
+            hdrDate = ws.Cells(MONTH_HDR_ROW, c).Value
             If Not IsDate(hdrDate) Then GoTo SkipCol
 
             Dim periodISO As String
@@ -492,13 +491,12 @@ SkipRow:
 
     BuildPushJSON = "{" & _
         """file_path"":"""            & JsonEscape(ws.Range("CTC_FilePath").Value)      & """," & _
-        """office"":"""               & JsonEscape(GetCell(CELL_OFFICE))                & """," & _
+        """office"":"""               & JsonEscape(GetCell(CELL_ORGANISATION))                & """," & _
         """project_number"":"""       & JsonEscape(GetCell(CELL_PROJECT_NUMBER))        & """," & _
         """task_order_number"":"""    & JsonEscape(GetCell(CELL_TASK_ORDER))            & """," & _
         """project_name"":"""         & JsonEscape(GetCell(CELL_PROJECT_NAME))          & """," & _
         """task_name"":"""            & JsonEscape(GetCell(CELL_TASK_NAME))             & """," & _
         """project_organisation"":""" & JsonEscape(GetCell(CELL_ORGANISATION))         & """," & _
-        """staff_team"":"""           & JsonEscape(GetCell(CELL_OFFICE))                & """," & _
         """project_director"":"""     & JsonEscape(GetCell(CELL_DIRECTOR))              & """," & _
         """project_manager"":"""      & JsonEscape(GetCell(CELL_MANAGER))               & """," & _
         """last_updated_by"":"""      & JsonEscape(Application.UserName)               & """," & _
@@ -580,12 +578,11 @@ End Function
 
 Private Function WriteStaffData(wsData As Worksheet, json As String) As Long
 
-    Dim fields(4) As String
+    Dim fields(3) As String
     fields(0) = "horizon_person_number"
     fields(1) = "name"
-    fields(2) = "technical_grade"
-    fields(3) = "staff_team"
-    fields(4) = "discipline"
+    fields(2) = "job_title"
+    fields(3) = "job_function"
 
     Dim rowNum As Long
     rowNum = 0
@@ -602,7 +599,7 @@ Private Function WriteStaffData(wsData As Worksheet, json As String) As Long
         obj = Mid(json, pos, objEnd - pos + 1)
 
         Dim f As Long
-        For f = 0 To 4
+        For f = 0 To 3
             Dim s As String
             Dim fStart As Long
             Dim fEnd As Long
