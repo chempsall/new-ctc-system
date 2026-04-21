@@ -277,7 +277,9 @@ def api_push():
 
     file_path      = data["file_path"]
     file_name      = os.path.basename(file_path)
-    department     = data.get("department") or data.get("office", "")
+    # Department is derived from project_organisation (from PAR data)
+    # not sent by the macro — it's the Horizon organisation that owns the project
+    department     = data.get("project_organisation", "")
     project_number = data.get("project_number", "").strip()
     task_order     = data.get("task_order_number", "").strip()
     ctc_start_date = data.get("ctc_start_date")
@@ -611,7 +613,6 @@ def _resolve_staff_id(cursor, name_string):
 
 def create_app():
     database.initialise_database()
-    summary_module.build()
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(

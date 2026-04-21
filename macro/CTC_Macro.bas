@@ -10,9 +10,10 @@ Option Explicit
 ' ---------------------------------------------------------------------------
 ' CONFIGURATION
 ' ---------------------------------------------------------------------------
-Private Const API_BASE As String = "http://localhost:5000"
+Private Const API_BASE   As String = "http://localhost:5000"
+Private Const PASSWORD   As String = "Cyberdyne"
 
-' Cell addresses (named ranges preferred, direct refs as fallback)
+' Header cell addresses
 Private Const CELL_START_DATE      As String = "E1"
 Private Const CELL_PROJECT_NUMBER  As String = "B3"
 Private Const CELL_TASK_ORDER      As String = "B4"
@@ -23,38 +24,31 @@ Private Const CELL_TASK_NAME       As String = "B8"
 Private Const CELL_DIRECTOR        As String = "B9"
 Private Const CELL_MANAGER         As String = "B10"
 Private Const CELL_LAST_UPDATED_BY As String = "B11"
-Private Const CELL_FILE_PATH       As String = "A13"   ' Hidden
+Private Const CELL_FILE_PATH       As String = "A13"
 
-' Allocation grid
-Private Const HEADER_ROW       As Long = 16   ' Column header row
-Private Const WORKING_DAYS_ROW As Long = 15
+' Staff grid layout
 Private Const MONTH_HDR_ROW    As Long = 14
+Private Const WORKING_DAYS_ROW As Long = 15
+Private Const HEADER_ROW       As Long = 16
 Private Const FIRST_DATA_ROW   As Long = 17
 Private Const LAST_DATA_ROW    As Long = 56
-Private Const COL_HORIZON_ID   As Long = 1    ' A (hidden)
-Private Const COL_NAME         As Long = 2    ' B
-Private Const COL_JOB_TITLE    As Long = 3    ' C
-Private Const COL_JOB_FUNC     As Long = 4    ' D
-Private Const ALLOC_FIRST_COL  As Long = 5    ' E = first month
+Private Const COL_HORIZON_ID   As Long = 1   ' A (hidden)
+Private Const COL_NAME         As Long = 2   ' B
+Private Const COL_JOB_TITLE    As Long = 3   ' C
+Private Const COL_JOB_FUNC     As Long = 4   ' D
+Private Const ALLOC_FIRST_COL  As Long = 5   ' E - first month
+Private Const NUM_MONTHS       As Long = 36
 
 
 ' =============================================================================
 ' ON OPEN
+' Called from ThisWorkbook.Workbook_Open
 ' =============================================================================
 
 Public Sub OnOpen()
 
-    SetCell CELL_FILE_PATH,       ThisWorkbook.FullName
-    SetCell CELL_LAST_UPDATED_BY, Application.UserName
-
-    ' Populate dropdowns from API
-    PopulateOfficeDropdown
-    PopulateTeamDropdown
     PopulateStaffDropdown
-
-    ' Highlight current month column
     HighlightCurrentMonth
-
     Application.StatusBar = False
 
 End Sub
@@ -62,6 +56,7 @@ End Sub
 
 ' =============================================================================
 ' BEFORE SAVE
+' Called from ThisWorkbook.Workbook_BeforeSave
 ' =============================================================================
 
 Public Sub OnBeforeSave(Cancel As Boolean)
@@ -69,65 +64,54 @@ Public Sub OnBeforeSave(Cancel As Boolean)
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
 
-    ' --- Validate required fields -------------------------------------------
-
-    Dim officeVal As String
-    officeVal = Trim(GetCell(CELL_ORGANISATION))
-    If officeVal = "" Then
-        MsgBox "Please select an Office before saving.", vbExclamation, "Save blocked"
-        ws.Range(CELL_ORGANISATION).Select
-        Cancel = True
-        Exit Sub
-    End If
-
-    Dim startDateVal As Variant
-    startDateVal = ws.Range(CELL_START_DATE).Value
-    If IsEmpty(startDateVal) Or startDateVal = "" Then
+    ' --- Validate CTCStartDate -------------------------------------------
+    Dim startDate As Variant
+    startDate = ws.Range(CELL_START_DATE).Value
+    If IsEmpty(startDate) Or startDate = "" Then
         MsgBox "Please set the CTC Start Date before saving." & vbCrLf & _
-               "Enter as a date in the yellow cell (top right).", _
+               "Enter a date in the yellow cell (top right).", _
                vbExclamation, "Save blocked"
         ws.Range(CELL_START_DATE).Select
         Cancel = True
         Exit Sub
     End If
 
-    ' --- Warn about placeholder project number (non-blocking) ---------------
-
+    ' --- Validate Project Number ----------------------------------------
     Dim projNum As String
     projNum = Trim(GetCell(CELL_PROJECT_NUMBER))
-    If IsPlaceholder(projNum) Then
-        MsgBox "Reminder: project number (" & projNum & ") looks like a placeholder." & vbCrLf & _
-               "Update it with the Horizon number when it is available." & vbCrLf & _
-               "The file will save normally.", vbInformation, "Project number reminder"
+    If projNum = "" Then
+        MsgBox "Please enter a Project Number before saving.", _
+               vbExclamation, "Save blocked"
+        ws.Range(CELL_PROJECT_NUMBER).Select
+        Cancel = True
+        Exit Sub
     End If
 
-    ' --- Lookup Horizon record if not already populated ---------------------
-    ' Only triggers if project name is still showing default value
+    ' --- Warn about placeholder (non-blocking) --------------------------
+    If IsPlaceholder(projNum) Then
+        MsgBox "Reminder: project number (" & projNum & ") looks like a placeholder." & vbCrLf & _
+               "Update it with the Horizon number when available." & vbCrLf & _
+               "The file will save normally.", vbInformation, "Project number"
+    End If
+
+    ' --- Look up Horizon record if not yet populated --------------------
     If GetCell(CELL_PROJECT_NAME) = "No Horizon Record Found" _
        Or GetCell(CELL_PROJECT_NAME) = "" Then
-        If projNum <> "" And Not IsPlaceholder(projNum) Then
-            LookupProjectFromAPI projNum, Trim(GetCell(CELL_TASK_ORDER))
+        Dim taskOrder As String
+        taskOrder = Trim(GetCell(CELL_TASK_ORDER))
+        If projNum <> "" And taskOrder <> "" And Not IsPlaceholder(projNum) Then
+            LookupProject projNum, taskOrder
         End If
     End If
 
-    ' --- Update macro-owned fields ------------------------------------------
+    ' --- Write macro-owned fields ---------------------------------------
+    ws.Unprotect Password:=PASSWORD
+    ws.Range(CELL_LAST_UPDATED_BY).Value = Application.UserName
+    ws.Range(CELL_FILE_PATH).Value       = ThisWorkbook.FullName
+    ws.Protect Password:=PASSWORD, Contents:=True, _
+        DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
-    ' Unprotect to write macro fields
-    ws.Unprotect Password:="Cyberdyne"
-
-    SetCell CELL_LAST_UPDATED_BY, Application.UserName
-    SetCell CELL_FILE_PATH,       ThisWorkbook.FullName
-
-    ws.Protect Password:="Cyberdyne", _
-        DrawingObjects:=True, Contents:=True, Scenarios:=True, _
-        AllowFormattingCells:=False, AllowFormattingColumns:=False, _
-        AllowFormattingRows:=False, AllowInsertingColumns:=False, _
-        AllowInsertingRows:=False, AllowDeletingColumns:=False, _
-        AllowDeletingRows:=False, AllowSorting:=False, _
-        AllowFiltering:=False, UserInterfaceOnly:=True
-
-    ' --- Push to server -----------------------------------------------------
-
+    ' --- Push to server -------------------------------------------------
     If Not PushToAPI() Then
         MsgBox "Could not connect to the resource forecast server." & vbCrLf & _
                "The file has been saved locally." & vbCrLf & _
@@ -139,25 +123,25 @@ End Sub
 
 
 ' =============================================================================
-' NAME SELECTED — fires when a name is picked in the allocation grid
+' NAME SELECTED
+' Called from ThisWorkbook.Workbook_SheetChange
+' Fires when a name is selected in the staff grid (column B)
 ' =============================================================================
 
 Public Sub OnNameSelected(ws As Worksheet, changedCell As Range)
 
     If changedCell.Column <> COL_NAME Then Exit Sub
-    If changedCell.Row <= HEADER_ROW Then Exit Sub
-    If changedCell.Row > LAST_DATA_ROW Then Exit Sub
+    If changedCell.Row < FIRST_DATA_ROW Or changedCell.Row > LAST_DATA_ROW Then Exit Sub
 
     Dim selectedName As String
     selectedName = Trim(changedCell.Value)
 
-    ws.Unprotect Password:="Cyberdyne"
+    ws.Unprotect Password:=PASSWORD
 
     If selectedName = "" Then
         ws.Cells(changedCell.Row, COL_HORIZON_ID).Value = ""
-        ws.Cells(changedCell.Row, COL_JOB_TITLE).Value      = ""
-        ws.Cells(changedCell.Row, COL_JOB_FUNC).Value       = ""
-        ws.Cells(changedCell.Row, COL_JOB_FUNC).Value = ""
+        ws.Cells(changedCell.Row, COL_JOB_TITLE).Value  = ""
+        ws.Cells(changedCell.Row, COL_JOB_FUNC).Value   = ""
         GoTo Reprotect
     End If
 
@@ -176,31 +160,28 @@ Public Sub OnNameSelected(ws As Worksheet, changedCell As Range)
     lastRow = wsData.Cells(wsData.Rows.Count, 2).End(xlUp).Row
 
     Dim i As Long
-    For i = 2 To lastRow  ' Row 1 is headers
+    For i = 2 To lastRow
         If wsData.Cells(i, 2).Value = selectedName Then
             ws.Cells(changedCell.Row, COL_HORIZON_ID).Value = wsData.Cells(i, 1).Value
-            ws.Cells(changedCell.Row, COL_JOB_TITLE).Value      = wsData.Cells(i, 3).Value
-            ws.Cells(changedCell.Row, COL_JOB_FUNC).Value       = wsData.Cells(i, 4).Value
-            ws.Cells(changedCell.Row, COL_JOB_FUNC).Value = wsData.Cells(i, 5).Value
+            ws.Cells(changedCell.Row, COL_JOB_TITLE).Value  = wsData.Cells(i, 3).Value
+            ws.Cells(changedCell.Row, COL_JOB_FUNC).Value   = wsData.Cells(i, 4).Value
             Exit For
         End If
     Next i
 
 Reprotect:
-    ws.Protect Password:="Cyberdyne", _
-        DrawingObjects:=True, Contents:=True, Scenarios:=True, _
-        UserInterfaceOnly:=True
+    ws.Protect Password:=PASSWORD, Contents:=True, _
+        DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
 End Sub
 
 
 ' =============================================================================
 ' PROJECT LOOKUP
+' Calls API to get project details by number and task order
 ' =============================================================================
 
-Private Sub LookupProjectFromAPI(projNum As String, taskOrder As String)
-
-    If projNum = "" Or taskOrder = "" Then Exit Sub
+Private Sub LookupProject(projNum As String, taskOrder As String)
 
     Dim url As String
     url = API_BASE & "/api/project?project_number=" & URLEncode(projNum) & _
@@ -210,120 +191,43 @@ Private Sub LookupProjectFromAPI(projNum As String, taskOrder As String)
     data = HttpGet(url)
     If data = "" Then Exit Sub
 
-    ' Parse JSON response and populate blue cells
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
+    ws.Unprotect Password:=PASSWORD
 
-    ws.Unprotect Password:="Cyberdyne"
+    Dim v As String
+    v = ParseJsonField(data, "project_name")
+    If v <> "" Then ws.Range(CELL_PROJECT_NAME).Value = v
 
-    Dim projName As String
-    Dim taskName As String
-    Dim org      As String
-    Dim customer As String
-    Dim director As String
-    Dim manager  As String
+    v = ParseJsonField(data, "task_name")
+    If v <> "" Then ws.Range(CELL_TASK_NAME).Value = v
 
-    projName = ParseJsonField(data, "project_name")
-    taskName = ParseJsonField(data, "task_name")
-    org      = ParseJsonField(data, "project_organisation")
-    customer = ParseJsonField(data, "project_customer")
-    director = ParseJsonField(data, "project_director")
-    manager  = ParseJsonField(data, "project_manager")
+    v = ParseJsonField(data, "project_organisation")
+    If v <> "" Then ws.Range(CELL_ORGANISATION).Value = v
 
-    If projName <> "" Then SetCell CELL_PROJECT_NAME, projName
-    If taskName <> "" Then SetCell CELL_TASK_NAME,    taskName
-    If org      <> "" Then SetCell CELL_ORGANISATION, org
-    If customer <> "" Then SetCell CELL_CUSTOMER,     customer
-    If director <> "" Then SetCell CELL_DIRECTOR,     director
-    If manager  <> "" Then SetCell CELL_MANAGER,      manager
+    v = ParseJsonField(data, "project_customer")
+    If v <> "" Then ws.Range(CELL_CUSTOMER).Value = v
 
-    ws.Protect Password:="Cyberdyne", _
-        DrawingObjects:=True, Contents:=True, Scenarios:=True, _
-        UserInterfaceOnly:=True
+    v = ParseJsonField(data, "project_director")
+    If v <> "" Then ws.Range(CELL_DIRECTOR).Value = v
+
+    v = ParseJsonField(data, "project_manager")
+    If v <> "" Then ws.Range(CELL_MANAGER).Value = v
+
+    ws.Protect Password:=PASSWORD, Contents:=True, _
+        DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
 End Sub
 
 
 ' =============================================================================
-' DROPDOWN POPULATION
+' STAFF DROPDOWN
 ' =============================================================================
-
-Private Sub PopulateOfficeDropdown()
-
-    Dim data As String
-    data = HttpGet(API_BASE & "/api/offices")
-    If data = "" Then Exit Sub
-
-    Dim items() As String
-    items = ParseStringArray(data, "office_name")
-    If Not IsArrayAllocated(items) Then Exit Sub
-
-    Dim ws As Worksheet
-    Set ws = ThisWorkbook.Sheets("Resources")
-    ws.Unprotect Password:="Cyberdyne"
-
-    With ws.Range(CELL_ORGANISATION).Validation
-        .Delete
-        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
-             Formula1:="""" & Join(items, ",") & """"
-        .ShowError = False
-    End With
-
-    ws.Protect Password:="Cyberdyne", DrawingObjects:=True, _
-        Contents:=True, Scenarios:=True, UserInterfaceOnly:=True
-
-End Sub
-
-
-Private Sub PopulateTeamDropdown()
-
-    Dim url As String
-    Dim officeVal As String
-    officeVal = Trim(GetCell(CELL_ORGANISATION))
-
-    If officeVal <> "" Then
-        url = API_BASE & "/api/teams?office=" & URLEncode(officeVal)
-    Else
-        url = API_BASE & "/api/teams"
-    End If
-
-    Dim data As String
-    data = HttpGet(url)
-    If data = "" Then Exit Sub
-
-    Dim items() As String
-    items = ParseStringArray(data, "team_name")
-    If Not IsArrayAllocated(items) Then Exit Sub
-
-    Dim ws As Worksheet
-    Set ws = ThisWorkbook.Sheets("Resources")
-    ws.Unprotect Password:="Cyberdyne"
-
-    ' Team dropdown applies to the header office/team row AND each staff row team col
-    With ws.Range(CELL_ORGANISATION).Offset(0, 0).Validation  ' placeholder - team is in staff rows
-        ' Team in header
-    End With
-
-    ws.Protect Password:="Cyberdyne", DrawingObjects:=True, _
-        Contents:=True, Scenarios:=True, UserInterfaceOnly:=True
-
-End Sub
-
 
 Private Sub PopulateStaffDropdown()
 
-    Dim officeVal As String
-    officeVal = Trim(GetCell(CELL_ORGANISATION))
-
-    Dim url As String
-    If officeVal <> "" Then
-        url = API_BASE & "/api/staff?office=" & URLEncode(officeVal)
-    Else
-        url = API_BASE & "/api/staff"
-    End If
-
     Dim data As String
-    data = HttpGet(url)
+    data = HttpGet(API_BASE & "/api/staff")
     If data = "" Then Exit Sub
 
     ' Write to hidden _StaffData sheet
@@ -341,21 +245,20 @@ Private Sub PopulateStaffDropdown()
         wsData.Cells.Clear
     End If
 
-    ' Headers
+    ' Headers in row 1
     wsData.Cells(1, 1).Value = "Horizon ID"
     wsData.Cells(1, 2).Value = "Name"
-    wsData.Cells(1, 3).Value = "Grade"
-    wsData.Cells(1, 4).Value = "Team"
-    wsData.Cells(1, 5).Value = "Discipline"
+    wsData.Cells(1, 3).Value = "Job Title"
+    wsData.Cells(1, 4).Value = "Job Function"
 
     Dim rowCount As Long
     rowCount = WriteStaffData(wsData, data)
     If rowCount = 0 Then Exit Sub
 
-    ' Apply name dropdown to staff grid
+    ' Apply dropdown to name column in staff grid
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
-    ws.Unprotect Password:="Cyberdyne"
+    ws.Unprotect Password:=PASSWORD
 
     With ws.Range(ws.Cells(FIRST_DATA_ROW, COL_NAME), _
                   ws.Cells(LAST_DATA_ROW, COL_NAME)).Validation
@@ -365,8 +268,8 @@ Private Sub PopulateStaffDropdown()
         .ShowError = False
     End With
 
-    ws.Protect Password:="Cyberdyne", DrawingObjects:=True, _
-        Contents:=True, Scenarios:=True, UserInterfaceOnly:=True
+    ws.Protect Password:=PASSWORD, Contents:=True, _
+        DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
 End Sub
 
@@ -375,7 +278,7 @@ Private Sub HighlightCurrentMonth()
 
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
-    ws.Unprotect Password:="Cyberdyne"
+    ws.Unprotect Password:=PASSWORD
 
     Dim monthNames(11) As String
     monthNames(0)  = "Jan": monthNames(1)  = "Feb": monthNames(2)  = "Mar"
@@ -388,14 +291,14 @@ Private Sub HighlightCurrentMonth()
 
     Dim col As Long
     Dim r As Long
-    For col = ALLOC_FIRST_COL To ALLOC_FIRST_COL + 35
-        Dim hdr As String
-        Dim hdrDate As Variant
-        hdrDate = ws.Cells(MONTH_HDR_ROW, col).Value
-        If IsDate(hdrDate) Then
-            hdr = monthNames(Month(hdrDate) - 1) & "-" & Right(CStr(Year(hdrDate)), 2)
-            If hdr = today Then
-                ws.Cells(15, col).Interior.Color = RGB(23, 55, 94)   ' darker blue
+    For col = ALLOC_FIRST_COL To ALLOC_FIRST_COL + NUM_MONTHS - 1
+        Dim hdrVal As Variant
+        hdrVal = ws.Cells(MONTH_HDR_ROW, col).Value
+        If IsDate(hdrVal) Then
+            Dim lbl As String
+            lbl = monthNames(Month(hdrVal) - 1) & "-" & Right(CStr(Year(hdrVal)), 2)
+            If lbl = today Then
+                ws.Cells(MONTH_HDR_ROW, col).Interior.Color = RGB(23, 55, 94)
                 For r = FIRST_DATA_ROW To LAST_DATA_ROW
                     ws.Cells(r, col).Interior.Color = RGB(220, 230, 241)
                 Next r
@@ -404,8 +307,8 @@ Private Sub HighlightCurrentMonth()
         End If
     Next col
 
-    ws.Protect Password:="Cyberdyne", DrawingObjects:=True, _
-        Contents:=True, Scenarios:=True, UserInterfaceOnly:=True
+    ws.Protect Password:=PASSWORD, Contents:=True, _
+        DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
 End Sub
 
@@ -417,25 +320,22 @@ End Sub
 Private Function PushToAPI() As Boolean
 
     PushToAPI = False
-    Dim jsonBody As String
-    jsonBody = BuildPushJSON()
-    If jsonBody = "" Then
+    Dim json As String
+    json = BuildPushJSON()
+    If json = "" Then
         PushToAPI = True
         Exit Function
     End If
 
-    On Error GoTo HttpError
+    On Error GoTo Fail
     Dim http As Object
     Set http = CreateObject("MSXML2.XMLHTTP")
     http.Open "POST", API_BASE & "/api/push", False
     http.setRequestHeader "Content-Type", "application/json"
-    http.send jsonBody
+    http.send json
     If http.Status = 200 Then PushToAPI = True
     Exit Function
-
-HttpError:
-    PushToAPI = False
-
+Fail:
 End Function
 
 
@@ -446,15 +346,14 @@ Private Function BuildPushJSON() As String
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
 
-    ' CTC start date from named range
+    ' Validate start date
     Dim startDate As Variant
-    startDate = ws.Range("CTCStartDate").Value
+    startDate = ws.Range(CELL_START_DATE).Value
     If Not IsDate(startDate) Then Exit Function
-
     Dim startISO As String
     startISO = Format(CDate(startDate), "yyyy-mm") & "-01"
 
-    ' Build allocations
+    ' Build allocations array
     Dim allocJSON As String
     allocJSON = ""
     Dim r As Long
@@ -463,15 +362,12 @@ Private Function BuildPushJSON() As String
     For r = FIRST_DATA_ROW To LAST_DATA_ROW
         Dim horizonID As String
         horizonID = Trim(CStr(ws.Cells(r, COL_HORIZON_ID).Value))
-        If horizonID = "" Then GoTo SkipRow
+        If horizonID = "" Then GoTo NextRow
 
-        For c = ALLOC_FIRST_COL To ALLOC_FIRST_COL + 35
-            Dim hdrDate As Variant
-            hdrDate = ws.Cells(MONTH_HDR_ROW, c).Value
-            If Not IsDate(hdrDate) Then GoTo SkipCol
-
-            Dim periodISO As String
-            periodISO = Format(CDate(hdrDate), "yyyy-mm-dd")
+        For c = ALLOC_FIRST_COL To ALLOC_FIRST_COL + NUM_MONTHS - 1
+            Dim hdrVal As Variant
+            hdrVal = ws.Cells(MONTH_HDR_ROW, c).Value
+            If Not IsDate(hdrVal) Then GoTo NextCol
 
             Dim days As Double
             days = 0
@@ -482,16 +378,15 @@ Private Function BuildPushJSON() As String
             If allocJSON <> "" Then allocJSON = allocJSON & ","
             allocJSON = allocJSON & "{" & _
                 """horizon_person_number"":""" & JsonEscape(horizonID) & """," & _
-                """period_start"":""" & periodISO & """," & _
+                """period_start"":""" & Format(CDate(hdrVal), "yyyy-mm-dd") & """," & _
                 """days"":" & Format(days, "0.##") & "}"
-SkipCol:
+NextCol:
         Next c
-SkipRow:
+NextRow:
     Next r
 
     BuildPushJSON = "{" & _
-        """file_path"":"""            & JsonEscape(ws.Range("CTC_FilePath").Value)      & """," & _
-        """office"":"""               & JsonEscape(GetCell(CELL_ORGANISATION))                & """," & _
+        """file_path"":"""            & JsonEscape(ws.Range(CELL_FILE_PATH).Value)      & """," & _
         """project_number"":"""       & JsonEscape(GetCell(CELL_PROJECT_NUMBER))        & """," & _
         """task_order_number"":"""    & JsonEscape(GetCell(CELL_TASK_ORDER))            & """," & _
         """project_name"":"""         & JsonEscape(GetCell(CELL_PROJECT_NAME))          & """," & _
@@ -527,55 +422,6 @@ End Function
 ' JSON HELPERS
 ' =============================================================================
 
-Private Function ParseStringArray(json As String, fieldName As String) As String()
-
-    Dim results() As String
-    ReDim results(0 To 200)
-    Dim count As Long
-    count = 0
-
-    Dim search As String
-    search = """" & fieldName & """:"""
-
-    Dim pos As Long
-    pos = 1
-
-    Do While count < 200
-        pos = InStr(pos, json, search)
-        If pos = 0 Then Exit Do
-        Dim vStart As Long
-        Dim vEnd As Long
-        vStart = pos + Len(search)
-        vEnd = InStr(vStart, json, """")
-        If vEnd = 0 Then Exit Do
-        results(count) = Mid(json, vStart, vEnd - vStart)
-        count = count + 1
-        pos = vEnd + 1
-    Loop
-
-    If count = 0 Then Exit Function
-    ReDim Preserve results(0 To count - 1)
-    ParseStringArray = results
-
-End Function
-
-
-Private Function ParseJsonField(json As String, fieldName As String) As String
-    ParseJsonField = ""
-    Dim search As String
-    search = """" & fieldName & """:"""
-    Dim pos As Long
-    pos = InStr(json, search)
-    If pos = 0 Then Exit Function
-    Dim vStart As Long
-    Dim vEnd As Long
-    vStart = pos + Len(search)
-    vEnd = InStr(vStart, json, """")
-    If vEnd = 0 Then Exit Function
-    ParseJsonField = Mid(json, vStart, vEnd - vStart)
-End Function
-
-
 Private Function WriteStaffData(wsData As Worksheet, json As String) As Long
 
     Dim fields(3) As String
@@ -590,7 +436,7 @@ Private Function WriteStaffData(wsData As Worksheet, json As String) As Long
     Dim pos As Long
     pos = InStr(json, "{")
 
-    Do While pos > 0 And rowNum < 200
+    Do While pos > 0 And rowNum < 300
         Dim objEnd As Long
         objEnd = InStr(pos, json, "}")
         If objEnd = 0 Then Exit Do
@@ -624,18 +470,25 @@ Private Function WriteStaffData(wsData As Worksheet, json As String) As Long
 End Function
 
 
-Private Function IsArrayAllocated(arr() As String) As Boolean
-    On Error Resume Next
-    IsArrayAllocated = (UBound(arr) >= 0)
-    If Err.Number <> 0 Then IsArrayAllocated = False
-    On Error GoTo 0
+Private Function ParseJsonField(json As String, fieldName As String) As String
+    ParseJsonField = ""
+    If json = "" Then Exit Function
+    Dim search As String
+    search = """" & fieldName & """:"""
+    Dim pos As Long
+    pos = InStr(json, search)
+    If pos = 0 Then Exit Function
+    Dim vStart As Long
+    Dim vEnd As Long
+    vStart = pos + Len(search)
+    vEnd = InStr(vStart, json, """")
+    If vEnd = 0 Then Exit Function
+    ParseJsonField = Mid(json, vStart, vEnd - vStart)
 End Function
 
 
 Private Function IsPlaceholder(s As String) As Boolean
-    Dim c As String
-    c = LCase(Trim(s))
-    Select Case c
+    Select Case LCase(Trim(s))
         Case "", "tbc", "tbd", "n/a", "na"
             IsPlaceholder = True
         Case Else
