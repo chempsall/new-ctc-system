@@ -308,7 +308,12 @@ a:hover { text-decoration: underline; }
 /* --------------------------------------------------------------------------
    Staff allocation table
    -------------------------------------------------------------------------- */
-.staff-table { width: 100%; border-collapse: collapse; }
+.staff-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.staff-table th:nth-child(1) { width: 35% } /* Name */
+.staff-table th:nth-child(2) { width: 18% } /* Job Function */
+.staff-table th:nth-child(3) { width: 22% } /* Allocated */
+.staff-table th:nth-child(4) { width: 17% } /* Capacity */
+.staff-table th:nth-child(5) { width: 8% } /* Status */
 
 .staff-table th {
   padding: 8px 12px;

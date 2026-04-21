@@ -144,55 +144,66 @@ def api_summary():
 
 
 @app.route("/api/offices")
+@app.route("/api/departments")
 def api_offices():
+    """Returns distinct departments from staff. Supports /api/offices
+    for macro backwards compatibility."""
     conn = database.get_connection()
-    rows = conn.execute(
-        "SELECT office_name, office_code FROM offices WHERE active=1 ORDER BY office_name"
-    ).fetchall()
+    rows = conn.execute("""
+        SELECT DISTINCT department
+        FROM staff
+        WHERE department IS NOT NULL
+        ORDER BY department
+    """).fetchall()
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    return jsonify([{"office_name": r["department"],
+                     "department":  r["department"]} for r in rows])
 
 
 @app.route("/api/teams")
+@app.route("/api/job-functions")
 def api_teams():
-    office = request.args.get("office")
-    conn   = database.get_connection()
-    if office:
+    """Returns distinct job functions (disciplines) from staff.
+    Supports /api/teams for macro backwards compatibility."""
+    department = request.args.get("office") or request.args.get("department")
+    conn = database.get_connection()
+    if department:
         rows = conn.execute("""
-            SELECT t.team_name, o.office_name
-            FROM teams t JOIN offices o ON o.office_id = t.office_id
-            WHERE o.office_name = ? AND t.active = 1
-            ORDER BY t.team_name
-        """, (office,)).fetchall()
+            SELECT DISTINCT job_function
+            FROM staff
+            WHERE job_function IS NOT NULL AND department = ?
+            ORDER BY job_function
+        """, (department,)).fetchall()
     else:
         rows = conn.execute("""
-            SELECT t.team_name, o.office_name
-            FROM teams t JOIN offices o ON o.office_id = t.office_id
-            WHERE t.active = 1
-            ORDER BY o.office_name, t.team_name
+            SELECT DISTINCT job_function
+            FROM staff
+            WHERE job_function IS NOT NULL
+            ORDER BY job_function
         """).fetchall()
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    return jsonify([{"team_name":    r["job_function"],
+                     "job_function": r["job_function"]} for r in rows])
 
 
 @app.route("/api/staff")
 def api_staff():
     """Staff list for macro dropdowns. No financial data."""
-    office = request.args.get("office")
+    department = request.args.get("office") or request.args.get("department")
     today  = datetime.now(timezone.utc).date().isoformat()
     conn   = database.get_connection()
-    if office:
+    if department:
         rows = conn.execute("""
-            SELECT horizon_person_number, name, technical_grade,
-                   staff_team, discipline, office
+            SELECT horizon_person_number, name, job_title, job_family,
+                   job_function, department
             FROM staff
-            WHERE office = ? AND (end_date IS NULL OR end_date > ?)
+            WHERE department = ? AND (end_date IS NULL OR end_date > ?)
             ORDER BY name
-        """, (office, today)).fetchall()
+        """, (department, today)).fetchall()
     else:
         rows = conn.execute("""
-            SELECT horizon_person_number, name, technical_grade,
-                   staff_team, discipline, office
+            SELECT horizon_person_number, name, job_title, job_family,
+                   job_function, department
             FROM staff
             WHERE end_date IS NULL OR end_date > ?
             ORDER BY name
@@ -200,6 +211,42 @@ def api_staff():
     conn.close()
     return jsonify([dict(r) for r in rows])
 
+
+
+
+# ---------------------------------------------------------------------------
+# PROJECT LOOKUP ENDPOINT
+# ---------------------------------------------------------------------------
+
+@app.route("/api/project")
+def api_project():
+    """
+    Returns project metadata for a given project_number + task_order_number.
+    Called by the macro when project number and task order are entered.
+    Returns project details from the PAR-populated projects table.
+    Returns empty object {} if not found.
+    """
+    project_number    = request.args.get("project_number", "").strip()
+    task_order_number = request.args.get("task_order_number", "").strip()
+
+    if not project_number or not task_order_number:
+        return jsonify({})
+
+    conn = database.get_connection()
+    row  = conn.execute("""
+        SELECT project_number, task_order_number, project_name, task_name,
+               project_organisation, project_customer, project_director,
+               project_manager, project_status, project_type,
+               task_start_date, task_end_date
+        FROM projects
+        WHERE project_number = ? AND task_order_number = ?
+    """, (project_number, task_order_number)).fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({})
+
+    return jsonify(dict(row))
 
 # ---------------------------------------------------------------------------
 # MACRO PUSH ENDPOINT
@@ -223,18 +270,17 @@ def api_push():
     if not data:
         return jsonify({"error": "No JSON body"}), 400
 
-    missing = [f for f in ["file_path", "office", "ctc_start_date", "allocations"]
+    missing = [f for f in ["file_path", "ctc_start_date", "allocations"]
                if f not in data]
     if missing:
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
 
     file_path      = data["file_path"]
     file_name      = os.path.basename(file_path)
-    office         = data["office"]
+    department     = data.get("department") or data.get("office", "")
     project_number = data.get("project_number", "").strip()
     task_order     = data.get("task_order_number", "").strip()
     ctc_start_date = data.get("ctc_start_date")
-    staff_team     = data.get("staff_team", "")
 
     conn = database.get_connection()
     c    = conn.cursor()
@@ -325,13 +371,13 @@ def api_push():
             )
         c.execute("""
             UPDATE ctc_files SET
-                project_id=?, office=?, staff_team=?, ctc_start_date=?,
+                project_id=?, department=?, ctc_start_date=?,
                 conflict_flag=?, start_date_changed=?,
                 previous_ctc_start_date = CASE WHEN ? THEN ? ELSE previous_ctc_start_date END,
                 last_pushed=?, last_updated_by=?
             WHERE ctc_id=?
         """, (
-            project_id, office, staff_team, ctc_start_date,
+            project_id, department, ctc_start_date,
             1 if conflict else 0,
             1 if start_date_changed else 0,
             start_date_changed, previous_start,
@@ -341,12 +387,12 @@ def api_push():
     else:
         c.execute("""
             INSERT INTO ctc_files (
-                project_id, office, staff_team, ctc_start_date,
+                project_id, department, ctc_start_date,
                 file_path, conflict_flag, start_date_changed,
                 last_pushed, last_updated_by
             ) VALUES (?,?,?,?,?,?,?,?,?)
         """, (
-            project_id, office, staff_team, ctc_start_date,
+            project_id, department, ctc_start_date,
             file_path, 1 if conflict else 0, 0,
             now, data.get("last_updated_by", "")
         ))
@@ -455,7 +501,7 @@ def admin_import_log():
 def admin_conflicts():
     conn = database.get_connection()
     rows = conn.execute("""
-        SELECT cf.ctc_id, cf.file_path, cf.office, cf.staff_team,
+        SELECT cf.ctc_id, cf.file_path, cf.department,
                cf.last_pushed, p.project_number, p.task_order_number,
                p.project_name
         FROM ctc_files cf
@@ -565,6 +611,7 @@ def _resolve_staff_id(cursor, name_string):
 
 def create_app():
     database.initialise_database()
+    summary_module.build()
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(

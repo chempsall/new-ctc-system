@@ -84,7 +84,7 @@ ADMIN_TOKEN = os.environ.get("RF_ADMIN_TOKEN", "")
 # ---------------------------------------------------------------------------
 STAFF_LIST_PATH = Path(os.environ.get(
     "RF_STAFF_LIST_PATH",
-    str(BASE_DIR / "source-data" / "UK010117_Staff_List.xlsx")
+    str(BASE_DIR / "source-data" / "staff_list.xlsx")
 ))
 
 
@@ -135,8 +135,8 @@ PAR_INDIRECT_ROWS = [
 # ---------------------------------------------------------------------------
 # Scheduler
 # ---------------------------------------------------------------------------
-# Time to run the daily import (24-hour clock, server local time)
-SCHEDULER_HOUR   = int(os.environ.get("RF_SCHEDULER_HOUR",   "8"))
+# Time to run the nightly import (24-hour clock, server local time)
+SCHEDULER_HOUR   = int(os.environ.get("RF_SCHEDULER_HOUR",   "0"))
 SCHEDULER_MINUTE = int(os.environ.get("RF_SCHEDULER_MINUTE", "0"))
 
 # ---------------------------------------------------------------------------

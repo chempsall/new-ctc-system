@@ -1,172 +1,176 @@
 """
 imports/staff_list.py
-Parses the UK010117_Staff_List.xlsx and upserts into the database.
-Called by the scheduler at midnight and can be run manually.
+Imports staff from the staff list Excel file into the database.
 
-Fields imported:
-    Horizon Person Number, Name, Technical Grade, Staff Team, Discipline,
-    Availability, Start Date, End Date, and the monthly availability columns.
+Expected columns (case-insensitive):
+    Horizon Person Number
+    Name
+    Job Title
+    Job Family
+    Job Function
+    Department
+    Availability
+    Start Date
+    End Date
 
-Fields deliberately excluded (financial):
-    Burdened Cost, Raw Cost, Utilisation Target
+Job Function is the discipline — derived from the suffix after the comma
+in the Horizon job title e.g. "Lead Professional, Mechanical Engineering"
+becomes "Mechanical Engineering". The column can also be populated manually
+for staff whose job title doesn't follow this pattern.
+
+Run directly:
+    python imports/staff_list.py source-data/staff_list.xlsx
 """
 
-import sqlite3
 import json
 import openpyxl
 from datetime import datetime, timezone, date
 import os
 import sys
+from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database import get_connection
+import config
 
 
-import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); from database import get_connection
-
-# Excel serial date origin
-EXCEL_EPOCH = date(1899, 12, 30)
-
-# Columns in the staff list that are NOT monthly availability fractions
-NON_PERIOD_COLS = {
-    "horizon person number", "name", "technical grade", "staff team",
-    "discipline", "availability", "start date", "end date",
-    "burdened cost", "raw cost", "utilisation target"
+# ---------------------------------------------------------------------------
+# Column name normalisation
+# ---------------------------------------------------------------------------
+COLUMN_MAP = {
+    "horizon person number": "horizon_person_number",
+    "name":                  "name",
+    "job title":             "job_title",
+    "job family":            "job_family",
+    "job function":          "job_function",
+    "department":            "department",
+    "availability":          "availability",
+    "start date":            "start_date",
+    "end date":              "end_date",
 }
 
 
-def excel_serial_to_date(serial):
-    """Convert Excel serial date integer to Python date."""
-    if not serial or not isinstance(serial, (int, float)):
-        return None
-    try:
-        return (EXCEL_EPOCH + __import__("datetime").timedelta(days=int(serial))).isoformat()
-    except Exception:
-        return None
+def _normalise_header(h):
+    if h is None:
+        return ""
+    return str(h).strip().lower()
 
 
-def is_period_column(header):
-    """
-    Returns True if a column header is a date/datetime representing a month.
-    openpyxl returns these as datetime objects when the file is opened normally.
-    Falls back to checking for Excel date serial integers.
-    """
-    if header is None:
-        return False
-    # openpyxl returns datetime objects for date-formatted cells
-    if hasattr(header, "year"):
-        return True
+def _clean(val):
+    if val is None:
+        return None
+    if isinstance(val, str):
+        v = val.strip()
+        return v if v else None
+    return val
+
+
+def _parse_date(val):
+    if val is None:
+        return None
+    if isinstance(val, (datetime, date)):
+        if hasattr(val, "date"):
+            return val.date().isoformat()
+        return val.isoformat()
+    s = str(val).strip()
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(s, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_availability(val):
+    if val is None:
+        return 1.0
     try:
-        val = int(float(str(header)))
-        # Excel date serials for 2024-2030 range roughly 45000-48000
-        return 44000 < val < 50000
+        f = float(val)
+        return max(0.0, min(1.0, f))
     except (ValueError, TypeError):
-        return False
+        return 1.0
 
 
-def header_to_iso(header):
-    """Convert a period column header (datetime or serial int) to ISO date string."""
-    if hasattr(header, "year"):
-        return header.date().isoformat()
-    try:
-        val = int(float(str(header)))
-        return (EXCEL_EPOCH + __import__("datetime").timedelta(days=val)).isoformat()
-    except Exception:
+def _job_function_from_title(job_title):
+    """
+    Extract job function from job title suffix.
+    "Lead Professional, Mechanical Engineering" -> "Mechanical Engineering"
+    Returns None if no comma found.
+    """
+    if not job_title:
         return None
+    if "," in job_title:
+        return job_title.split(",", 1)[1].strip() or None
+    return None
 
 
-def run(file_path: str, office: str = "London - Chancery Lane") -> dict:
-    """
-    Parse the staff list file and upsert into the database.
-    Returns a summary dict for the import log.
-    """
+def run(file_path: str) -> dict:
     started_at = datetime.now(timezone.utc).isoformat()
-    errors = []
-    rows_processed = 0
-    rows_inserted = 0
-    rows_updated = 0
+    errors     = []
+    processed  = 0
+    inserted   = 0
+    updated    = 0
+    skipped    = 0
 
     try:
         wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
-        ws = wb["Staff Details"]
+        ws = wb[wb.sheetnames[0]]
     except Exception as e:
-        return _log_result(file_path, started_at, 0, 0, 0, [str(e)])
+        return _log(file_path, started_at, 0, 0, 0, 0, [str(e)])
 
     rows = list(ws.iter_rows(values_only=True))
-    if not rows:
-        return _log_result(file_path, started_at, 0, 0, 0, ["Sheet is empty"])
+    if len(rows) < 2:
+        return _log(file_path, started_at, 0, 0, 0, 0, ["Sheet has no data rows"])
 
-    # -- Parse header row ------------------------------------------------
-    header_row = rows[0]
+    # Build column index from header row
+    raw_headers = [_normalise_header(h) for h in rows[0]]
+    col_idx = {}
+    for i, h in enumerate(raw_headers):
+        field = COLUMN_MAP.get(h)
+        if field:
+            col_idx[field] = i
 
-    def clean_header(h):
-        if h is None:
-            return ""
-        s = str(h).strip()
-        # openpyxl sometimes includes a leading apostrophe from Excel
-        # text-prefixed cells
-        return s.lstrip("'").strip()
+    # Horizon person number is required
+    if "horizon_person_number" not in col_idx:
+        return _log(file_path, started_at, 0, 0, 0, 0,
+                    ["Column 'Horizon Person Number' not found in header row"])
 
-    headers = [clean_header(h) for h in header_row]
-
-    # Identify which column indices are monthly period columns.
-    # IMPORTANT: use header_row (raw) for period detection, headers (cleaned)
-    # for text column mapping — datetime objects must not be stringified first.
-    period_cols = {}  # col_index -> ISO date string
-    col_map = {}      # normalised header name -> col_index
-
-    for i, raw_h in enumerate(header_row):
-        if is_period_column(raw_h):
-            iso = header_to_iso(raw_h)
-            if iso:
-                period_cols[i] = iso
-        else:
-            col_map[headers[i].lower()] = i
+    def get(row, field):
+        idx = col_idx.get(field)
+        if idx is None or idx >= len(row):
+            return None
+        return row[idx]
 
     conn = get_connection()
-    c = conn.cursor()
+    c    = conn.cursor()
+    now  = datetime.now(timezone.utc).isoformat()
 
     for row in rows[1:]:
         if not any(row):
             continue
 
-        rows_processed += 1
+        processed += 1
 
-        def get(field):
-            idx = col_map.get(field.lower())
-            if idx is None:
-                return None
-            val = row[idx]
-            if val in ("", None):
-                return None
-            # Strip leading apostrophe from text-prefixed cells
-            if isinstance(val, str):
-                val = val.lstrip("'").strip()
-            return val if val != "" else None
+        horizon_id = _clean(get(row, "horizon_person_number"))
+        name       = _clean(get(row, "name"))
 
-        horizon_id = get("horizon person number")
-        name = get("name")
-
-        # Skip the generic grade placeholder rows at the bottom
-        # (those with no Horizon Person Number and a name like "UK Director")
-        if not horizon_id:
-            continue
-
-        horizon_id = str(horizon_id).strip()
+        # Skip placeholder rows (no horizon ID or no name)
         if not horizon_id or not name:
-            errors.append(f"Row {rows_processed}: missing ID or name, skipped")
+            skipped += 1
             continue
 
-        technical_grade  = get("technical grade") or ""
-        staff_team       = get("staff team") or ""
-        discipline       = get("discipline") or ""
-        availability     = get("availability") or 1.0
-        start_date_raw   = get("start date")
-        end_date_raw     = get("end date")
+        job_title    = _clean(get(row, "job_title"))
+        job_family   = _clean(get(row, "job_family"))
+        job_function = _clean(get(row, "job_function"))
+        department   = _clean(get(row, "department"))
+        availability = _parse_availability(get(row, "availability"))
+        start_date   = _parse_date(get(row, "start_date"))
+        end_date     = _parse_date(get(row, "end_date"))
 
-        start_date = excel_serial_to_date(start_date_raw)
-        end_date   = excel_serial_to_date(end_date_raw)
+        # If job_function not explicitly provided, try to derive from job title
+        if not job_function and job_title:
+            job_function = _job_function_from_title(job_title)
 
-        now = datetime.now(timezone.utc).isoformat()
-
-        # Upsert staff row
         existing = c.execute(
             "SELECT horizon_person_number FROM staff WHERE horizon_person_number = ?",
             (horizon_id,)
@@ -175,100 +179,74 @@ def run(file_path: str, office: str = "London - Chancery Lane") -> dict:
         if existing:
             c.execute("""
                 UPDATE staff SET
-                    name = ?, technical_grade = ?, staff_team = ?,
-                    discipline = ?, availability = ?, start_date = ?,
-                    end_date = ?, office = ?, last_imported = ?
-                WHERE horizon_person_number = ?
-            """, (name, technical_grade, staff_team, discipline,
-                  availability, start_date, end_date, office, now, horizon_id))
-            rows_updated += 1
+                    name=?, job_title=?, job_family=?, job_function=?,
+                    department=?, availability=?, start_date=?,
+                    end_date=?, last_imported=?
+                WHERE horizon_person_number=?
+            """, (name, job_title, job_family, job_function,
+                  department, availability, start_date,
+                  end_date, now, horizon_id))
+            updated += 1
         else:
             c.execute("""
-                INSERT INTO staff
-                    (horizon_person_number, name, technical_grade, staff_team,
-                     discipline, availability, start_date, end_date, office, last_imported)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (horizon_id, name, technical_grade, staff_team, discipline,
-                  availability, start_date, end_date, office, now))
-            rows_inserted += 1
-
-        # Upsert monthly availability fractions
-        for col_idx, period_iso in period_cols.items():
-            fraction = row[col_idx]
-            if fraction is None:
-                fraction = 0.0
-            try:
-                fraction = float(fraction)
-            except (ValueError, TypeError):
-                fraction = 0.0
-
-            c.execute("""
-                INSERT INTO staff_availability
-                    (horizon_person_number, period_start, availability_fraction)
-                VALUES (?, ?, ?)
-                ON CONFLICT(horizon_person_number, period_start)
-                DO UPDATE SET availability_fraction = excluded.availability_fraction
-            """, (horizon_id, period_iso, fraction))
+                INSERT INTO staff (
+                    horizon_person_number, name, job_title, job_family,
+                    job_function, department, availability,
+                    start_date, end_date, last_imported
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
+            """, (horizon_id, name, job_title, job_family,
+                  job_function, department, availability,
+                  start_date, end_date, now))
+            inserted += 1
 
     conn.commit()
     conn.close()
 
-    return _log_result(
-        file_path, started_at, rows_processed,
-        rows_inserted, rows_updated, errors
-    )
+    return _log(file_path, started_at, processed, inserted, updated,
+                skipped, errors)
 
 
-def _log_result(file_path, started_at, processed, inserted, updated, errors):
+def _log(file_path, started_at, processed, inserted, updated, skipped, errors):
     completed_at = datetime.now(timezone.utc).isoformat()
     result = {
         "import_type":    "staff_list",
-        "filename":       os.path.basename(file_path),
+        "filename":       os.path.basename(str(file_path)),
         "started_at":     started_at,
         "completed_at":   completed_at,
         "rows_processed": processed,
         "rows_inserted":  inserted,
         "rows_updated":   updated,
-        "errors":         errors
+        "rows_skipped":   skipped,
+        "errors":         errors,
     }
-    _write_log(result)
-    return result
-
-
-def _write_log(result):
     try:
         conn = get_connection()
         conn.execute("""
             INSERT INTO import_log
                 (import_type, filename, started_at, completed_at,
                  rows_processed, rows_inserted, rows_updated, errors)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            result["import_type"],
-            result["filename"],
-            result["started_at"],
-            result["completed_at"],
-            result["rows_processed"],
-            result["rows_inserted"],
-            result["rows_updated"],
-            json.dumps(result["errors"])
-        ))
+            VALUES (?,?,?,?,?,?,?,?)
+        """, (result["import_type"], result["filename"],
+              result["started_at"], result["completed_at"],
+              result["rows_processed"], result["rows_inserted"],
+              result["rows_updated"], json.dumps(result["errors"])))
         conn.commit()
         conn.close()
     except Exception as e:
         print(f"Warning: could not write import log: {e}")
+    return result
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python staff_list.py <path_to_staff_list.xlsx>")
-        sys.exit(1)
-    result = run(sys.argv[1])
-    print(f"Staff list import complete:")
+    path = sys.argv[1] if len(sys.argv) > 1 else str(config.STAFF_LIST_PATH)
+    result = run(path)
+    print(f"Staff import:")
+    print(f"  Source    : {result['filename']}")
     print(f"  Processed : {result['rows_processed']}")
     print(f"  Inserted  : {result['rows_inserted']}")
     print(f"  Updated   : {result['rows_updated']}")
+    print(f"  Skipped   : {result['rows_skipped']} (no Horizon ID or name)")
     if result["errors"]:
-        print(f"  Errors    : {len(result['errors'])}")
-        for e in result["errors"]:
+        print(f"  Errors ({len(result['errors'])}):")
+        for e in result["errors"][:5]:
             print(f"    - {e}")

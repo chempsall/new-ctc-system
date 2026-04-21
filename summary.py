@@ -40,16 +40,16 @@ def _get_active_periods(conn, from_date=None):
 def _get_rates(conn):
     """Grade -> rate dict. Used only within this module, never serialised."""
     rows = conn.execute(
-        "SELECT grade, raw_cost, burdened_cost FROM grade_rates"
+        "SELECT job_title, raw_cost, burdened_cost FROM grade_rates"
     ).fetchall()
-    return {r["grade"]: {"raw": r["raw_cost"], "burdened": r["burdened_cost"]}
+    return {r["job_title"]: {"raw": r["raw_cost"], "burdened": r["burdened_cost"]}
             for r in rows}
 
 
-def build(office: str = None) -> dict:
+def build(department: str = None) -> dict:
     """
     Build the full summary JSON.
-    If office is specified, builds for that office only (future: multi-office).
+    If department is specified, builds for that department only.
     Returns the summary dict and also writes it to summary_cache table.
     """
     conn = get_connection()
@@ -64,9 +64,9 @@ def build(office: str = None) -> dict:
 
     # -- Staff ---------------------------------------------------------------
     staff_query = "SELECT * FROM staff WHERE end_date IS NULL OR end_date > ?"
-    if office:
-        staff_query += " AND office = ?"
-        staff_rows = conn.execute(staff_query, (date.today().isoformat(), office)).fetchall()
+    if department:
+        staff_query += " AND department = ?"
+        staff_rows = conn.execute(staff_query, (date.today().isoformat(), department)).fetchall()
     else:
         staff_rows = conn.execute(staff_query, (date.today().isoformat(),)).fetchall()
 
@@ -88,7 +88,7 @@ def build(office: str = None) -> dict:
     # of "Active" from the PAR import — i.e. it exists in Horizon.
     alloc_rows = conn.execute("""
         SELECT a.horizon_person_number, cf.project_id, a.period_start, a.days,
-               p.project_status, cf.office, cf.ctc_id
+               p.project_status, cf.department, cf.ctc_id
         FROM allocations a
         JOIN ctc_files cf ON cf.ctc_id = a.ctc_id
         JOIN projects p   ON p.project_id = cf.project_id
@@ -119,7 +119,6 @@ def build(office: str = None) -> dict:
     staff_list = []
     for s in staff_rows:
         pid = s["horizon_person_number"]
-        grade = s["technical_grade"]
 
         capacity     = {}
         allocated    = {}
@@ -168,10 +167,10 @@ def build(office: str = None) -> dict:
         staff_list.append({
             "id":           pid,
             "name":         s["name"],
-            "grade":        grade,
-            "team":         s["staff_team"] or "",
-            "discipline":   s["discipline"] or "",
-            "office":       s["office"],
+            "job_title":    s["job_title"] or "",
+            "job_function": s["job_function"] or "",
+            "job_family":   s["job_family"] or "",
+            "department":   s["department"] or "",
             "availability": s["availability"],
             "capacity":     capacity,
             "allocated":    allocated,
@@ -185,18 +184,18 @@ def build(office: str = None) -> dict:
     # Query projects that have at least one CTC file (i.e. are being worked on).
     # Join ctc_files to get office/team context.
     # Filter by office if specified — shows only projects this office is working on.
-    if office:
+    if department:
         proj_rows = conn.execute("""
-            SELECT DISTINCT p.*, cf.office, cf.staff_team, cf.ctc_id,
+            SELECT DISTINCT p.*, cf.department, cf.ctc_id,
                    cf.ctc_start_date, cf.conflict_flag, cf.start_date_changed,
                    cf.last_pushed
             FROM projects p
             JOIN ctc_files cf ON cf.project_id = p.project_id
-            WHERE cf.office = ?
-        """, (office,)).fetchall()
+            WHERE cf.department = ?
+        """, (department,)).fetchall()
     else:
         proj_rows = conn.execute("""
-            SELECT DISTINCT p.*, cf.office, cf.staff_team, cf.ctc_id,
+            SELECT DISTINCT p.*, cf.department, cf.ctc_id,
                    cf.ctc_start_date, cf.conflict_flag, cf.start_date_changed,
                    cf.last_pushed
             FROM projects p
@@ -244,8 +243,7 @@ def build(office: str = None) -> dict:
             "organisation":       p["project_organisation"] or "No Horizon Record Found",
             "horizon_status":     horizon_status,
             "project_type":       p["project_type"] or "",
-            "team":               p["staff_team"] or "",
-            "office":             p["office"] if "office" in p.keys() else "",
+            "department":         p["department"] if "department" in p.keys() else "",
             "pm":                 p["project_manager"],
             "director":           p["project_director"],
             "task_start_date":    p["task_start_date"],
@@ -271,8 +269,8 @@ def build(office: str = None) -> dict:
         "staff":         staff_list,
         "projects":      projects_list,
         "conflicts":     conflicts,
-        "offices":       _get_offices(conn),
-        "teams":         _get_teams(conn),
+        "departments":   _get_departments(conn),
+        "job_functions": _get_job_functions(conn),
         "last_imports":  _get_last_imports(conn)
     }
 
@@ -310,7 +308,7 @@ def _calculate_financials(conn, project_id, project_row, periods, rates,
 
     # Cost-to-complete from future allocations x grade rates
     alloc_rows = conn.execute("""
-        SELECT a.period_start, a.days, s.technical_grade
+        SELECT a.period_start, a.days, s.job_title
         FROM allocations a
         JOIN staff s ON s.horizon_person_number = a.horizon_person_number
         WHERE a.project_id = ?
@@ -324,7 +322,7 @@ def _calculate_financials(conn, project_id, project_row, periods, rates,
     for r in alloc_rows:
         if r["period_start"] < today:
             continue
-        rate = rates.get(r["technical_grade"], {"raw": 0, "burdened": 0})
+        rate = rates.get(r["job_title"], {"raw": 0, "burdened": 0})
         days = r["days"] or 0
         raw_ctc      += days * rate["raw"]
         burdened_ctc += days * rate["burdened"]
@@ -363,24 +361,24 @@ def _staff_name(conn, horizon_person_number):
     return row["name"] if row else None
 
 
-def _get_offices(conn):
-    rows = conn.execute(
-        "SELECT office_name, office_code FROM offices WHERE active = 1"
-    ).fetchall()
-    return [{"name": r["office_name"], "code": r["office_code"]} for r in rows]
-
-
-def _get_teams(conn):
+def _get_departments(conn):
     rows = conn.execute("""
-        SELECT t.team_name, o.office_name
-        FROM teams t
-        JOIN offices o ON o.office_id = t.office_id
-        WHERE t.active = 1
-        ORDER BY o.office_name, t.team_name
+        SELECT DISTINCT department
+        FROM staff
+        WHERE department IS NOT NULL
+        ORDER BY department
     """).fetchall()
-    return [{"team": r["team_name"], "office": r["office_name"]} for r in rows]
+    return [{"department": r["department"]} for r in rows]
 
 
+def _get_job_functions(conn):
+    rows = conn.execute("""
+        SELECT DISTINCT job_function
+        FROM staff
+        WHERE job_function IS NOT NULL
+        ORDER BY job_function
+    """).fetchall()
+    return [{"job_function": r["job_function"]} for r in rows]
 def _get_last_imports(conn):
     rows = conn.execute("""
         SELECT import_type, MAX(completed_at) as last_run, SUM(errors != '[]') as had_errors

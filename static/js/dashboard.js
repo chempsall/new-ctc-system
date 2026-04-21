@@ -15,9 +15,9 @@ const state = {
   activePeriod:   null,    // Currently selected month label e.g. "Apr-2026"
   activeView:     "staff", // "staff" | "projects"
   filters: {
-    team:         "all",
-    grade:        "all",
-    discipline:   "all",
+    job_function: "all",
+    job_title:    "all",
+    department:   "all",
     horizon:      "all",   // "all" | "linked" | "norecord"
     search:       "",
   },
@@ -33,7 +33,7 @@ const fmt = {
     if (d === null || d === undefined) return "—";
     const n = parseFloat(d);
     if (isNaN(n)) return "—";
-    return n % 1 === 0 ? n.toString() : n.toFixed(1);
+    return n === 0 ? "—" : n % 1 === 0 ? n.toString() : n.toFixed(1);
   },
   currency: n => {
     if (n === null || n === undefined) return "—";
@@ -58,10 +58,10 @@ const fmt = {
     }
     return name.slice(0, 2).toUpperCase();
   },
-  gradeShort: grade => {
-    if (!grade) return "";
-    const m = grade.match(/^(P\d|L\d|T\d)/);
-    return m ? m[1] : grade.slice(0, 3);
+  gradeShort: job_title => {
+    if (!job_title) return "";
+    const m = job_title.match(/^(P\d|L\d|T\d)/);
+    return m ? m[1] : job_title.slice(0, 3);
   },
 };
 
@@ -114,16 +114,16 @@ function buildFilterOptions() {
   const s = state.summary;
 
   // Teams — from unique values in staff
-  const teams = [...new Set(s.staff.map(p => p.team).filter(Boolean))].sort();
-  populateSelect("filter-team", teams, "All teams");
+  const depts = [...new Set(s.staff.map(p => p.department).filter(Boolean))].sort();
+  populateSelect("filter-department", depts, "All departments");
 
-  // Grades
-  const grades = [...new Set(s.staff.map(p => p.grade).filter(Boolean))].sort();
-  populateSelect("filter-grade", grades, "All grades");
+  // Job Titles — from unique values in staff
+  const titles = [...new Set(s.staff.map(p => p.job_title).filter(Boolean))].sort();
+  populateSelect("filter-job-title", titles, "All job titles");
 
   // Disciplines
-  const discs = [...new Set(s.staff.map(p => p.discipline).filter(Boolean))].sort();
-  populateSelect("filter-discipline", discs, "All disciplines");
+  const funcs = [...new Set(s.staff.map(p => p.job_function).filter(Boolean))].sort();
+  populateSelect("filter-job-function", funcs, "All job functions");
 }
 
 function populateSelect(id, values, allLabel) {
@@ -185,13 +185,13 @@ function filteredStaff() {
   const f = state.filters;
   const p = state.activePeriod;
   return state.summary.staff.filter(person => {
-    if (f.team !== "all" && person.team !== f.team) return false;
-    if (f.grade !== "all" && person.grade !== f.grade) return false;
-    if (f.discipline !== "all" && person.discipline !== f.discipline) return false;
+    if (f.department !== "all" && person.department !== f.department) return false;
+    if (f.job_title !== "all" && person.job_title !== f.job_title) return false;
+    if (f.job_function !== "all" && person.job_function !== f.job_function) return false;
     if (f.search) {
       const q = f.search.toLowerCase();
       if (!person.name.toLowerCase().includes(q) &&
-          !person.grade.toLowerCase().includes(q)) return false;
+          !person.job_title.toLowerCase().includes(q)) return false;
     }
     return true;
   }).sort((a, b) => {
@@ -208,7 +208,7 @@ function filteredProjects() {
   const f = state.filters;
   const p = state.activePeriod;
   return state.summary.projects.filter(proj => {
-    if (f.team !== "all" && proj.team !== f.team) return false;
+    if (f.department !== "all" && proj.department !== f.department) return false;
     if (f.horizon !== "all") {
       if (f.horizon === "linked"   && proj.horizon_status !== "linked")   return false;
       if (f.horizon === "norecord" && proj.horizon_status === "linked")   return false;
@@ -276,10 +276,10 @@ function renderStaffTable() {
     return `<tr data-id="${person.id}" class="${isSelected ? "selected" : ""}">
       <td>
         <div class="staff-name">${escHtml(person.name)}</div>
-        <div class="staff-grade">${escHtml(person.grade)}</div>
+        <div class="staff-grade">${escHtml(person.job_title)}</div>
       </td>
       <td>
-        <span class="team-badge">${escHtml(person.team || "—")}</span>
+        <span class="team-badge">${escHtml(person.job_function || "—")}</span>
       </td>
       <td>
         <div class="alloc-bar-wrap">
@@ -336,7 +336,7 @@ function renderProjectTable() {
         <div class="proj-name">${escHtml(proj.name)}${conflict}</div>
         <div class="proj-task">${escHtml(proj.task_name || "")}</div>
       </td>
-      <td><span class="team-badge">${escHtml(proj.team || "—")}</span></td>
+      <td><span class="team-badge">${escHtml(proj.department || "—")}</span></td>
       <td>
         <span class="horizon horizon--${linked ? "linked" : "norecord"}">
           <span class="horizon--dot"></span>
@@ -384,7 +384,7 @@ function showStaffDetail(person) {
   document.getElementById("dp-avatar").textContent  = fmt.initials(person.name);
   document.getElementById("dp-name").textContent    = person.name;
   document.getElementById("dp-role").textContent    =
-    `${person.grade} · ${person.team || "No team"} · ${person.discipline || ""}`;
+    `${person.job_title} · ${person.job_function || ""}`;
 
   document.getElementById("dp-stat-alloc").textContent    = fmt.days(alloc) + "d";
   document.getElementById("dp-stat-cap").textContent      = fmt.days(cap) + "d";
@@ -461,7 +461,7 @@ function showProjectDetail(proj) {
     : "PROJ";
   document.getElementById("dp-name").textContent = proj.name;
   document.getElementById("dp-role").textContent =
-    `${proj.task_name || ""} · ${proj.team || "No team"}`;
+    `${proj.task_name || ""}`;
 
   const totalDays = Object.values(proj.total_days).reduce((a, b) => a + b, 0);
   document.getElementById("dp-stat-alloc").textContent  = fmt.days(proj.total_days[p]) + "d";
@@ -529,7 +529,7 @@ function showProjectDetail(proj) {
                                         (pr.days[p] || 0) > 0))
     .map(s => ({
       name: s.name,
-      grade: s.grade,
+      job_title: s.job_title,
       days: (s.projects.find(pr => pr.project_id === proj.project_id)?.days[p] || 0)
     }))
     .sort((a, b) => b.days - a.days);
@@ -543,7 +543,7 @@ function showProjectDetail(proj) {
       </div>
       ${allocated.map(s => `
         <div class="detail-project-row">
-          <span class="team-badge">${fmt.gradeShort(s.grade)}</span>
+          <span class="team-badge">${fmt.gradeShort(s.job_title)}</span>
           <span class="detail-proj-name">${escHtml(s.name)}</span>
           <span class="detail-proj-days">${fmt.days(s.days)}d</span>
         </div>`).join("")}`;
@@ -634,10 +634,13 @@ function wireEvents() {
   });
 
   // Filters
-  ["filter-team", "filter-grade", "filter-discipline"].forEach(id => {
+  ["filter-department", "filter-job-title", "filter-job-function"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", () => {
-      state.filters[id.replace("filter-", "")] = el.value;
+      // Convert kebab-case id to camelCase filter key
+      // filter-job-function -> job_function, filter-job-title -> job_title
+      const key = id.replace("filter-", "").replace(/-/g, "_");
+      state.filters[key] = el.value;
       renderView();
     });
   });

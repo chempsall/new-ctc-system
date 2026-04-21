@@ -13,7 +13,7 @@ save. The dashboard aggregates everything in real time.
 pip install -r requirements.txt
 copy .env.template .env        # then edit .env with your paths
 python database.py
-python imports\staff_list.py source-data\UK010117_Staff_List.xlsx
+python imports\staff_list.py source-data\staff_list.xlsx
 python imports\par_import.py
 python app.py
 ```
@@ -35,7 +35,7 @@ Open `http://localhost:5000` in your browser.
 
 ## Data sources
 
-- **Staff list**: `source-data/UK010117_Staff_List.xlsx`
+- **Staff list**: `source-data/staff_list.xlsx`
 - **PAR**: Most recent `YYYYMM_UK_PAR_*.xlsx` in `source-data/`, or direct
   SharePoint connection when `RF_PAR_USE_SHAREPOINT=true`
 
