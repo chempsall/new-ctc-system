@@ -33,7 +33,8 @@ const fmt = {
     if (d === null || d === undefined) return "—";
     const n = parseFloat(d);
     if (isNaN(n)) return "—";
-    return n === 0 ? "—" : n % 1 === 0 ? n.toString() : n.toFixed(1);
+    //return n === 0 ? "—" : n % 1 === 0 ? n.toString() : n.toFixed(1);
+    return n % 1 === 0 ? n.toString() : n.toFixed(1);
   },
   currency: n => {
     if (n === null || n === undefined) return "—";
