@@ -17,10 +17,11 @@ data/*.db-shm
 data/*.db-wal
 
 # ---------------------------------------------------------------------------
-# Source Data — raw WSP data which must never be committed
+# Source Data — raw WSP data which must never be committed (readme file explains)
 # ---------------------------------------------------------------------------
 source-data/*.*
 source-data/**/*
+!source-data/readme.md
 
 # ---------------------------------------------------------------------------
 # Python
