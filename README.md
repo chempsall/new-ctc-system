@@ -1,6 +1,7 @@
 # New CTC System
 
-Resource forecasting system for WSP London Building Services.
+Resource forecasting system. Built for WSP London Building Services with one
+eye on potential scalability.
 
 Replaces the Excel-based `Resource_Forecast.xlsx` aggregator with a Flask web
 application. Project managers maintain individual CTC files using the provided
