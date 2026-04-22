@@ -1,4 +1,3 @@
-Attribute VB_Name = "CTC_Macro"
 Option Explicit
 
 ' =============================================================================
@@ -14,20 +13,19 @@ Private Const API_BASE   As String = "http://localhost:5000"
 Private Const PASSWORD   As String = "Cyberdyne"
 
 ' Header cell addresses
-Private Const CELL_START_DATE      As String = "E1"
-Private Const CELL_PROJECT_NUMBER  As String = "B3"
-Private Const CELL_TASK_ORDER      As String = "B4"
-Private Const CELL_ORGANISATION    As String = "B5"
-Private Const CELL_CUSTOMER        As String = "B6"
-Private Const CELL_PROJECT_NAME    As String = "B7"
-Private Const CELL_TASK_NAME       As String = "B8"
-Private Const CELL_DIRECTOR        As String = "B9"
-Private Const CELL_MANAGER         As String = "B10"
-Private Const CELL_LAST_UPDATED_BY As String = "B11"
-Private Const CELL_FILE_PATH       As String = "A13"
+Private Const CELL_START_DATE      As String = "E16"
+Private Const CELL_PROJECT_NUMBER  As String = "C5"
+Private Const CELL_TASK_ORDER      As String = "C6"
+Private Const CELL_ORGANISATION    As String = "C7"
+Private Const CELL_CUSTOMER        As String = "C8"
+Private Const CELL_PROJECT_NAME    As String = "C9"
+Private Const CELL_TASK_NAME       As String = "C10"
+Private Const CELL_DIRECTOR        As String = "C11"
+Private Const CELL_MANAGER         As String = "C12"
+Private Const CELL_LAST_UPDATED_BY As String = "C13"
+Private Const CELL_FILE_PATH       As String = "A1" ' (hidden)
 
 ' Staff grid layout
-Private Const MONTH_HDR_ROW    As Long = 14
 Private Const WORKING_DAYS_ROW As Long = 15
 Private Const HEADER_ROW       As Long = 16
 Private Const FIRST_DATA_ROW   As Long = 17
@@ -69,7 +67,7 @@ Public Sub OnBeforeSave(Cancel As Boolean)
     startDate = ws.Range(CELL_START_DATE).Value
     If IsEmpty(startDate) Or startDate = "" Then
         MsgBox "Please set the CTC Start Date before saving." & vbCrLf & _
-               "Enter a date in the yellow cell (top right).", _
+               "Enter a date in the orange cell.", _
                vbExclamation, "Save blocked"
         ws.Range(CELL_START_DATE).Select
         Cancel = True
@@ -105,10 +103,10 @@ Public Sub OnBeforeSave(Cancel As Boolean)
     End If
 
     ' --- Write macro-owned fields ---------------------------------------
-    ws.Unprotect Password:=PASSWORD
+    ws.Unprotect PASSWORD:=PASSWORD
     ws.Range(CELL_LAST_UPDATED_BY).Value = Application.UserName
-    ws.Range(CELL_FILE_PATH).Value       = ThisWorkbook.FullName
-    ws.Protect Password:=PASSWORD, Contents:=True, _
+    ws.Range(CELL_FILE_PATH).Value = ThisWorkbook.FullName
+    ws.Protect PASSWORD:=PASSWORD, Contents:=True, _
         DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
     ' --- Push to server -------------------------------------------------
@@ -136,12 +134,12 @@ Public Sub OnNameSelected(ws As Worksheet, changedCell As Range)
     Dim selectedName As String
     selectedName = Trim(changedCell.Value)
 
-    ws.Unprotect Password:=PASSWORD
+    ws.Unprotect PASSWORD:=PASSWORD
 
     If selectedName = "" Then
         ws.Cells(changedCell.Row, COL_HORIZON_ID).Value = ""
-        ws.Cells(changedCell.Row, COL_JOB_TITLE).Value  = ""
-        ws.Cells(changedCell.Row, COL_JOB_FUNC).Value   = ""
+        ws.Cells(changedCell.Row, COL_JOB_TITLE).Value = ""
+        ws.Cells(changedCell.Row, COL_JOB_FUNC).Value = ""
         GoTo Reprotect
     End If
 
@@ -163,14 +161,14 @@ Public Sub OnNameSelected(ws As Worksheet, changedCell As Range)
     For i = 2 To lastRow
         If wsData.Cells(i, 2).Value = selectedName Then
             ws.Cells(changedCell.Row, COL_HORIZON_ID).Value = wsData.Cells(i, 1).Value
-            ws.Cells(changedCell.Row, COL_JOB_TITLE).Value  = wsData.Cells(i, 3).Value
-            ws.Cells(changedCell.Row, COL_JOB_FUNC).Value   = wsData.Cells(i, 4).Value
+            ws.Cells(changedCell.Row, COL_JOB_TITLE).Value = wsData.Cells(i, 3).Value
+            ws.Cells(changedCell.Row, COL_JOB_FUNC).Value = wsData.Cells(i, 4).Value
             Exit For
         End If
     Next i
 
 Reprotect:
-    ws.Protect Password:=PASSWORD, Contents:=True, _
+    ws.Protect PASSWORD:=PASSWORD, Contents:=True, _
         DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
 End Sub
@@ -193,7 +191,7 @@ Private Sub LookupProject(projNum As String, taskOrder As String)
 
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
-    ws.Unprotect Password:=PASSWORD
+    ws.Unprotect PASSWORD:=PASSWORD
 
     Dim v As String
     v = ParseJsonField(data, "project_name")
@@ -214,7 +212,7 @@ Private Sub LookupProject(projNum As String, taskOrder As String)
     v = ParseJsonField(data, "project_manager")
     If v <> "" Then ws.Range(CELL_MANAGER).Value = v
 
-    ws.Protect Password:=PASSWORD, Contents:=True, _
+    ws.Protect PASSWORD:=PASSWORD, Contents:=True, _
         DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
 End Sub
@@ -240,7 +238,7 @@ Private Sub PopulateStaffDropdown()
         Set wsData = ThisWorkbook.Sheets.Add( _
             After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
         wsData.Name = "_StaffData"
-        wsData.Visible = xlSheetVeryHidden
+        
     Else
         wsData.Cells.Clear
     End If
@@ -254,11 +252,12 @@ Private Sub PopulateStaffDropdown()
     Dim rowCount As Long
     rowCount = WriteStaffData(wsData, data)
     If rowCount = 0 Then Exit Sub
+    wsData.Visible = xlSheetVeryHidden
 
     ' Apply dropdown to name column in staff grid
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
-    ws.Unprotect Password:=PASSWORD
+    ws.Unprotect PASSWORD:=PASSWORD
 
     With ws.Range(ws.Cells(FIRST_DATA_ROW, COL_NAME), _
                   ws.Cells(LAST_DATA_ROW, COL_NAME)).Validation
@@ -268,7 +267,7 @@ Private Sub PopulateStaffDropdown()
         .ShowError = False
     End With
 
-    ws.Protect Password:=PASSWORD, Contents:=True, _
+    ws.Protect PASSWORD:=PASSWORD, Contents:=True, _
         DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
 End Sub
@@ -278,13 +277,13 @@ Private Sub HighlightCurrentMonth()
 
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
-    ws.Unprotect Password:=PASSWORD
+    ws.Unprotect PASSWORD:=PASSWORD
 
     Dim monthNames(11) As String
-    monthNames(0)  = "Jan": monthNames(1)  = "Feb": monthNames(2)  = "Mar"
-    monthNames(3)  = "Apr": monthNames(4)  = "May": monthNames(5)  = "Jun"
-    monthNames(6)  = "Jul": monthNames(7)  = "Aug": monthNames(8)  = "Sep"
-    monthNames(9)  = "Oct": monthNames(10) = "Nov": monthNames(11) = "Dec"
+    monthNames(0) = "Jan": monthNames(1) = "Feb": monthNames(2) = "Mar"
+    monthNames(3) = "Apr": monthNames(4) = "May": monthNames(5) = "Jun"
+    monthNames(6) = "Jul": monthNames(7) = "Aug": monthNames(8) = "Sep"
+    monthNames(9) = "Oct": monthNames(10) = "Nov": monthNames(11) = "Dec"
 
     Dim today As String
     today = monthNames(Month(Now()) - 1) & "-" & Right(CStr(Year(Now())), 2)
@@ -293,12 +292,12 @@ Private Sub HighlightCurrentMonth()
     Dim r As Long
     For col = ALLOC_FIRST_COL To ALLOC_FIRST_COL + NUM_MONTHS - 1
         Dim hdrVal As Variant
-        hdrVal = ws.Cells(MONTH_HDR_ROW, col).Value
+        hdrVal = ws.Cells(HEADER_ROW, col).Value
         If IsDate(hdrVal) Then
             Dim lbl As String
             lbl = monthNames(Month(hdrVal) - 1) & "-" & Right(CStr(Year(hdrVal)), 2)
             If lbl = today Then
-                ws.Cells(MONTH_HDR_ROW, col).Interior.Color = RGB(23, 55, 94)
+                ws.Cells(HEADER_ROW, col).Interior.Color = RGB(23, 55, 94)
                 For r = FIRST_DATA_ROW To LAST_DATA_ROW
                     ws.Cells(r, col).Interior.Color = RGB(220, 230, 241)
                 Next r
@@ -307,7 +306,7 @@ Private Sub HighlightCurrentMonth()
         End If
     Next col
 
-    ws.Protect Password:=PASSWORD, Contents:=True, _
+    ws.Protect PASSWORD:=PASSWORD, Contents:=True, _
         DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
 End Sub
@@ -332,10 +331,15 @@ Private Function PushToAPI() As Boolean
     Set http = CreateObject("MSXML2.XMLHTTP")
     http.Open "POST", API_BASE & "/api/push", False
     http.setRequestHeader "Content-Type", "application/json"
+    
+    MsgBox "About to send. JSON length: " & Len(json)
+    
     http.send json
+    MsgBox "HTTP Status: " & http.Status & vbCrLf & "Response: " & Left(http.responseText, 300)
     If http.Status = 200 Then PushToAPI = True
     Exit Function
 Fail:
+MsgBox "Error " & Err.Number & ": " & Err.Description
 End Function
 
 
@@ -366,7 +370,7 @@ Private Function BuildPushJSON() As String
 
         For c = ALLOC_FIRST_COL To ALLOC_FIRST_COL + NUM_MONTHS - 1
             Dim hdrVal As Variant
-            hdrVal = ws.Cells(MONTH_HDR_ROW, c).Value
+            hdrVal = ws.Cells(HEADER_ROW, c).Value
             If Not IsDate(hdrVal) Then GoTo NextCol
 
             Dim days As Double
@@ -375,6 +379,7 @@ Private Function BuildPushJSON() As String
                 days = CDbl(ws.Cells(r, c).Value)
             End If
 
+            If days = 0 Then GoTo NextCol
             If allocJSON <> "" Then allocJSON = allocJSON & ","
             allocJSON = allocJSON & "{" & _
                 """horizon_person_number"":""" & JsonEscape(horizonID) & """," & _
@@ -386,17 +391,17 @@ NextRow:
     Next r
 
     BuildPushJSON = "{" & _
-        """file_path"":"""            & JsonEscape(ws.Range(CELL_FILE_PATH).Value)      & """," & _
-        """project_number"":"""       & JsonEscape(GetCell(CELL_PROJECT_NUMBER))        & """," & _
-        """task_order_number"":"""    & JsonEscape(GetCell(CELL_TASK_ORDER))            & """," & _
-        """project_name"":"""         & JsonEscape(GetCell(CELL_PROJECT_NAME))          & """," & _
-        """task_name"":"""            & JsonEscape(GetCell(CELL_TASK_NAME))             & """," & _
-        """project_organisation"":""" & JsonEscape(GetCell(CELL_ORGANISATION))         & """," & _
-        """project_director"":"""     & JsonEscape(GetCell(CELL_DIRECTOR))              & """," & _
-        """project_manager"":"""      & JsonEscape(GetCell(CELL_MANAGER))               & """," & _
-        """last_updated_by"":"""      & JsonEscape(Application.UserName)               & """," & _
-        """ctc_start_date"":"""       & startISO                                        & """," & _
-        """allocations"":["           & allocJSON                                       & "]}"
+        """file_path"":""" & Replace(ws.Range(CELL_FILE_PATH).Value, "\", "\\") & """, " & _
+        """project_number"":""" & JsonEscape(GetCell(CELL_PROJECT_NUMBER)) & """," & _
+        """task_order_number"":""" & JsonEscape(GetCell(CELL_TASK_ORDER)) & """," & _
+        """project_name"":""" & JsonEscape(GetCell(CELL_PROJECT_NAME)) & """," & _
+        """task_name"":""" & JsonEscape(GetCell(CELL_TASK_NAME)) & """," & _
+        """project_organisation"":""" & JsonEscape(GetCell(CELL_ORGANISATION)) & """," & _
+        """project_director"":""" & JsonEscape(GetCell(CELL_DIRECTOR)) & """," & _
+        """project_manager"":""" & JsonEscape(GetCell(CELL_MANAGER)) & """," & _
+        """last_updated_by"":""" & JsonEscape(Application.UserName) & """," & _
+        """ctc_start_date"":""" & startISO & """," & _
+        """allocations"":[" & allocJSON & "]}"
 
 End Function
 
@@ -449,7 +454,7 @@ Private Function WriteStaffData(wsData As Worksheet, json As String) As Long
             Dim s As String
             Dim fStart As Long
             Dim fEnd As Long
-            s = """" & fields(f) & """:"""
+            s = """" & fields(f) & """: """
             fStart = InStr(obj, s)
             If fStart > 0 Then
                 fStart = fStart + Len(s)
@@ -474,7 +479,7 @@ Private Function ParseJsonField(json As String, fieldName As String) As String
     ParseJsonField = ""
     If json = "" Then Exit Function
     Dim search As String
-    search = """" & fieldName & """:"""
+    search = """" & fieldName & """: """
     Dim pos As Long
     pos = InStr(json, search)
     If pos = 0 Then Exit Function
@@ -540,3 +545,5 @@ Private Function GetCell(address As String) As String
     If Err.Number <> 0 Then GetCell = ""
     On Error GoTo 0
 End Function
+
+    
