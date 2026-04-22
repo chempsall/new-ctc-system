@@ -255,12 +255,6 @@ def api_project():
 @app.route("/api/push", methods=["POST"])
 def api_push():
 
-    ### TEST CODE
-    print(f"Content-Type: {request.content_type}")
-    print(f"Raw data: {request.data[:200]}")
-    print(f"Data length: {len(request.data)}")
-
-
 
     """
     Receives allocation data pushed by the Excel macro on file save.
@@ -621,6 +615,7 @@ def _resolve_staff_id(cursor, name_string):
 
 def create_app():
     database.initialise_database()
+    summary_module.build()
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(

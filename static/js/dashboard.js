@@ -471,8 +471,6 @@ function showProjectDetail(proj) {
   const panel   = document.getElementById("detail-panel");
   const p       = state.activePeriod;
   const linked  = proj.horizon_status === "linked";
-  const fin     = proj.financials || {};
-
   document.getElementById("dp-avatar").textContent = proj.number
     ? proj.number.slice(-4)
     : "PROJ";
@@ -483,10 +481,7 @@ function showProjectDetail(proj) {
   const totalDays = Object.values(proj.total_days).reduce((a, b) => a + b, 0);
   document.getElementById("dp-stat-alloc").textContent  = fmt.days(proj.total_days[p]) + "d";
   document.getElementById("dp-stat-cap").textContent    = fmt.days(totalDays) + "d total";
-  document.getElementById("dp-stat-remain").textContent =
-    linked ? fmt.currency(fin.remaining_fee) : "—";
-  document.getElementById("dp-stat-remain").style.color =
-    fin.remaining_fee < 0 ? "var(--red)" : "var(--green-dark)";
+  document.getElementById("dp-stat-remain").textContent = "—";
 
   document.getElementById("dp-kpi").className   = `horizon horizon--${linked ? "linked" : "norecord"}`;
   document.getElementById("dp-kpi").innerHTML   =
@@ -501,41 +496,8 @@ function showProjectDetail(proj) {
     warnEl.classList.add("hidden");
   }
 
-  // Financial stats
   const projContainer = document.getElementById("dp-projects");
-  if (linked && fin.task_order_fee) {
-    projContainer.innerHTML = `
-      <table class="fin-table">
-        <tr><td>Task order fee</td>
-            <td>${fmt.currency(fin.task_order_fee)}</td></tr>
-        <tr><td>Raw cost to complete</td>
-            <td>${fmt.currency(fin.raw_cost_to_complete)}</td></tr>
-        <tr><td>Burdened cost to complete</td>
-            <td>${fmt.currency(fin.burdened_cost_to_complete)}</td></tr>
-        <tr><td>Budget multiplier</td>
-            <td>${fmt.multiplier(fin.current_budget_multiplier)}</td></tr>
-        <tr><td>Forecast net revenue</td>
-            <td>${fmt.currency(fin.forecast_net_revenue)}</td></tr>
-        <tr class="fin-total"><td>Remaining fee</td>
-            <td style="color:${fin.remaining_fee < 0 ? "var(--red)" : "var(--green-dark)"}">
-              ${fmt.currency(fin.remaining_fee)}</td></tr>
-        ${fin.variance_vs_budget !== null && fin.variance_vs_budget !== undefined ? `
-        <tr><td>Variance vs budget DLM</td>
-            <td style="color:${fin.variance_vs_budget < 0 ? "var(--red)" : "var(--green-dark)"}">
-              ${fmt.multiplier(fin.variance_vs_budget)}</td></tr>
-        ` : ""}
-      </table>`;
-  } else if (!linked) {
-    projContainer.innerHTML =
-      `<div class="empty-state" style="padding:16px">
-         No financial data — project not linked to Horizon
-       </div>`;
-  } else {
-    projContainer.innerHTML =
-      `<div class="empty-state" style="padding:16px">
-         No fee data available for this project
-       </div>`;
-  }
+  projContainer.innerHTML = "";
 
   // Show staff allocated to this project
   const staffLookup = Object.fromEntries(

@@ -332,14 +332,10 @@ Private Function PushToAPI() As Boolean
     http.Open "POST", API_BASE & "/api/push", False
     http.setRequestHeader "Content-Type", "application/json"
     
-    MsgBox "About to send. JSON length: " & Len(json)
-    
     http.send json
-    MsgBox "HTTP Status: " & http.Status & vbCrLf & "Response: " & Left(http.responseText, 300)
     If http.Status = 200 Then PushToAPI = True
     Exit Function
 Fail:
-MsgBox "Error " & Err.Number & ": " & Err.Description
 End Function
 
 
@@ -391,7 +387,7 @@ NextRow:
     Next r
 
     BuildPushJSON = "{" & _
-        """file_path"":""" & Replace(ws.Range(CELL_FILE_PATH).Value, "\", "\\") & """, " & _
+        """file_path"":""" & Replace(ws.Range(CELL_FILE_PATH).Value, "\", "\\") & """," & _
         """project_number"":""" & JsonEscape(GetCell(CELL_PROJECT_NUMBER)) & """," & _
         """task_order_number"":""" & JsonEscape(GetCell(CELL_TASK_ORDER)) & """," & _
         """project_name"":""" & JsonEscape(GetCell(CELL_PROJECT_NAME)) & """," & _

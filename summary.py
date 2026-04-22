@@ -6,8 +6,8 @@ Called after every import run and after every macro push.
 The frontend receives one payload on page load and does all filtering
 in JavaScript — zero additional server requests for any dashboard interaction.
 
-Financial statistics are calculated here using grade_rates (server-side only).
-The rates themselves never appear in the output JSON — only computed results.
+Resourcing data only. Financial calculations are parked pending resourcing
+working reliably — grade_rates table is retained in the database but unused here.
 """
 
 import json
@@ -37,14 +37,6 @@ def _get_active_periods(conn, from_date=None):
     return [dict(r) for r in rows]
 
 
-def _get_rates(conn):
-    """Grade -> rate dict. Used only within this module, never serialised."""
-    rows = conn.execute(
-        "SELECT job_title, raw_cost, burdened_cost FROM grade_rates"
-    ).fetchall()
-    return {r["job_title"]: {"raw": r["raw_cost"], "burdened": r["burdened_cost"]}
-            for r in rows}
-
 
 def build(department: str = None) -> dict:
     """
@@ -57,8 +49,6 @@ def build(department: str = None) -> dict:
 
     periods = _get_active_periods(conn)
     period_starts = [p["period_start"] for p in periods]
-    rates = _get_rates(conn)
-
     # -- Working days lookup -------------------------------------------------
     working_days = {p["label"]: p["working_days"] for p in periods}
 
@@ -221,11 +211,6 @@ def build(department: str = None) -> dict:
             label = period["label"]
             period_days[label] = round(proj_days_map.get(project_id, {}).get(ps, 0), 2)
 
-        # Financial statistics — calculated server-side, rates never exposed
-        financials = _calculate_financials(
-            conn, project_id, p, periods, rates, period_starts
-        )
-
         # A project is "linked" if it came from PAR with Active status
         horizon_status = (
             "linked"
@@ -255,7 +240,6 @@ def build(department: str = None) -> dict:
             "last_pushed":        p["last_pushed"] if "last_pushed" in p.keys() else None,
             "last_imported":      p["last_imported"],
             "total_days":         period_days,
-            "financials":         financials
         })
 
     # -- Conflict warnings ---------------------------------------------------
@@ -287,79 +271,6 @@ def build(department: str = None) -> dict:
     conn.close()
 
     return summary
-
-
-def _calculate_financials(conn, project_id, project_row, periods, rates,
-                          period_starts):
-    """
-    Calculate financial statistics for a project.
-    Combines:
-      - PAR figures already on the project row (budgets, actuals, funding)
-      - Cost-to-complete calculated from future allocations x grade rates
-    Rates are used server-side only and never appear in the output.
-    """
-    # Budget and actuals come directly from the project row (populated by PAR import)
-    budget_dlm      = project_row["current_budget_dlm"] or 0
-    budget_raw      = project_row["current_budget_raw_labor"] or 0
-    budget_nr       = project_row["current_budget_nr"] or 0
-    actual_itd_dlm  = project_row["actual_itd_dlm"]
-    actual_itd_raw  = project_row["actual_itd_raw_labor"]
-    funding_value   = project_row["funding_value"]
-
-    # Cost-to-complete from future allocations x grade rates
-    alloc_rows = conn.execute("""
-            SELECT a.period_start, a.days, s.job_title
-            FROM allocations a
-            JOIN ctc_files cf ON cf.ctc_id = a.ctc_id
-            JOIN staff s ON s.horizon_person_number = a.horizon_person_number
-            WHERE cf.project_id = ?
-            AND a.period_start IN ({})
-        """.format(",".join("?" * len(period_starts))),
-            [project_id] + period_starts
-    ).fetchall()
-
-    raw_ctc = burdened_ctc = 0.0
-    today = __import__("datetime").date.today().isoformat()
-    for r in alloc_rows:
-        if r["period_start"] < today:
-            continue
-        rate = rates.get(r["job_title"], {"raw": 0, "burdened": 0})
-        days = r["days"] or 0
-        raw_ctc      += days * rate["raw"]
-        burdened_ctc += days * rate["burdened"]
-
-    # Variance: actual ITD DLM vs budget DLM
-    variance = None
-    if actual_itd_dlm is not None and budget_dlm:
-        variance = round(actual_itd_dlm - budget_dlm, 4)
-
-    # Remaining budget: funding value minus burdened cost to complete
-    remaining = None
-    if funding_value:
-        remaining = round(funding_value - burdened_ctc, 2)
-
-    return {
-        "funding_value":             round(funding_value, 2) if funding_value else None,
-        "current_budget_dlm":        budget_dlm,
-        "current_budget_raw_labor":  round(budget_raw, 2) if budget_raw else None,
-        "current_budget_nr":         round(budget_nr, 2) if budget_nr else None,
-        "actual_itd_dlm":            actual_itd_dlm,
-        "actual_itd_raw_labor":      round(actual_itd_raw, 2) if actual_itd_raw else None,
-        "raw_cost_to_complete":      round(raw_ctc, 2),
-        "burdened_cost_to_complete": round(burdened_ctc, 2),
-        "remaining_budget":          remaining,
-        "variance_vs_budget_dlm":    variance,
-    }
-
-
-def _staff_name(conn, horizon_person_number):
-    if not horizon_person_number:
-        return None
-    row = conn.execute(
-        "SELECT name FROM staff WHERE horizon_person_number = ?",
-        (horizon_person_number,)
-    ).fetchone()
-    return row["name"] if row else None
 
 
 def _get_departments(conn):
