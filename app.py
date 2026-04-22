@@ -254,6 +254,14 @@ def api_project():
 
 @app.route("/api/push", methods=["POST"])
 def api_push():
+
+    ### TEST CODE
+    print(f"Content-Type: {request.content_type}")
+    print(f"Raw data: {request.data[:200]}")
+    print(f"Data length: {len(request.data)}")
+
+
+
     """
     Receives allocation data pushed by the Excel macro on file save.
 
@@ -266,7 +274,7 @@ def api_push():
     is genuinely new and pending Horizon setup), a minimal project row is
     created as a placeholder and will be enriched by the next PAR import.
     """
-    data = request.get_json(silent=True)
+    data = request.get_json(silent=True, force=True)
     if not data:
         return jsonify({"error": "No JSON body"}), 400
 
@@ -392,7 +400,7 @@ def api_push():
                 project_id, department, ctc_start_date,
                 file_path, conflict_flag, start_date_changed,
                 last_pushed, last_updated_by
-            ) VALUES (?,?,?,?,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?)
         """, (
             project_id, department, ctc_start_date,
             file_path, 1 if conflict else 0, 0,

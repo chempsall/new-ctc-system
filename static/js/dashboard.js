@@ -118,7 +118,24 @@ function buildFilterOptions() {
   populateSelect("filter-department", depts, "All departments");
 
   // Job Titles — from unique values in staff
-  const titles = [...new Set(s.staff.map(p => p.job_title).filter(Boolean))].sort();
+  const gradeOrder = t => {
+    const m = t.match(/^([LPT])(\d+)/);
+    if (!m) return "999";
+
+    const letterOrder = { L: '1', P: '2', T: '3' }[m[1]] || '9';
+
+    const n = parseInt(m[2], 10);
+    const num = String(99 - n).padStart(2, '0');  // supports 1–99
+
+    return letterOrder + num;
+  };
+
+  const titles = [...new Set(s.staff
+    .map(p => p.job_title)
+    .filter(Boolean)
+  )].sort((a, b) => gradeOrder(a).localeCompare(gradeOrder(b)));
+
+
   populateSelect("filter-job-title", titles, "All job titles");
 
   // Disciplines

@@ -308,13 +308,14 @@ def _calculate_financials(conn, project_id, project_row, periods, rates,
 
     # Cost-to-complete from future allocations x grade rates
     alloc_rows = conn.execute("""
-        SELECT a.period_start, a.days, s.job_title
-        FROM allocations a
-        JOIN staff s ON s.horizon_person_number = a.horizon_person_number
-        WHERE a.project_id = ?
-        AND a.period_start IN ({})
-    """.format(",".join("?" * len(period_starts))),
-        [project_id] + period_starts
+            SELECT a.period_start, a.days, s.job_title
+            FROM allocations a
+            JOIN ctc_files cf ON cf.ctc_id = a.ctc_id
+            JOIN staff s ON s.horizon_person_number = a.horizon_person_number
+            WHERE cf.project_id = ?
+            AND a.period_start IN ({})
+        """.format(",".join("?" * len(period_starts))),
+            [project_id] + period_starts
     ).fetchall()
 
     raw_ctc = burdened_ctc = 0.0
