@@ -288,7 +288,7 @@ function renderStaffTable() {
     const pct       = capacity > 0
       ? Math.min(100, (allocated / capacity) * 100).toFixed(1)
       : 0;
-    const isSelected = person.id === state.selectedStaff;
+    const isSelected = String(person.id) === String(state.selectedStaff);
 
     return `<tr data-id="${person.id}" class="${isSelected ? "selected" : ""}">
       <td>
@@ -340,7 +340,7 @@ function renderProjectTable() {
   tbody.innerHTML = projects.map(proj => {
     const days       = proj.total_days[p] || 0;
     const linked     = proj.horizon_status === "linked";
-    const isSelected = proj.project_id === state.selectedProject;
+    const isSelected = String(proj.project_id) === String(state.selectedProject);
     const conflict   = proj.conflict_flag
       ? `<span title="Filename conflict" style="color:var(--amber-dark);margin-left:4px">⚠</span>`
       : "";
@@ -380,7 +380,7 @@ function renderProjectTable() {
 // Detail panel — staff
 // ---------------------------------------------------------------------------
 function selectStaff(id) {
-  const person = state.summary.staff.find(p => p.id === id);
+  const person = state.summary.staff.find(p => String(p.id) === String(id));
   if (!person) return;
 
   state.selectedStaff   = id;
@@ -458,7 +458,7 @@ function showStaffDetail(person) {
 // Detail panel — project
 // ---------------------------------------------------------------------------
 function selectProject(id) {
-  const proj = state.summary.projects.find(p => p.project_id === id);
+  const proj = state.summary.projects.find(p => String(p.project_id) === String(id));
   if (!proj) return;
 
   state.selectedProject = id;
@@ -541,11 +541,11 @@ function selectPeriod(label) {
   });
   renderView();
   if (state.selectedStaff) {
-    const person = state.summary.staff.find(p => p.id === state.selectedStaff);
+    const person = state.summary.staff.find(p => String(p.id) === String(state.selectedStaff));
     if (person) showStaffDetail(person);
   }
   if (state.selectedProject) {
-    const proj = state.summary.projects.find(p => p.project_id === state.selectedProject);
+    const proj = state.summary.projects.find(p => String(p.project_id) === String(state.selectedProject));
     if (proj) showProjectDetail(proj);
   }
 }
@@ -643,14 +643,28 @@ function wireEvents() {
   // Close detail panel
   document.getElementById("dp-close")?.addEventListener("click", closeDetailPanel);
 
-  // Click outside detail panel to close
+  // Click outside detail panel to close.
+  // The row click listener (selectStaff/selectProject) calls renderView(),
+  // which rebuilds tbody.innerHTML and opens the panel — all synchronously,
+  // before this listener runs. By the time this runs, e.target may be a
+  // detached node from the OLD table HTML, so .closest() against it always
+  // fails even though the click genuinely landed on a row. Checking
+  // composedPath() at dispatch time avoids this, since it captures the
+  // event path before any DOM mutation happens.
   document.addEventListener("click", e => {
     const panel = document.getElementById("detail-panel");
-    if (panel.classList.contains("open") &&
-        !panel.contains(e.target) &&
-        !e.target.closest(".staff-table tr, .project-table tr")) {
-      closeDetailPanel();
-    }
+    if (!panel.classList.contains("open")) return;
+    if (panel.contains(e.target)) return;
+
+    const clickedRow = e.composedPath().some(node =>
+      node.nodeType === 1 &&
+      node.tagName === "TR" &&
+      node.dataset &&
+      node.dataset.id !== undefined
+    );
+    if (clickedRow) return;
+
+    closeDetailPanel();
   });
 }
 
