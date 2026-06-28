@@ -38,12 +38,6 @@ Private Const COL_JOB_FUNC     As Long = 4   ' D
 Private Const ALLOC_FIRST_COL  As Long = 5   ' E - first month
 Private Const NUM_MONTHS       As Long = 36
 
-' Colours
-Private Const COLOR_HEADER_NORMAL    As Long = RGB(151, 193, 231)
-Private Const COLOR_HEADER_CURRENT   As Long = RGB(23, 55, 94)
-Private Const COLOR_DATA_NORMAL      As Long = RGB(255, 255, 255)
-Private Const COLOR_DATA_CURRENT     As Long = RGB(220, 230, 241)
-Private Const COLOR_START_UNSAVED    As Long = RGB(255, 192, 0)   ' orange
 
 
 ' =============================================================================
@@ -403,23 +397,23 @@ Private Sub HighlightCurrentMonth()
         ' --- Header cell colour ---------------------------------------
         If col = ALLOC_FIRST_COL And Not isSaved Then
             ' First column before first save: always orange, regardless of month
-            ws.Cells(HEADER_ROW, col).Interior.Color = COLOR_START_UNSAVED
+            ws.Cells(HEADER_ROW, col).Interior.Color = RGB(255, 192, 0)
             ws.Cells(HEADER_ROW, col).Font.Color = RGB(0, 0, 0)
         ElseIf isCurrentMonth Then
-            ws.Cells(HEADER_ROW, col).Interior.Color = COLOR_HEADER_CURRENT
+            ws.Cells(HEADER_ROW, col).Interior.Color = RGB(23, 55, 94)
             ws.Cells(HEADER_ROW, col).Font.Color = RGB(255, 255, 255)
             currentMonthFound = True
         Else
-            ws.Cells(HEADER_ROW, col).Interior.Color = COLOR_HEADER_NORMAL
+            ws.Cells(HEADER_ROW, col).Interior.Color = RGB(151, 193, 231)
             ws.Cells(HEADER_ROW, col).Font.Color = RGB(0, 0, 0)
         End If
 
         ' --- Data cell colours ------------------------------------------
         For r = FIRST_DATA_ROW To LAST_DATA_ROW
             If isCurrentMonth Then
-                ws.Cells(r, col).Interior.Color = COLOR_DATA_CURRENT
+                ws.Cells(r, col).Interior.Color = RGB(220, 230, 241)
             Else
-                ws.Cells(r, col).Interior.Color = COLOR_DATA_NORMAL
+                ws.Cells(r, col).Interior.Color = RGB(255, 255, 255)
             End If
         Next r
 
