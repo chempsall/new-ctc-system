@@ -489,7 +489,7 @@ Private Function BuildPushJSON() As String
             allocJSON = allocJSON & "{" & _
                 """horizon_person_number"":""" & JsonEscape(horizonID) & """," & _
                 """period_start"":""" & Format(CDate(hdrVal), "yyyy-mm-dd") & """," & _
-                """days"":" & Format(days, "0.##") & "}"
+                """days"":" & Format(days, "0.00") & "}"
 NextCol:
         Next c
 NextRow:

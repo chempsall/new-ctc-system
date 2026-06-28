@@ -277,6 +277,7 @@ def api_push():
             print("...but it WAS valid JSON when parsed directly?!")
         except Exception as e:
             print(f"json.loads error: {e}")
+            print(f"Context around char 523: {raw[510:540]!r}")
         return jsonify({"error": "No JSON body"}), 400
 
     missing = [f for f in ["file_path", "ctc_start_date", "allocations"]
