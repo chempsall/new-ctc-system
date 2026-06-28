@@ -24,6 +24,7 @@ Private Const CELL_DIRECTOR        As String = "C11"
 Private Const CELL_MANAGER         As String = "C12"
 Private Const CELL_LAST_UPDATED_BY As String = "C13"
 Private Const CELL_FILE_PATH       As String = "A1" ' (hidden)
+Private Const CELL_IS_SAVED        As String = "A2" ' (hidden) "1" once first save has completed
 
 ' Staff grid layout
 Private Const WORKING_DAYS_ROW As Long = 15
@@ -37,6 +38,13 @@ Private Const COL_JOB_FUNC     As Long = 4   ' D
 Private Const ALLOC_FIRST_COL  As Long = 5   ' E - first month
 Private Const NUM_MONTHS       As Long = 36
 
+' Colours
+Private Const COLOR_HEADER_NORMAL    As Long = RGB(151, 193, 231)
+Private Const COLOR_HEADER_CURRENT   As Long = RGB(23, 55, 94)
+Private Const COLOR_DATA_NORMAL      As Long = RGB(255, 255, 255)
+Private Const COLOR_DATA_CURRENT     As Long = RGB(220, 230, 241)
+Private Const COLOR_START_UNSAVED    As Long = RGB(255, 192, 0)   ' orange
+
 
 ' =============================================================================
 ' ON OPEN
@@ -47,7 +55,28 @@ Public Sub OnOpen()
 
     PopulateStaffDropdown
     HighlightCurrentMonth
+    EnforceStartDateLock
     Application.StatusBar = False
+
+End Sub
+
+
+' Defensive check — re-applies the start date lock on every open if the
+' file has already been saved once, in case protection was somehow lost
+' (e.g. file edited outside Excel, or protection reset manually).
+Private Sub EnforceStartDateLock()
+
+    If GetCell(CELL_IS_SAVED) <> "1" Then Exit Sub
+
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Resources")
+
+    If Not ws.Range(CELL_START_DATE).Locked Then
+        ws.Unprotect Password:=PASSWORD
+        ws.Range(CELL_START_DATE).Locked = True
+        ws.Protect Password:=PASSWORD, Contents:=True, _
+            DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
+    End If
 
 End Sub
 
@@ -62,6 +91,21 @@ Public Sub OnBeforeSave(Cancel As Boolean)
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
 
+    ' --- Check file extension --------------------------------------------
+    ' Must be .xlsm or the macro itself will be stripped out on save,
+    ' silently breaking the push to the server with no error shown.
+    Dim ext As String
+    ext = LCase(Right(ThisWorkbook.FullName, 5))
+    If ext <> ".xlsm" Then
+        MsgBox "This file must be saved as an Excel Macro-Enabled Workbook (.xlsm)." & vbCrLf & _
+               "Any other format (such as .xlsx) will remove the code that sends" & vbCrLf & _
+               "your data to the resource forecast server." & vbCrLf & vbCrLf & _
+               "Please choose .xlsm from the 'Save as type' list and try again.", _
+               vbCritical, "Wrong file format"
+        Cancel = True
+        Exit Sub
+    End If
+
     ' --- Validate CTCStartDate -------------------------------------------
     Dim startDate As Variant
     startDate = ws.Range(CELL_START_DATE).Value
@@ -72,6 +116,27 @@ Public Sub OnBeforeSave(Cancel As Boolean)
         ws.Range(CELL_START_DATE).Select
         Cancel = True
         Exit Sub
+    End If
+
+    ' --- First-save warning + lock-down -----------------------------------
+    ' The start date drives every month column via formula. Once allocations
+    ' exist against those months, changing the start date would silently
+    ' shift every figure into the wrong month. So it can only be set freely
+    ' up to and including the first save; after that it is locked.
+    Dim isSaved As Boolean
+    isSaved = (GetCell(CELL_IS_SAVED) = "1")
+
+    If Not isSaved Then
+        Dim response As VbMsgBoxResult
+        response = MsgBox("The CTC Start Date cannot be changed once this file has been saved." & vbCrLf & vbCrLf & _
+               "Current start date: " & Format(startDate, "mmm-yy") & vbCrLf & vbCrLf & _
+               "Continue saving with this start date?", _
+               vbExclamation + vbYesNo, "Start date will be locked")
+        If response = vbNo Then
+            Cancel = True
+            ws.Range(CELL_START_DATE).Select
+            Exit Sub
+        End If
     End If
 
     ' --- Validate Project Number ----------------------------------------
@@ -115,6 +180,11 @@ Public Sub OnBeforeSave(Cancel As Boolean)
                "The file has been saved locally." & vbCrLf & _
                "Data will sync on the next successful save.", _
                vbExclamation, "Server not reachable"
+    End If
+
+    ' --- Lock down start date after first save ---------------------------
+    If Not isSaved Then
+        LockStartDate
     End If
 
 End Sub
@@ -273,11 +343,32 @@ Private Sub PopulateStaffDropdown()
 End Sub
 
 
+Private Sub LockStartDate()
+
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Resources")
+    ws.Unprotect Password:=PASSWORD
+
+    ' Record that the file has now been saved once — start date is
+    ' permanently locked from this point on.
+    ws.Range(CELL_IS_SAVED).Value = "1"
+    ws.Range(CELL_START_DATE).Locked = True
+
+    ws.Protect Password:=PASSWORD, Contents:=True, _
+        DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
+
+    ' Re-run so the first month column resolves to its proper
+    ' normal/current colour instead of staying orange.
+    HighlightCurrentMonth
+
+End Sub
+
+
 Private Sub HighlightCurrentMonth()
 
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
-    ws.Unprotect PASSWORD:=PASSWORD
+    ws.Unprotect Password:=PASSWORD
 
     Dim monthNames(11) As String
     monthNames(0) = "Jan": monthNames(1) = "Feb": monthNames(2) = "Mar"
@@ -288,33 +379,57 @@ Private Sub HighlightCurrentMonth()
     Dim today As String
     today = monthNames(Month(Now()) - 1) & "-" & Right(CStr(Year(Now())), 2)
 
+    Dim isSaved As Boolean
+    isSaved = (GetCell(CELL_IS_SAVED) = "1")
+
     Dim col As Long
     Dim r As Long
+    Dim currentMonthFound As Boolean
+    currentMonthFound = False
+
     For col = ALLOC_FIRST_COL To ALLOC_FIRST_COL + NUM_MONTHS - 1
+
         Dim hdrVal As Variant
         hdrVal = ws.Cells(HEADER_ROW, col).Value
+
+        Dim isCurrentMonth As Boolean
+        isCurrentMonth = False
         If IsDate(hdrVal) Then
             Dim lbl As String
             lbl = monthNames(Month(hdrVal) - 1) & "-" & Right(CStr(Year(hdrVal)), 2)
-            If lbl = today Then
-                ws.Cells(HEADER_ROW, col).Interior.Color = RGB(23, 55, 94)
-                For r = FIRST_DATA_ROW To LAST_DATA_ROW
-                    ws.Cells(r, col).Interior.Color = RGB(220, 230, 241)
-                Next r
-                Exit For
-            End If
+            isCurrentMonth = (lbl = today)
         End If
+
+        ' --- Header cell colour ---------------------------------------
+        If col = ALLOC_FIRST_COL And Not isSaved Then
+            ' First column before first save: always orange, regardless of month
+            ws.Cells(HEADER_ROW, col).Interior.Color = COLOR_START_UNSAVED
+            ws.Cells(HEADER_ROW, col).Font.Color = RGB(0, 0, 0)
+        ElseIf isCurrentMonth Then
+            ws.Cells(HEADER_ROW, col).Interior.Color = COLOR_HEADER_CURRENT
+            ws.Cells(HEADER_ROW, col).Font.Color = RGB(255, 255, 255)
+            currentMonthFound = True
+        Else
+            ws.Cells(HEADER_ROW, col).Interior.Color = COLOR_HEADER_NORMAL
+            ws.Cells(HEADER_ROW, col).Font.Color = RGB(0, 0, 0)
+        End If
+
+        ' --- Data cell colours ------------------------------------------
+        For r = FIRST_DATA_ROW To LAST_DATA_ROW
+            If isCurrentMonth Then
+                ws.Cells(r, col).Interior.Color = COLOR_DATA_CURRENT
+            Else
+                ws.Cells(r, col).Interior.Color = COLOR_DATA_NORMAL
+            End If
+        Next r
+
     Next col
 
-    ws.Protect PASSWORD:=PASSWORD, Contents:=True, _
+    ws.Protect Password:=PASSWORD, Contents:=True, _
         DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
 End Sub
 
-
-' =============================================================================
-' API PUSH
-' =============================================================================
 
 Private Function PushToAPI() As Boolean
 
@@ -380,7 +495,7 @@ Private Function BuildPushJSON() As String
             allocJSON = allocJSON & "{" & _
                 """horizon_person_number"":""" & JsonEscape(horizonID) & """," & _
                 """period_start"":""" & Format(CDate(hdrVal), "yyyy-mm-dd") & """," & _
-                """days"":" & Format(days, "0.00") & "}"
+                """days"":" & Format(days, "0.##") & "}"
 NextCol:
         Next c
 NextRow:
