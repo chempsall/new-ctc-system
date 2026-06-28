@@ -198,6 +198,23 @@ a:hover { text-decoration: underline; }
   margin: 0 4px;
 }
 
+.filter-reset-btn {
+  font-family: var(--font-body);
+  font-size: 12px; font-weight: 500;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  margin-left: auto;
+}
+.filter-reset-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
 /* Month tabs */
 .month-tabs {
   display: flex; gap: 4px;

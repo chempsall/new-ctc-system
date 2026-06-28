@@ -604,6 +604,31 @@ function updateStatusBar() {
 }
 
 // ---------------------------------------------------------------------------
+// Reset all filters back to defaults
+// ---------------------------------------------------------------------------
+function resetFilters() {
+  state.filters.job_function = "all";
+  state.filters.job_title    = "all";
+  state.filters.department   = "all";
+  state.filters.horizon      = "all";
+  state.filters.search       = "";
+
+  const deptSel  = document.getElementById("filter-department");
+  const titleSel = document.getElementById("filter-job-title");
+  const funcSel  = document.getElementById("filter-job-function");
+  const horizonSel = document.getElementById("filter-horizon");
+  const searchEl  = document.getElementById("filter-search");
+
+  if (deptSel)    deptSel.value    = "all";
+  if (titleSel)   titleSel.value   = "all";
+  if (funcSel)    funcSel.value    = "all";
+  if (horizonSel) horizonSel.value = "all";
+  if (searchEl)   searchEl.value   = "";
+
+  renderView();
+}
+
+// ---------------------------------------------------------------------------
 // Wire up events
 // ---------------------------------------------------------------------------
 function wireEvents() {
@@ -639,6 +664,9 @@ function wireEvents() {
       renderView();
     });
   }
+
+  // Reset filters
+  document.getElementById("filter-reset")?.addEventListener("click", resetFilters);
 
   // Close detail panel
   document.getElementById("dp-close")?.addEventListener("click", closeDetailPanel);
