@@ -254,8 +254,6 @@ def api_project():
 
 @app.route("/api/push", methods=["POST"])
 def api_push():
-
-
     """
     Receives allocation data pushed by the Excel macro on file save.
 
@@ -270,11 +268,13 @@ def api_push():
     """
     data = request.get_json(silent=True, force=True)
     if not data:
+        print(f"PUSH FAILED — no JSON body. Raw data: {request.data[:300]!r}")
         return jsonify({"error": "No JSON body"}), 400
 
     missing = [f for f in ["file_path", "ctc_start_date", "allocations"]
                if f not in data]
     if missing:
+        print(f"PUSH FAILED — missing fields: {missing}. Data keys: {list(data.keys())}")
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
 
     file_path      = data["file_path"]
@@ -290,19 +290,6 @@ def api_push():
     c    = conn.cursor()
     now  = datetime.now(timezone.utc).isoformat()
     warnings = []
-
-
-    data = request.get_json(silent=True, force=True)
-    if not data:
-        print(f"PUSH FAILED. Raw data: {request.data[:300]}")
-        return jsonify({"error": "No JSON body"}), 400
-
-    missing = [f for f in ["file_path", "ctc_start_date", "allocations"] if f not in data]
-    if missing:
-        print(f"PUSH FAILED. Missing fields: {missing}. Data keys: {list(data.keys())}")
-
-
-
 
     # ------------------------------------------------------------------
     # Step 1: Find or create the project row
