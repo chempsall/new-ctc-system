@@ -268,7 +268,15 @@ def api_push():
     """
     data = request.get_json(silent=True, force=True)
     if not data:
-        print(f"PUSH FAILED — no JSON body. Raw data: {request.data[:300]!r}")
+        raw = request.data.decode("utf-8", errors="replace")
+        print(f"PUSH FAILED — no JSON body. Length: {len(raw)}")
+        print(f"Raw data (plain): {raw[:400]}")
+        import json as _json
+        try:
+            _json.loads(raw)
+            print("...but it WAS valid JSON when parsed directly?!")
+        except Exception as e:
+            print(f"json.loads error: {e}")
         return jsonify({"error": "No JSON body"}), 400
 
     missing = [f for f in ["file_path", "ctc_start_date", "allocations"]
