@@ -590,16 +590,28 @@ function updateStatusBar() {
   const el = document.getElementById("status-text");
   if (!el || !s) return;
 
-  const imports = s.last_imports || {};
-  const staffRun = imports.staff_list?.last_run;
-  if (staffRun) {
-    const d = new Date(staffRun);
-    el.innerHTML = `Data refreshed <strong>${d.toLocaleDateString("en-GB", {
+  const fmtDate = iso => {
+    if (!iso) return null;
+    return new Date(iso).toLocaleDateString("en-GB", {
       day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
-    })}</strong>`;
+    });
+  };
+
+  const imports = s.last_imports || {};
+  const staffRun = fmtDate(imports.staff_list?.last_run);
+  const parRun = fmtDate(imports.par_import?.last_run);
+  const builtAt = fmtDate(s.generated_at);
+
+  const parts = [];
+  if (builtAt) parts.push(`Dashboard built <strong>${builtAt}</strong>`);
+  if (staffRun) parts.push(`Staff list imported <strong>${staffRun}</strong>`);
+  if (parRun) parts.push(`PAR imported <strong>${parRun}</strong>`);
+  
+  if (parts.length > 0) {
+    el.innerHTML = parts.join(" &nbsp;&nbsp; ");
   } else {
-    el.innerHTML = `<strong>${s.staff.length}</strong> staff · ` +
-                   `<strong>${s.projects.length}</strong> projects`;
+    el.innerHTML = '<strong>${s.staff.length}</strong> staff · ' +
+                   '<strong>${s.projects.length}</strong> projects';
   }
 }
 
