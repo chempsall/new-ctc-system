@@ -1,5 +1,20 @@
 Option Explicit
 
+' Windows API call used to generate a genuine random GUID for each CTC
+' file (see NewGuid below) — the same underlying mechanism every other
+' Windows application uses, so uniqueness is guaranteed regardless of how
+' many people are creating files at once on different machines.
+Private Declare PtrSafe Function CoCreateGuid Lib "ole32.dll" (ByRef guid As Byte) As Long
+
+' Set by OnBeforeSave, read by OnAfterSave. The push and the "saved in the
+' right folder?" check both need ThisWorkbook.FullName to be settled and
+' accurate — which it is NOT yet during BeforeSave, especially mid-way
+' through a Save As dialog (Excel can report a transient/incomplete path
+' while the dialog is still open). So those checks happen in AfterSave,
+' once the save has genuinely finished — these flags carry the bits of
+' state AfterSave needs that BeforeSave already knows.
+Private pendingPush     As Boolean   ' validation passed — safe to attempt a push
+
 ' =============================================================================
 ' CTC_Macro.bas
 ' Resource Forecast - CTC Template Macro
@@ -11,6 +26,15 @@ Option Explicit
 ' ---------------------------------------------------------------------------
 Private Const API_BASE   As String = "http://localhost:5000"
 Private Const PASSWORD   As String = "Cyberdyne"
+
+' The folder CTC files must be saved under for their data to be pushed to
+' the server. Files saved outside this folder will still save normally,
+' but their allocations will NOT reach the database — a popup explains why.
+'
+' This single line is the only thing that needs to change when files move
+' to SharePoint — e.g.:
+'   "https://wsponline.sharepoint.com/sites/.../Resource to Complete"
+Private Const ALLOWED_ROOT As String = "C:\Users\UKCMH001\Dev\new-ctc-system\Resource to Complete"
 
 ' Header cell addresses
 Private Const CELL_START_DATE      As String = "E16"
@@ -25,6 +49,7 @@ Private Const CELL_MANAGER         As String = "C12"
 Private Const CELL_LAST_UPDATED_BY As String = "C13"
 Private Const CELL_FILE_PATH       As String = "A1" ' (hidden)
 Private Const CELL_IS_SAVED        As String = "A2" ' (hidden) "1" once first save has completed
+Private Const CELL_GUID            As String = "A3" ' (hidden) generated once, identifies this file permanently even if renamed/moved
 
 ' Staff grid layout
 Private Const WORKING_DAYS_ROW As Long = 15
@@ -46,6 +71,21 @@ Private Const NUM_MONTHS       As Long = 36
 ' =============================================================================
 
 Public Sub OnOpen()
+
+    ' Pre-selects "Excel Macro-Enabled Workbook (*.xlsm)" in the Save/Save As
+    ' dialog for the rest of this Excel session, so whenever this file is
+    ' first saved, the right format is already chosen — no dialog of our
+    ' own, no risk of someone picking .xlsx by accident from a long list.
+    Application.DefaultSaveFormat = 52   ' xlOpenXMLWorkbookMacroEnabled
+
+    ' For a brand-new file (never saved — ThisWorkbook.Path is empty), also
+    ' point the Save dialog at the agreed root folder by default, so people
+    ' aren't dropped into OneDrive or wherever Excel last happened to save.
+    ' This only affects files that haven't been saved yet; once a file has
+    ' a real location, this has no further effect on it.
+    If ThisWorkbook.Path = "" Then
+        Application.DefaultFilePath = ALLOWED_ROOT
+    End If
 
     PopulateStaffDropdown
     HighlightCurrentMonth
@@ -85,20 +125,11 @@ Public Sub OnBeforeSave(Cancel As Boolean)
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Resources")
 
-    ' --- Check file extension --------------------------------------------
-    ' Must be .xlsm or the macro itself will be stripped out on save,
-    ' silently breaking the push to the server with no error shown.
-    Dim ext As String
-    ext = LCase(Right(ThisWorkbook.FullName, 5))
-    If ext <> ".xlsm" Then
-        MsgBox "This file must be saved as an Excel Macro-Enabled Workbook (.xlsm)." & vbCrLf & _
-               "Any other format (such as .xlsx) will remove the code that sends" & vbCrLf & _
-               "your data to the resource forecast server." & vbCrLf & vbCrLf & _
-               "Please choose .xlsm from the 'Save as type' list and try again.", _
-               vbCritical, "Wrong file format"
-        Cancel = True
-        Exit Sub
-    End If
+    ' If this IS the template (.xltm), stop here — no validation, no push.
+    ' The template itself has no real project data and should just save
+    ' normally like any other file. (Extension format itself is checked
+    ' separately, after the save completes — see OnAfterSave.)
+    If LCase(Right(ThisWorkbook.FullName, 5)) = ".xltm" Then Exit Sub
 
     ' --- Validate CTCStartDate -------------------------------------------
     Dim startDate As Variant
@@ -164,22 +195,98 @@ Public Sub OnBeforeSave(Cancel As Boolean)
     ' --- Write macro-owned fields ---------------------------------------
     ws.Unprotect PASSWORD:=PASSWORD
     ws.Range(CELL_LAST_UPDATED_BY).Value = Application.UserName
-    ws.Range(CELL_FILE_PATH).Value = ThisWorkbook.FullName
+    EnsureGuid ws
     ws.Protect PASSWORD:=PASSWORD, Contents:=True, _
         DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
 
-    ' --- Push to server -------------------------------------------------
-    If Not PushToAPI() Then
-        MsgBox "Could not connect to the resource forecast server." & vbCrLf & _
-               "The file has been saved locally." & vbCrLf & _
-               "Data will sync on the next successful save.", _
-               vbExclamation, "Server not reachable"
-    End If
+    ' --- Defer the push and location check to AfterSave -------------------
+    ' ThisWorkbook.FullName isn't reliable here, especially mid-way through
+    ' a Save As dialog. Once AfterSave fires, the path is settled, and
+    ' THAT is when we check location, write file_path, and push.
+    pendingPush = True
 
     ' --- Lock down start date after first save ---------------------------
     If Not isSaved Then
         LockStartDate
     End If
+
+End Sub
+
+
+' =============================================================================
+' AFTER SAVE
+' Called from ThisWorkbook.Workbook_AfterSave
+'
+' Checks the file format only once the save has genuinely finished, when
+' ThisWorkbook.FullName is guaranteed accurate. Checking this in
+' BeforeSave instead caused false alarms during the Save As dialog itself
+' — Excel can report a transient/incomplete filename while the dialog is
+' still open (e.g. while clicking "Browse"), which BeforeSave sees before
+' the user has actually finished choosing where to save.
+'
+' Because the save has already happened, we can't block a bad save — but
+' DefaultSaveFormat (set in OnOpen) makes .xlsm the pre-selected option
+' for every save, so this should only ever fire if someone deliberately
+' overrides that choice.
+' =============================================================================
+
+Public Sub OnAfterSave(ByVal Success As Boolean)
+
+    If Not Success Then
+        pendingPush = False   ' save didn't happen — nothing to push
+        Exit Sub
+    End If
+
+    Dim ext As String
+    ext = LCase(Right(ThisWorkbook.FullName, 5))
+
+    If ext <> ".xlsm" And ext <> ".xltm" Then
+        MsgBox "This file has been saved as the wrong format." & vbCrLf & vbCrLf & _
+               "It must be an Excel Macro-Enabled Workbook (.xlsm), or the code " & _
+               "that sends your data to the resource forecast server will be lost." & vbCrLf & vbCrLf & _
+               "Please use File > Save As now and choose " & _
+               "'Excel Macro-Enabled Workbook (*.xlsm)' to fix this.", _
+               vbCritical, "Wrong file format saved"
+        pendingPush = False
+        Exit Sub
+    End If
+
+    ' .xltm is the template itself — never validated, never pushed.
+    If ext = ".xltm" Then
+        pendingPush = False
+        Exit Sub
+    End If
+
+    If Not pendingPush Then Exit Sub   ' nothing to do — e.g. AfterSave fired
+                                        ' for a save BeforeSave didn't validate
+
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Resources")
+
+    ' Now that the path is settled, record it and check the location —
+    ' both were unreliable to check any earlier than this.
+    ws.Unprotect PASSWORD:=PASSWORD
+    ws.Range(CELL_FILE_PATH).Value = ThisWorkbook.FullName
+    ws.Protect PASSWORD:=PASSWORD, Contents:=True, _
+        DrawingObjects:=True, Scenarios:=True, UserInterfaceOnly:=True
+
+    If IsInAllowedLocation() Then
+        If Not PushToAPI() Then
+            MsgBox "Could not connect to the resource forecast server." & vbCrLf & _
+                   "The file has been saved locally." & vbCrLf & _
+                   "Data will sync on the next successful save.", _
+                   vbExclamation, "Server not reachable"
+        End If
+    Else
+        MsgBox "This file is not saved in the agreed Resource to Complete folder." & vbCrLf & vbCrLf & _
+               "The file has been saved, but its data will NOT be sent to the " & _
+               "resource forecast server." & vbCrLf & vbCrLf & _
+               "Move it into:" & vbCrLf & ALLOWED_ROOT & vbCrLf & _
+               "and save again to have it included in the dashboard.", _
+               vbExclamation, "File outside agreed location"
+    End If
+
+    pendingPush = False
 
 End Sub
 
@@ -496,6 +603,7 @@ NextRow:
     Next r
 
     BuildPushJSON = "{" & _
+        """ctc_guid"":""" & JsonEscape(GetCell(CELL_GUID)) & """," & _
         """file_path"":""" & Replace(ws.Range(CELL_FILE_PATH).Value, "\", "\\") & """," & _
         """project_number"":""" & JsonEscape(GetCell(CELL_PROJECT_NUMBER)) & """," & _
         """task_order_number"":""" & JsonEscape(GetCell(CELL_TASK_ORDER)) & """," & _
@@ -605,6 +713,63 @@ Private Function IsPlaceholder(s As String) As Boolean
             IsPlaceholder = False
     End Select
 End Function
+
+
+' Checks whether the current file is saved somewhere under ALLOWED_ROOT.
+' Case-insensitive (Windows paths) and tolerant of a trailing backslash
+' on either side of the comparison.
+Private Function IsInAllowedLocation() As Boolean
+
+    Dim filePath As String
+    Dim root     As String
+
+    filePath = LCase(ThisWorkbook.FullName)
+    root     = LCase(ALLOWED_ROOT)
+
+    ' Normalise: ensure root ends with exactly one backslash, so a file
+    ' directly named "...Resource to CompleteX\file.xlsm" can't false-match
+    ' a root of "...Resource to Complete" without the separator.
+    If Right(root, 1) <> "\" Then root = root & "\"
+
+    IsInAllowedLocation = (Left(filePath, Len(root)) = root)
+
+End Function
+
+
+' Generates a genuine random GUID (e.g. "3F2504E0-4F89-11D3-9A0C-0305E82C3301")
+' using the Windows COM library — the same mechanism .NET, PowerShell, and
+' everything else on Windows ultimately uses. 122 random bits means the
+' chance of two files ever getting the same GUID is negligible even across
+' many thousands of files created by hundreds of people simultaneously.
+Private Function NewGuid() As String
+
+    Dim bytes(15) As Byte
+    CoCreateGuid bytes(0)
+
+    Dim i As Integer
+    Dim result As String
+    For i = 0 To 15
+        result = result & Right("0" & Hex(bytes(i)), 2)
+    Next i
+
+    NewGuid = Mid(result, 1, 8) & "-" & Mid(result, 9, 4) & "-" & _
+              Mid(result, 13, 4) & "-" & Mid(result, 17, 4) & "-" & Mid(result, 21, 12)
+
+End Function
+
+
+' Writes a GUID into the hidden cell if one doesn't already exist. Called
+' once, the first time a file is genuinely saved with real data — after
+' that the GUID never changes, so the server can always recognise this
+' file as "the same one" no matter how many times it's renamed or moved.
+' Caller is responsible for unprotecting/reprotecting the sheet.
+Private Sub EnsureGuid(ws As Worksheet)
+
+    If GetCell(CELL_GUID) = "" Then
+        ws.Range(CELL_GUID).Value = NewGuid()
+    End If
+
+End Sub
 
 
 Private Function JsonEscape(s As String) As String

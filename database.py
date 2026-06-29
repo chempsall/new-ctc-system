@@ -147,10 +147,11 @@ def initialise_database():
     c.execute("""
         CREATE TABLE IF NOT EXISTS ctc_files (
             ctc_id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            ctc_guid                TEXT    NOT NULL UNIQUE,
             project_id              INTEGER NOT NULL REFERENCES projects(project_id),
             department              TEXT    NOT NULL,
             ctc_start_date          TEXT,
-            file_path               TEXT    NOT NULL UNIQUE,
+            file_path               TEXT    NOT NULL,
             conflict_flag           INTEGER NOT NULL DEFAULT 0,
             start_date_changed      INTEGER NOT NULL DEFAULT 0,
             previous_ctc_start_date TEXT,
@@ -167,7 +168,7 @@ def initialise_database():
         CREATE TABLE IF NOT EXISTS allocations (
             allocation_id           INTEGER PRIMARY KEY AUTOINCREMENT,
             horizon_person_number   TEXT    NOT NULL REFERENCES staff(horizon_person_number),
-            ctc_id                  INTEGER NOT NULL REFERENCES ctc_files(ctc_id),
+            ctc_id                  INTEGER NOT NULL REFERENCES ctc_files(ctc_id) ON DELETE CASCADE,
             period_start            TEXT    NOT NULL,
             days                    REAL    NOT NULL DEFAULT 0,
             pushed_at               TEXT    NOT NULL,

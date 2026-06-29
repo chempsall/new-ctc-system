@@ -80,6 +80,63 @@ def require_admin(f):
     return decorated
 
 
+def _cleanup_deleted_ctc_files() -> dict:
+    """
+    Checks every row in ctc_files to see whether its source file still
+    exists on disk. If a file has been deleted (or moved — moves are
+    indistinguishable from delete+recreate, which is an accepted limitation
+    for now), its ctc_files row is removed, and ON DELETE CASCADE removes
+    the associated allocations automatically.
+
+    Returns a summary dict, and also writes a full record (including which
+    files were removed) to import_log as import_type "cleanup".
+    """
+    started_at = datetime.now(timezone.utc).isoformat()
+    conn = database.get_connection()
+    c    = conn.cursor()
+
+    rows = c.execute("""
+        SELECT cf.ctc_id, cf.file_path, p.project_number, p.project_name,
+               (SELECT COUNT(*) FROM allocations a WHERE a.ctc_id = cf.ctc_id) AS alloc_count
+        FROM ctc_files cf
+        JOIN projects p ON p.project_id = cf.project_id
+    """).fetchall()
+
+    removed = []
+    for row in rows:
+        if not Path(row["file_path"]).exists():
+            c.execute("DELETE FROM ctc_files WHERE ctc_id = ?", (row["ctc_id"],))
+            removed.append({
+                "ctc_id":         row["ctc_id"],
+                "file_path":      row["file_path"],
+                "project_number": row["project_number"],
+                "project_name":   row["project_name"],
+                "allocations_removed": row["alloc_count"],
+            })
+
+    completed_at = datetime.now(timezone.utc).isoformat()
+
+    c.execute("""
+        INSERT INTO import_log
+            (import_type, filename, started_at, completed_at,
+             rows_processed, rows_inserted, rows_updated, errors)
+        VALUES (?,?,?,?,?,?,?,?)
+    """, ("cleanup", None, started_at, completed_at,
+          len(rows), 0, 0, json.dumps(removed)))
+
+    conn.commit()
+    conn.close()
+
+    if removed:
+        summary_module.build()
+
+    return {
+        "files_checked": len(rows),
+        "files_removed": len(removed),
+        "removed":       removed,
+    }
+
+
 # ---------------------------------------------------------------------------
 # SCHEDULED JOBS
 # ---------------------------------------------------------------------------
@@ -87,8 +144,8 @@ def require_admin(f):
 def _nightly_imports():
     """
     Runs at the time configured in config.py (default midnight).
-    Imports all three data sources then rebuilds the summary cache.
-    Paths come from config — no hardcoding.
+    Imports all three data sources, cleans up deleted CTC files,
+    then rebuilds the summary cache. Paths come from config — no hardcoding.
     """
     print(f"[{datetime.now(timezone.utc).isoformat()}] Starting nightly import")
 
@@ -106,6 +163,14 @@ def _nightly_imports():
     print(f"  PAR import: {r['rows_processed']} rows, "
           f"{r['rows_inserted']} inserted, {r['rows_updated']} updated"
           + (f", {len(r['errors'])} errors" if r["errors"] else ""))
+
+    # Remove CTC files that no longer exist on disk
+    cleanup = _cleanup_deleted_ctc_files()
+    print(f"  Cleanup: {cleanup['files_checked']} files checked, "
+          f"{cleanup['files_removed']} removed")
+    for item in cleanup["removed"]:
+        print(f"    Removed: {item['file_path']} "
+              f"({item['project_number']} — {item['allocations_removed']} allocation rows)")
 
     summary_module.build()
     print(f"  Summary cache rebuilt")
@@ -268,24 +333,16 @@ def api_push():
     """
     data = request.get_json(silent=True, force=True)
     if not data:
-        raw = request.data.decode("utf-8", errors="replace")
-        print(f"PUSH FAILED — no JSON body. Length: {len(raw)}")
-        print(f"Raw data (plain): {raw[:400]}")
-        import json as _json
-        try:
-            _json.loads(raw)
-            print("...but it WAS valid JSON when parsed directly?!")
-        except Exception as e:
-            print(f"json.loads error: {e}")
-            print(f"Context around char 523: {raw[510:540]!r}")
+        print(f"Push rejected: invalid JSON body ({len(request.data)} bytes received)")
         return jsonify({"error": "No JSON body"}), 400
 
-    missing = [f for f in ["file_path", "ctc_start_date", "allocations"]
+    missing = [f for f in ["ctc_guid", "file_path", "ctc_start_date", "allocations"]
                if f not in data]
     if missing:
-        print(f"PUSH FAILED — missing fields: {missing}. Data keys: {list(data.keys())}")
+        print(f"Push rejected: missing fields {missing}")
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
 
+    ctc_guid       = data["ctc_guid"]
     file_path      = data["file_path"]
     file_name      = os.path.basename(file_path)
     # Department is derived from project_organisation (from PAR data)
@@ -363,10 +420,15 @@ def api_push():
 
     # ------------------------------------------------------------------
     # Step 3: Upsert ctc_files row
+    # Keyed on ctc_guid (a permanent ID generated once by the macro), NOT
+    # file_path. This is deliberate: file_path changes if someone renames
+    # or moves the file, but the GUID doesn't — so a rename/move correctly
+    # updates the existing row instead of creating a duplicate that would
+    # double-count the same allocations under two different ctc_id values.
     # ------------------------------------------------------------------
     existing_ctc = c.execute(
-        "SELECT ctc_id, ctc_start_date FROM ctc_files WHERE file_path = ?",
-        (file_path,)
+        "SELECT ctc_id, ctc_start_date FROM ctc_files WHERE ctc_guid = ?",
+        (ctc_guid,)
     ).fetchone()
 
     start_date_changed = False
@@ -385,12 +447,13 @@ def api_push():
         c.execute("""
             UPDATE ctc_files SET
                 project_id=?, department=?, ctc_start_date=?,
-                conflict_flag=?, start_date_changed=?,
+                file_path=?, conflict_flag=?, start_date_changed=?,
                 previous_ctc_start_date = CASE WHEN ? THEN ? ELSE previous_ctc_start_date END,
                 last_pushed=?, last_updated_by=?
             WHERE ctc_id=?
         """, (
             project_id, department, ctc_start_date,
+            file_path,
             1 if conflict else 0,
             1 if start_date_changed else 0,
             start_date_changed, previous_start,
@@ -400,12 +463,12 @@ def api_push():
     else:
         c.execute("""
             INSERT INTO ctc_files (
-                project_id, department, ctc_start_date,
+                ctc_guid, project_id, department, ctc_start_date,
                 file_path, conflict_flag, start_date_changed,
                 last_pushed, last_updated_by
-            ) VALUES (?,?,?,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?)
         """, (
-            project_id, department, ctc_start_date,
+            ctc_guid, project_id, department, ctc_start_date,
             file_path, 1 if conflict else 0, 0,
             now, data.get("last_updated_by", "")
         ))
@@ -463,8 +526,12 @@ def api_push():
 # ---------------------------------------------------------------------------
 
 @app.route("/admin")
-@require_admin
 def admin_index():
+    # No @require_admin here — this just serves the page, which prompts
+    # for the token via JavaScript. Every actual action triggered from
+    # this page (imports, cleanup, viewing logs, etc.) calls a separate
+    # /admin/* endpoint that DOES require the token, so nothing sensitive
+    # is exposed by leaving the page itself open.
     return render_template("admin.html")
 
 
@@ -548,6 +615,21 @@ def admin_start_date_changes():
 def admin_rebuild_summary():
     summary_module.build()
     return jsonify({"status": "ok", "rebuilt_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/admin/run-cleanup", methods=["POST"])
+@require_admin
+def admin_run_cleanup():
+    """
+    Manually triggers the deleted-CTC-file cleanup that normally only runs
+    as part of the nightly job. Checks every ctc_files row against disk and
+    removes any whose source file no longer exists (cascades to allocations).
+    Intended for admins who need this run immediately rather than waiting
+    for the next scheduled pass — this check is intentionally NOT run on
+    every push, as it scales poorly once files live on SharePoint.
+    """
+    result = _cleanup_deleted_ctc_files()
+    return jsonify(result)
 
 
 @app.route("/admin/clear-flag/conflict/<int:ctc_id>", methods=["POST"])

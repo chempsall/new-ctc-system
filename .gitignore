@@ -24,6 +24,13 @@ source-data/**/*
 !source-data/readme.md
 
 # ---------------------------------------------------------------------------
+# Resource to Complete — test/live CTC files. Real allocation data, must
+# never be committed. Will move to SharePoint eventually, but excluded
+# here regardless in case it's ever used locally again.
+# ---------------------------------------------------------------------------
+Resource to Complete/
+
+# ---------------------------------------------------------------------------
 # Python
 # ---------------------------------------------------------------------------
 __pycache__/

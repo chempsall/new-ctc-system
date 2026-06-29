@@ -64,6 +64,13 @@
     </div>
 
     <div class="admin-card">
+      <h2>Clean up deleted CTC files</h2>
+      <p>Checks every CTC file on record against disk and removes any whose file no longer exists, along with its allocations. Runs automatically every night — use this to force it immediately.</p>
+      <button class="btn" onclick="runCleanup()">Run cleanup</button>
+      <div class="result" id="result-cleanup"></div>
+    </div>
+
+    <div class="admin-card">
       <h2>Conflict flags</h2>
       <p>Projects flagged due to duplicate filenames with placeholder project numbers.</p>
       <button class="btn" onclick="loadConflicts()">View conflicts</button>
@@ -122,6 +129,22 @@
         const r = await fetch("/admin/rebuild-summary", { method: "POST", headers: headers() });
         const d = await r.json();
         el.textContent = r.ok ? `✓ Rebuilt at ${d.rebuilt_at}` : `✗ ${d.error}`;
+      } catch(e) { el.textContent = `✗ ${e.message}`; }
+    }
+
+    async function runCleanup() {
+      const el = document.getElementById("result-cleanup");
+      el.textContent = "Checking files on disk — this may take a moment...";
+      try {
+        const r = await fetch("/admin/run-cleanup", { method: "POST", headers: headers() });
+        const d = await r.json();
+        if (!r.ok) { el.textContent = `✗ ${d.error}`; return; }
+        el.textContent = d.files_removed === 0
+          ? `✓ Checked ${d.files_checked} files — none missing`
+          : `✓ Checked ${d.files_checked} files — removed ${d.files_removed}\n\n`
+            + d.removed.map(f =>
+                `${f.project_number} (${f.project_name})\n  ${f.file_path}\n  ${f.allocations_removed} allocation rows removed`
+              ).join("\n\n");
       } catch(e) { el.textContent = `✗ ${e.message}`; }
     }
 
