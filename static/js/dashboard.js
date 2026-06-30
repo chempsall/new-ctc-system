@@ -569,6 +569,13 @@ function switchView(view) {
     horizonFilter.style.display = view === "projects" ? "" : "none";
   }
 
+  // Show/hide job title + job function filters (only relevant for staff —
+  // a project doesn't have a single job title or job function)
+  const staffOnlyFilters = document.getElementById("staff-only-filters");
+  if (staffOnlyFilters) {
+    staffOnlyFilters.style.display = view === "staff" ? "" : "none";
+  }
+
   renderView();
 }
 

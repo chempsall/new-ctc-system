@@ -2,102 +2,163 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin — Resource Forecast</title>
   <link rel="stylesheet" href="/static/css/dashboard.css">
   <style>
-    body { font-family: var(--font-body); background: var(--bg); padding: 32px; }
-    h1   { font-size: 20px; font-weight: 600; margin-bottom: 24px; color: var(--navy-900); }
+    body { font-family: var(--font-body); background: var(--bg); padding: 0; }
+
+    .admin-topbar {
+      height: var(--nav-h);
+      background: var(--black);
+      border-bottom: 2px solid var(--wsp-red);
+      display: flex; align-items: center;
+      padding: 0 20px;
+      margin-bottom: 24px;
+    }
+    .admin-topbar img { height: 22px; width: auto; display: block; }
+    .admin-topbar .divider {
+      width: 1px; height: 20px;
+      background: var(--grey-700);
+      margin: 0 14px;
+    }
+    .admin-topbar .title {
+      font-size: 13px; font-weight: 500;
+      color: var(--grey-200);
+    }
+    .admin-topbar a {
+      margin-left: auto;
+      font-size: 11px; color: var(--grey-400);
+      text-decoration: none;
+      padding: 4px 10px;
+      border: 1px solid var(--grey-700);
+      border-radius: var(--radius-sm);
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .admin-topbar a:hover { background: var(--wsp-red); border-color: var(--wsp-red); color: #fff; }
+
+    .admin-main { max-width: 1400px; margin: 0 auto; padding: 0 24px 32px; }
+
+    h1   { font-size: 18px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); }
+    .admin-intro { font-size: 12px; color: var(--text-secondary); margin-bottom: 24px; }
+
     .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
     .admin-card {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius-lg); padding: 20px;
       box-shadow: var(--shadow-sm);
     }
-    .admin-card h2 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--navy-700); }
-    .admin-card p  { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+    .admin-card h2 { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
+    .admin-card p  { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5; }
+
     .btn {
       display: inline-block; padding: 7px 16px;
-      background: var(--navy-900); color: #fff;
+      background: var(--black); color: #fff;
       border: none; border-radius: var(--radius-sm);
       font-family: var(--font-body); font-size: 12px;
       cursor: pointer; transition: background 0.15s;
     }
-    .btn:hover { background: var(--navy-700); }
-    .result { margin-top: 10px; font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono); white-space: pre-wrap; }
+    .btn:hover { background: var(--wsp-red); }
+
+    .result {
+      margin-top: 10px; font-size: 11px; color: var(--text-secondary);
+      font-family: var(--font-mono); white-space: pre-wrap;
+    }
+
+    .flag-item {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-body);
+      font-size: 11px;
+    }
+    .flag-item:last-child { border-bottom: none; }
+    .flag-item__detail { color: var(--text-secondary); white-space: pre-wrap; }
+    .flag-item__clear {
+      flex-shrink: 0;
+      font-size: 10px; padding: 3px 9px;
+      background: var(--surface-2); color: var(--text-secondary);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .flag-item__clear:hover { background: var(--wsp-red); border-color: var(--wsp-red); color: #fff; }
   </style>
 </head>
 <body>
-  <h1>Resource Forecast — Admin</h1>
-  <p style="font-size:12px;color:var(--text-secondary);margin-bottom:24px">
-    All actions require the admin token in the Authorization header.
-    Use the API directly or via the buttons below.
-  </p>
 
-  <div class="admin-grid">
+  <div class="admin-topbar">
+    <img src="{{ url_for('static', filename='images/wsp-logo.png') }}" alt="WSP">
+    <span class="divider"></span>
+    <span class="title">Resource Forecast — Admin</span>
+    <a href="/">Back to dashboard</a>
+  </div>
 
-    <div class="admin-card">
-      <h2>Import staff list</h2>
-      <p>Re-reads the staff list Excel file and updates the database. Rebuilds summary cache.</p>
-      <button class="btn" onclick="triggerImport('staff')">Run import</button>
-      <div class="result" id="result-staff"></div>
+  <div class="admin-main">
+    <h1>Admin</h1>
+    <p class="admin-intro">
+      All actions require the admin token, entered once below and reused for every request on this page.
+    </p>
+
+    <div class="admin-grid">
+
+      <div class="admin-card">
+        <h2>Import staff list</h2>
+        <p>Re-reads the staff list Excel file and updates the database. Rebuilds the summary cache.</p>
+        <button class="btn" onclick="triggerImport('staff')">Run import</button>
+        <div class="result" id="result-staff"></div>
+      </div>
+
+      <div class="admin-card">
+        <h2>Import PAR actuals</h2>
+        <p>Re-reads the PAR actuals export and updates project metadata and inception-to-date figures.</p>
+        <button class="btn" onclick="triggerImport('par')">Run import</button>
+        <div class="result" id="result-par"></div>
+      </div>
+
+      <div class="admin-card">
+        <h2>Rebuild summary cache</h2>
+        <p>Forces a full rebuild of the dashboard summary JSON. Runs automatically after imports.</p>
+        <button class="btn" onclick="rebuildSummary()">Rebuild</button>
+        <div class="result" id="result-rebuild"></div>
+      </div>
+
+      <div class="admin-card">
+        <h2>Clean up deleted CTC files</h2>
+        <p>Checks every CTC file on record against disk and removes any whose file no longer exists, along with its allocations. Runs automatically every night — use this to force it immediately.</p>
+        <button class="btn" onclick="runCleanup()">Run cleanup</button>
+        <div class="result" id="result-cleanup"></div>
+      </div>
+
+      <div class="admin-card">
+        <h2>Conflict flags</h2>
+        <p>Projects flagged due to duplicate filenames with placeholder project numbers.</p>
+        <button class="btn" onclick="loadConflicts()">View conflicts</button>
+        <div class="result" id="result-conflicts"></div>
+      </div>
+
+      <div class="admin-card">
+        <h2>Start date changes</h2>
+        <p>Projects where the CTC start date was changed after initial setup.</p>
+        <button class="btn" onclick="loadStartDateChanges()">View changes</button>
+        <div class="result" id="result-startdates"></div>
+      </div>
+
+      <div class="admin-card">
+        <h2>Import log</h2>
+        <p>Recent import runs with row counts and any errors.</p>
+        <button class="btn" onclick="loadImportLog()">View log</button>
+        <div class="result" id="result-log"></div>
+      </div>
+
+      <div class="admin-card">
+        <h2>Configuration</h2>
+        <p>Current server configuration (non-sensitive settings only).</p>
+        <button class="btn" onclick="loadConfig()">View config</button>
+        <div class="result" id="result-config"></div>
+      </div>
+
     </div>
-
-    <div class="admin-card">
-      <h2>Import Horizon projects</h2>
-      <p>Re-reads the Horizon export and updates project metadata. Does not affect allocations.</p>
-      <button class="btn" onclick="triggerImport('horizon')">Run import</button>
-      <div class="result" id="result-horizon"></div>
-    </div>
-
-    <div class="admin-card">
-      <h2>Import PAR actuals</h2>
-      <p>Re-reads the PAR actuals export and updates inception-to-date figures.</p>
-      <button class="btn" onclick="triggerImport('par')">Run import</button>
-      <div class="result" id="result-par"></div>
-    </div>
-
-    <div class="admin-card">
-      <h2>Rebuild summary cache</h2>
-      <p>Forces a full rebuild of the dashboard summary JSON. Runs automatically after imports.</p>
-      <button class="btn" onclick="rebuildSummary()">Rebuild</button>
-      <div class="result" id="result-rebuild"></div>
-    </div>
-
-    <div class="admin-card">
-      <h2>Clean up deleted CTC files</h2>
-      <p>Checks every CTC file on record against disk and removes any whose file no longer exists, along with its allocations. Runs automatically every night — use this to force it immediately.</p>
-      <button class="btn" onclick="runCleanup()">Run cleanup</button>
-      <div class="result" id="result-cleanup"></div>
-    </div>
-
-    <div class="admin-card">
-      <h2>Conflict flags</h2>
-      <p>Projects flagged due to duplicate filenames with placeholder project numbers.</p>
-      <button class="btn" onclick="loadConflicts()">View conflicts</button>
-      <div class="result" id="result-conflicts"></div>
-    </div>
-
-    <div class="admin-card">
-      <h2>Start date changes</h2>
-      <p>Projects where the CTC start date was changed after initial setup.</p>
-      <button class="btn" onclick="loadStartDateChanges()">View changes</button>
-      <div class="result" id="result-startdates"></div>
-    </div>
-
-    <div class="admin-card">
-      <h2>Import log</h2>
-      <p>Recent import runs with row counts and any errors.</p>
-      <button class="btn" onclick="loadImportLog()">View log</button>
-      <div class="result" id="result-log"></div>
-    </div>
-
-    <div class="admin-card">
-      <h2>Configuration</h2>
-      <p>Current server configuration (non-sensitive settings only).</p>
-      <button class="btn" onclick="loadConfig()">View config</button>
-      <div class="result" id="result-config"></div>
-    </div>
-
   </div>
 
   <script>
@@ -105,6 +166,12 @@
 
     function headers() {
       return { "Authorization": `Bearer ${TOKEN}`, "Content-Type": "application/json" };
+    }
+
+    function escHtml(s) {
+      const d = document.createElement("div");
+      d.textContent = s ?? "";
+      return d.innerHTML;
     }
 
     async function triggerImport(type) {
@@ -154,10 +221,31 @@
       try {
         const r = await fetch("/admin/conflicts", { headers: headers() });
         const d = await r.json();
-        el.textContent = d.length === 0
-          ? "✓ No conflicts"
-          : d.map(p => `${p.project_number} — ${p.file_path}`).join("\n");
+        if (!r.ok) { el.textContent = `✗ ${d.error}`; return; }
+        if (d.length === 0) { el.textContent = "✓ No conflicts"; return; }
+        el.innerHTML = d.map(p => `
+          <div class="flag-item">
+            <span class="flag-item__detail">${escHtml(p.project_number)} — ${escHtml(p.file_path)}</span>
+            <button class="flag-item__clear" onclick="clearConflict(${p.ctc_id}, this)">Clear</button>
+          </div>`).join("");
       } catch(e) { el.textContent = `✗ ${e.message}`; }
+    }
+
+    async function clearConflict(ctcId, btn) {
+      btn.textContent = "...";
+      btn.disabled = true;
+      try {
+        const r = await fetch(`/admin/clear-flag/conflict/${ctcId}`, { method: "POST", headers: headers() });
+        if (r.ok) {
+          btn.closest(".flag-item").remove();
+        } else {
+          btn.textContent = "Clear";
+          btn.disabled = false;
+        }
+      } catch(e) {
+        btn.textContent = "Clear";
+        btn.disabled = false;
+      }
     }
 
     async function loadStartDateChanges() {
@@ -166,10 +254,31 @@
       try {
         const r = await fetch("/admin/start-date-changes", { headers: headers() });
         const d = await r.json();
-        el.textContent = d.length === 0
-          ? "✓ No pending changes"
-          : d.map(p => `${p.project_name}\n  ${p.previous_ctc_start_date} → ${p.ctc_start_date}`).join("\n\n");
+        if (!r.ok) { el.textContent = `✗ ${d.error}`; return; }
+        if (d.length === 0) { el.textContent = "✓ No pending changes"; return; }
+        el.innerHTML = d.map(p => `
+          <div class="flag-item">
+            <span class="flag-item__detail">${escHtml(p.project_name)}\n  ${escHtml(p.previous_ctc_start_date)} → ${escHtml(p.ctc_start_date)}</span>
+            <button class="flag-item__clear" onclick="clearStartDate(${p.ctc_id}, this)">Clear</button>
+          </div>`).join("");
       } catch(e) { el.textContent = `✗ ${e.message}`; }
+    }
+
+    async function clearStartDate(ctcId, btn) {
+      btn.textContent = "...";
+      btn.disabled = true;
+      try {
+        const r = await fetch(`/admin/clear-flag/start-date/${ctcId}`, { method: "POST", headers: headers() });
+        if (r.ok) {
+          btn.closest(".flag-item").remove();
+        } else {
+          btn.textContent = "Clear";
+          btn.disabled = false;
+        }
+      } catch(e) {
+        btn.textContent = "Clear";
+        btn.disabled = false;
+      }
     }
 
     async function loadImportLog() {

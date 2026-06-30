@@ -1,70 +1,91 @@
 /* ==========================================================================
    Resource Forecast — Dashboard Stylesheet
-   Typeface: DM Sans (body) + DM Mono (codes/numbers)
-   Palette: dark navy base, amber accent, semantic greens/reds
+   WSP brand: monochromatic (black/white/greys) with WSP red as the sole
+   accent colour. Typeface: Arial (WSP's documented fallback for PP Neue
+   Montreal, their licensed corporate typeface, which isn't available as
+   a webfont we can legally embed here).
    ========================================================================== */
-
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap');
 
 /* --------------------------------------------------------------------------
    Custom properties
    -------------------------------------------------------------------------- */
 :root {
-  /* Core palette */
-  --navy-950: #0b1220;
-  --navy-900: #111827;
-  --navy-800: #1a2535;
-  --navy-700: #243044;
-  --navy-600: #2e3d55;
-  --navy-500: #3d5068;
-  --navy-400: #5a6e87;
-  --navy-300: #8296ad;
-  --navy-200: #b4c2d0;
-  --navy-100: #dce4ec;
-  --navy-50:  #f0f4f8;
+  /* WSP brand red — Pantone Warm Red C, #FF272F per brand guidelines.
+     This is the only colour accent in the entire interface; everything
+     else is black, white, or grey. */
+  --wsp-red:       #ff272f;
+  --wsp-red-light: #ffe9e9;
+  --wsp-red-dark:  #c4151b;
 
-  --amber:        #e8a020;
+  /* Monochromatic core — black, white, and a grey scale between them.
+     Used for structure (the old "navy" role) instead of a colour. */
+  --black:    #000000;
+  --grey-950: #141414;
+  --grey-900: #1f1f1f;
+  --grey-800: #2c2c2c;
+  --grey-700: #3d3d3d;
+  --grey-600: #565656;
+  --grey-500: #717171;
+  --grey-400: #8f8f8f;
+  --grey-300: #b3b3b3;
+  --grey-200: #d6d6d6;
+  --grey-100: #e9e9e9;
+  --grey-50:  #f4f4f4;
+  --white:    #ffffff;
+
+  /* Semantic status colours — deliberately separate from the brand red,
+     so "this needs attention" never gets confused with "this is WSP". */
+  --amber:        #b87a10;
   --amber-light:  #fdf3e0;
-  --amber-dark:   #b87a10;
+  --amber-dark:   #8a5c0c;
 
   --green:        #1a9e5c;
   --green-light:  #e4f7ef;
   --green-dark:   #0f6e3e;
 
-  --red:          #d63c3c;
-  --red-light:    #fdeaea;
-  --red-dark:     #9e1f1f;
+  --status-red:       #d63c3c;
+  --status-red-light: #fdeaea;
+  --status-red-dark:  #9e1f1f;
 
   --blue:         #2c72c7;
   --blue-light:   #e8f1fc;
   --blue-dark:    #1a4e8f;
 
   /* Surfaces */
-  --bg:           var(--navy-50);
-  --surface:      #ffffff;
-  --surface-2:    #f5f7fa;
-  --border:       #dde3eb;
-  --border-strong:#b4c2d0;
+  --bg:           var(--grey-50);
+  --surface:      var(--white);
+  --surface-2:    var(--grey-50);
+  --border:       var(--grey-200);
+  --border-strong:var(--grey-300);
 
   /* Text */
-  --text-primary:   var(--navy-900);
-  --text-secondary: var(--navy-400);
-  --text-tertiary:  var(--navy-300);
+  --text-primary:   var(--black);
+  --text-secondary: var(--grey-600);
+  --text-tertiary:  var(--grey-400);
 
-  /* Fonts */
-  --font-body: 'DM Sans', sans-serif;
-  --font-mono: 'DM Mono', monospace;
+  /* Fonts — Arial per WSP's documented fallback for PP Neue Montreal */
+  --font-body: Arial, Helvetica, sans-serif;
+  --font-mono: 'Consolas', 'Courier New', monospace;
 
   /* Sizing */
-  --nav-h:     52px;
+  --nav-h:     56px;
   --sidebar-w: 220px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(11,18,32,0.08);
-  --shadow-md: 0 4px 12px rgba(11,18,32,0.10);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+}
+
+/* Disable any slashed-zero glyph variant for consistency — without
+   this, numbers can render with or without a slash through the zero
+   depending on font fallback, which looks inconsistent on the page. */
+.mono, [class*="mono"], .alloc-days, .proj-number, .detail-proj-days,
+.fin-table td:last-child {
+  font-variant-numeric: normal;
+  font-feature-settings: "zero" 0, "slashed-zero" 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -72,7 +93,7 @@
    -------------------------------------------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { font-size: 14px; }
+html { font-size: 14px; scrollbar-gutter: stable;}
 
 body {
   font-family: var(--font-body);
@@ -94,22 +115,31 @@ a:hover { text-decoration: underline; }
 .topnav {
   position: sticky; top: 0; z-index: 100;
   height: var(--nav-h);
-  background: var(--navy-900);
+  background: var(--black);
   display: flex; align-items: center;
   padding: 0 20px;
   gap: 0;
-  border-bottom: 1px solid var(--navy-700);
+  border-bottom: 2px solid var(--wsp-red);
 }
 
 .topnav__logo {
-  font-size: 15px; font-weight: 600;
-  color: #fff;
-  letter-spacing: -0.01em;
-  margin-right: 32px;
-  white-space: nowrap;
+  display: flex; align-items: center;
+  margin-right: 28px;
+  flex-shrink: 0;
 }
-.topnav__logo span {
-  color: var(--amber);
+.topnav__logo img {
+  height: 22px; width: auto; display: block;
+}
+.topnav__logo-divider {
+  width: 1px; height: 20px;
+  background: var(--grey-700);
+  margin: 0 14px;
+}
+.topnav__product-name {
+  font-size: 13px; font-weight: 500;
+  color: var(--grey-200);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .topnav__tabs {
@@ -120,33 +150,33 @@ a:hover { text-decoration: underline; }
   padding: 6px 14px;
   border-radius: var(--radius-sm);
   font-size: 13px; font-weight: 400;
-  color: var(--navy-300);
+  color: var(--grey-300);
   cursor: pointer;
   border: none; background: none;
   transition: background 0.15s, color 0.15s;
 }
-.topnav__tab:hover  { background: var(--navy-700); color: #fff; }
-.topnav__tab.active { background: var(--navy-700); color: #fff; font-weight: 500; }
+.topnav__tab:hover  { background: var(--grey-800); color: #fff; }
+.topnav__tab.active { background: var(--wsp-red); color: #fff; font-weight: 500; }
 
 .topnav__right {
   display: flex; align-items: center; gap: 12px; margin-left: auto;
 }
 
 .topnav__status {
-  font-size: 11px; color: var(--navy-400);
+  font-size: 11px; color: var(--grey-400);
   white-space: nowrap;
 }
-.topnav__status strong { color: var(--navy-200); }
+.topnav__status strong { color: var(--grey-200); }
 
 .topnav__admin-link {
-  font-size: 11px; color: var(--navy-400);
+  font-size: 11px; color: var(--grey-400);
   text-decoration: none;
   padding: 4px 10px;
-  border: 1px solid var(--navy-700);
+  border: 1px solid var(--grey-700);
   border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.topnav__admin-link:hover { background: var(--navy-700); color: #fff; }
+.topnav__admin-link:hover { background: var(--wsp-red); border-color: var(--wsp-red); color: #fff; }
 
 /* Main content area */
 .main {
@@ -208,6 +238,29 @@ a:hover { text-decoration: underline; }
   margin: 0 4px;
 }
 
+.filter-reset-btn {
+  font-family: var(--font-body);
+  font-size: 12px; font-weight: 500;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  margin-left: auto;
+}
+.filter-reset-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+/* Wrapper for filters that only apply to one view (People vs Projects) —
+   keeps its child selects in the same flex flow with consistent gaps. */
+#staff-only-filters, #horizon-filter-wrap {
+  display: inline-flex; align-items: center; gap: 10px;
+}
+
 /* Month tabs */
 .month-tabs {
   display: flex; gap: 4px;
@@ -226,8 +279,8 @@ a:hover { text-decoration: underline; }
 }
 .month-tab:hover { border-color: var(--border-strong); color: var(--text-primary); }
 .month-tab.active {
-  background: var(--navy-900);
-  border-color: var(--navy-900);
+  background: var(--wsp-red);
+  border-color: var(--wsp-red);
   color: #fff;
   font-weight: 500;
 }
@@ -237,9 +290,13 @@ a:hover { text-decoration: underline; }
    -------------------------------------------------------------------------- */
 .metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin-bottom: 20px;
+}
+
+@media (max-width: 700px) {
+  .metrics { grid-template-columns: repeat(2, 1fr); }
 }
 
 .metric-card {
@@ -272,7 +329,7 @@ a:hover { text-decoration: underline; }
 }
 
 .metric-card--warn  .metric-card__value { color: var(--amber-dark); }
-.metric-card--alert .metric-card__value { color: var(--red); }
+.metric-card--alert .metric-card__value { color: var(--status-red); }
 .metric-card--good  .metric-card__value { color: var(--green-dark); }
 
 /* --------------------------------------------------------------------------
@@ -345,6 +402,7 @@ a:hover { text-decoration: underline; }
   font-size: 12px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+  overflow: hidden;
 }
 
 .staff-table tr:last-child td { border-bottom: none; }
@@ -373,7 +431,7 @@ a:hover { text-decoration: underline; }
 
 .alloc-bar {
   flex: 1; height: 6px;
-  background: var(--navy-100);
+  background: var(--grey-100);
   border-radius: 3px;
   overflow: hidden;
   min-width: 60px;
@@ -386,8 +444,8 @@ a:hover { text-decoration: underline; }
 
 .alloc-bar__fill--ok    { background: var(--green); }
 .alloc-bar__fill--check { background: var(--amber); }
-.alloc-bar__fill--over  { background: var(--red); }
-.alloc-bar__fill--none  { background: var(--navy-200); }
+.alloc-bar__fill--over  { background: var(--status-red); }
+.alloc-bar__fill--none  { background: var(--grey-200); }
 
 .alloc-days {
   font-family: var(--font-mono);
@@ -410,13 +468,19 @@ a:hover { text-decoration: underline; }
 }
 .kpi--ok    { background: var(--green-light);  color: var(--green-dark); }
 .kpi--check { background: var(--amber-light);  color: var(--amber-dark); }
-.kpi--over  { background: var(--red-light);    color: var(--red-dark);   }
-.kpi--none  { background: var(--navy-100);     color: var(--navy-400);   }
+.kpi--over  { background: var(--status-red-light); color: var(--status-red-dark); }
+.kpi--none  { background: var(--grey-100);    color: var(--grey-400);   }
 
 /* --------------------------------------------------------------------------
    Project table
    -------------------------------------------------------------------------- */
-.project-table { width: 100%; border-collapse: collapse; }
+.project-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.project-table th:nth-child(1) { width: 12% } /* Number */
+.project-table th:nth-child(2) { width: 34% } /* Project / Task */
+.project-table th:nth-child(3) { width: 20% } /* Cost Centre */
+.project-table th:nth-child(4) { width: 14% } /* Horizon */
+.project-table th:nth-child(5) { width: 12% } /* PM */
+.project-table th:nth-child(6) { width: 8%  } /* Days */
 
 .project-table th {
   padding: 8px 12px;
@@ -433,6 +497,7 @@ a:hover { text-decoration: underline; }
   font-size: 12px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+  overflow: hidden;
 }
 
 .project-table tr:last-child td { border-bottom: none; }
@@ -445,6 +510,8 @@ a:hover { text-decoration: underline; }
   font-size: 10px;
   color: var(--text-tertiary);
   white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  display: block;
 }
 
 .proj-name {
@@ -469,22 +536,24 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
 }
 .horizon--linked   { background: var(--green-light); color: var(--green-dark); }
-.horizon--norecord { background: var(--red-light);   color: var(--red-dark);   }
+.horizon--norecord { background: var(--status-red-light); color: var(--status-red-dark); }
 .horizon--dot {
   width: 5px; height: 5px; border-radius: 50%;
 }
 .horizon--linked   .horizon--dot { background: var(--green); }
-.horizon--norecord .horizon--dot { background: var(--red); }
+.horizon--norecord .horizon--dot { background: var(--status-red); }
 
 /* Team badge */
 .team-badge {
   display: inline-block;
+  max-width: 100%;
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 10px; font-weight: 500;
-  background: var(--navy-100);
-  color: var(--navy-500);
+  background: var(--grey-100);
+  color: var(--grey-600);
   white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
 }
 
 /* --------------------------------------------------------------------------
@@ -640,7 +709,7 @@ a:hover { text-decoration: underline; }
    -------------------------------------------------------------------------- */
 #loading {
   position: fixed; inset: 0; z-index: 9999;
-  background: var(--navy-900);
+  background: var(--black);
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   gap: 16px;
@@ -649,21 +718,21 @@ a:hover { text-decoration: underline; }
 #loading.hidden { opacity: 0; pointer-events: none; }
 
 .loading-logo {
-  font-family: var(--font-body);
-  font-size: 20px; font-weight: 600;
-  color: #fff; letter-spacing: -0.02em;
+  display: flex; align-items: center;
 }
-.loading-logo span { color: var(--amber); }
+.loading-logo img {
+  height: 32px; width: auto;
+}
 
 .loading-bar {
   width: 200px; height: 2px;
-  background: var(--navy-700);
+  background: var(--grey-800);
   border-radius: 1px;
   overflow: hidden;
 }
 .loading-bar__fill {
   height: 100%;
-  background: var(--amber);
+  background: var(--wsp-red);
   border-radius: 1px;
   animation: load-sweep 1.2s ease-in-out infinite;
 }
@@ -674,7 +743,7 @@ a:hover { text-decoration: underline; }
 }
 
 .loading-status {
-  font-size: 12px; color: var(--navy-400);
+  font-size: 12px; color: var(--grey-400);
 }
 
 /* --------------------------------------------------------------------------
@@ -683,10 +752,10 @@ a:hover { text-decoration: underline; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--navy-200);
+  background: var(--grey-300);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--navy-300); }
+::-webkit-scrollbar-thumb:hover { background: var(--grey-400); }
 
 /* --------------------------------------------------------------------------
    Utility
