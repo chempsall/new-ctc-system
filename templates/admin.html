@@ -125,23 +125,9 @@
 
       <div class="admin-card">
         <h2>Clean up deleted CTC files</h2>
-        <p>Checks every CTC file on record against disk and removes any whose file no longer exists, along with its allocations. Runs automatically every night — use this to force it immediately.</p>
+        <p>Checks every RTC on record and archives any that have no future allocations and haven't been opened in 30+ days. Runs automatically every night — use this to force it immediately.</p>
         <button class="btn" onclick="runCleanup()">Run cleanup</button>
         <div class="result" id="result-cleanup"></div>
-      </div>
-
-      <div class="admin-card">
-        <h2>Conflict flags</h2>
-        <p>Projects flagged due to duplicate filenames with placeholder project numbers.</p>
-        <button class="btn" onclick="loadConflicts()">View conflicts</button>
-        <div class="result" id="result-conflicts"></div>
-      </div>
-
-      <div class="admin-card">
-        <h2>Start date changes</h2>
-        <p>Projects where the CTC start date was changed after initial setup.</p>
-        <button class="btn" onclick="loadStartDateChanges()">View changes</button>
-        <div class="result" id="result-startdates"></div>
       </div>
 
       <div class="admin-card">
@@ -213,72 +199,6 @@
                 `${f.project_number} (${f.project_name})\n  ${f.file_path}\n  ${f.allocations_removed} allocation rows removed`
               ).join("\n\n");
       } catch(e) { el.textContent = `✗ ${e.message}`; }
-    }
-
-    async function loadConflicts() {
-      const el = document.getElementById("result-conflicts");
-      el.textContent = "Loading...";
-      try {
-        const r = await fetch("/admin/conflicts", { headers: headers() });
-        const d = await r.json();
-        if (!r.ok) { el.textContent = `✗ ${d.error}`; return; }
-        if (d.length === 0) { el.textContent = "✓ No conflicts"; return; }
-        el.innerHTML = d.map(p => `
-          <div class="flag-item">
-            <span class="flag-item__detail">${escHtml(p.project_number)} — ${escHtml(p.file_path)}</span>
-            <button class="flag-item__clear" onclick="clearConflict(${p.ctc_id}, this)">Clear</button>
-          </div>`).join("");
-      } catch(e) { el.textContent = `✗ ${e.message}`; }
-    }
-
-    async function clearConflict(ctcId, btn) {
-      btn.textContent = "...";
-      btn.disabled = true;
-      try {
-        const r = await fetch(`/admin/clear-flag/conflict/${ctcId}`, { method: "POST", headers: headers() });
-        if (r.ok) {
-          btn.closest(".flag-item").remove();
-        } else {
-          btn.textContent = "Clear";
-          btn.disabled = false;
-        }
-      } catch(e) {
-        btn.textContent = "Clear";
-        btn.disabled = false;
-      }
-    }
-
-    async function loadStartDateChanges() {
-      const el = document.getElementById("result-startdates");
-      el.textContent = "Loading...";
-      try {
-        const r = await fetch("/admin/start-date-changes", { headers: headers() });
-        const d = await r.json();
-        if (!r.ok) { el.textContent = `✗ ${d.error}`; return; }
-        if (d.length === 0) { el.textContent = "✓ No pending changes"; return; }
-        el.innerHTML = d.map(p => `
-          <div class="flag-item">
-            <span class="flag-item__detail">${escHtml(p.project_name)}\n  ${escHtml(p.previous_ctc_start_date)} → ${escHtml(p.ctc_start_date)}</span>
-            <button class="flag-item__clear" onclick="clearStartDate(${p.ctc_id}, this)">Clear</button>
-          </div>`).join("");
-      } catch(e) { el.textContent = `✗ ${e.message}`; }
-    }
-
-    async function clearStartDate(ctcId, btn) {
-      btn.textContent = "...";
-      btn.disabled = true;
-      try {
-        const r = await fetch(`/admin/clear-flag/start-date/${ctcId}`, { method: "POST", headers: headers() });
-        if (r.ok) {
-          btn.closest(".flag-item").remove();
-        } else {
-          btn.textContent = "Clear";
-          btn.disabled = false;
-        }
-      } catch(e) {
-        btn.textContent = "Clear";
-        btn.disabled = false;
-      }
     }
 
     async function loadImportLog() {

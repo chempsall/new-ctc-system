@@ -1,12 +1,8 @@
-# New CTC System
+# Resource Forecast
 
-Resource forecasting system. Built for WSP London Building Services with one
-eye on potential scalability.
-
-Replaces the Excel-based `Resource_Forecast.xlsx` aggregator with a Flask web
-application. Project managers maintain individual CTC files using the provided
-Excel template. The macro in each file pushes allocation data to the server on
-save. The dashboard aggregates everything in real time.
+Web-based resourcing system for WSP London Building Services. Replaced the
+Excel/macro-based CTC system with a web application where RTCs (Resource to
+Complete) are created and edited directly in the browser.
 
 ## Setup
 
@@ -25,19 +21,33 @@ Open `http://localhost:5000` in your browser.
 
 | Path | Purpose |
 |---|---|
-| `app.py` | Flask server and API endpoints |
-| `database.py` | Schema and seed data |
+| `app.py` | Flask server and all API endpoints |
+| `database.py` | Schema definition and seed data |
 | `summary.py` | Pre-built JSON cache for the dashboard |
-| `imports/` | Staff list and PAR importers |
-| `template/` | CTC Excel template (contains macro) |
-| `macro/` | VBA source files for reference |
-| `source-data/` | Local data files — not in git |
-| `data/` | SQLite database — not in git |
+| `imports/` | Staff list and PAR data importers |
+| `source-data/` | Local data files — not committed to git |
+| `data/` | SQLite database — not committed to git |
+| `static/` | CSS, JavaScript, images |
+| `templates/` | Jinja HTML templates |
 
 ## Data sources
 
-- **Staff list**: `source-data/staff_list.xlsx`
-- **PAR**: Most recent `YYYYMM_UK_PAR_*.xlsx` in `source-data/`, or direct
-  SharePoint connection when `RF_PAR_USE_SHAREPOINT=true`
+- **Staff list**: `source-data/staff_list.xlsx` — imported manually when the
+  staff list changes
+- **PAR actuals**: Most recent `YYYYMM_UK_PAR_*.xlsx` in `source-data/`,
+  or direct SharePoint connection when `RF_PAR_USE_SHAREPOINT=true`
 
-The database is rebuilt from source files and is never committed to git.
+Both imports run automatically every night and can be triggered manually
+from the Admin page.
+
+## Architecture notes
+
+- RTCs are database rows, not files. There is no Excel template or macro.
+  Identity is server-assigned (`rtc_id`) — no GUID or file-path based
+  identity, so duplicating, renaming, or moving is not a concern.
+- The dashboard summary is pre-calculated and cached on every import or
+  RTC save. All filtering happens in JavaScript against that cache — zero
+  additional server requests during normal browsing.
+- Authentication is a placeholder (`get_current_user()` in `app.py`).
+  When this system moves to the WSP corporate environment, replace that
+  single function with the appropriate corporate auth mechanism.

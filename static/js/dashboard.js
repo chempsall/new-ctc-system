@@ -99,7 +99,6 @@ function init() {
   buildMonthTabs();
   buildFilterOptions();
   renderMetrics();
-  renderConflictBanner();
   renderView();
   wireEvents();
   updateStatusBar();
@@ -175,7 +174,6 @@ function renderMetrics() {
   const overCount = staff.filter(ps => ps.kpi[p] === "over").length;
   const noRecDays = staff.reduce((sum, ps) =>
     sum + (ps.no_record_days[p] || 0), 0);
-  const conflicts = s.conflicts ? s.conflicts.length : 0;
   const noRecProj = projects.filter(pr => pr.horizon_status !== "linked").length;
 
   document.getElementById("metric-staff").textContent  = staff.length;
@@ -192,17 +190,6 @@ function renderMetrics() {
 // ---------------------------------------------------------------------------
 // Conflict banner
 // ---------------------------------------------------------------------------
-function renderConflictBanner() {
-  const banner = document.getElementById("conflict-banner");
-  const count  = state.summary.conflicts ? state.summary.conflicts.length : 0;
-  if (count === 0) {
-    banner.classList.add("hidden");
-    return;
-  }
-  banner.classList.remove("hidden");
-  document.getElementById("conflict-count").textContent = count;
-}
-
 // ---------------------------------------------------------------------------
 // Filtered data
 // ---------------------------------------------------------------------------
@@ -356,16 +343,13 @@ function renderProjectTable() {
     const days       = proj.total_days[p] || 0;
     const linked     = proj.horizon_status === "linked";
     const isSelected = String(proj.project_id) === String(state.selectedProject);
-    const conflict   = proj.conflict_flag
-      ? `<span title="Filename conflict" style="color:var(--amber-dark);margin-left:4px">⚠</span>`
-      : "";
 
     return `<tr data-id="${proj.project_id}" class="${isSelected ? "selected" : ""}">
       <td>
         <div class="proj-number">${escHtml(proj.number || "—")}</div>
       </td>
       <td>
-        <div class="proj-name">${escHtml(proj.name)}${conflict}</div>
+        <div class="proj-name">${escHtml(proj.name)}</div>
         <div class="proj-task">${escHtml(proj.task_name || "")}</div>
       </td>
       <td><span class="team-badge">${escHtml(proj.department || "—")}</span></td>
