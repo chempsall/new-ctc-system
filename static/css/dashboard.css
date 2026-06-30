@@ -748,3 +748,107 @@ a:hover { text-decoration: underline; }
 .mono   { font-family: var(--font-mono); }
 .muted  { color: var(--text-tertiary); }
 .right  { text-align: right; }
+
+/* --------------------------------------------------------------------------
+   RTC table
+   -------------------------------------------------------------------------- */
+.rtc-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.rtc-table th:nth-child(1) { width: 32% } /* Project / Task */
+.rtc-table th:nth-child(2) { width: 16% } /* Cost Centre */
+.rtc-table th:nth-child(3) { width: 12% } /* PM */
+.rtc-table th:nth-child(4) { width: 12% } /* Status */
+.rtc-table th:nth-child(5) { width: 8%  } /* This month */
+.rtc-table th:nth-child(6) { width: 10% } /* Last updated */
+.rtc-table th:nth-child(7) { width: 10% } /* Last opened */
+
+.rtc-table th {
+  padding: 9px 12px;
+  font-size: 11px; font-weight: 500;
+  text-align: left; white-space: nowrap;
+  background: var(--surface-2);
+  border-bottom: 2px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.rtc-table td {
+  padding: 9px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.rtc-table tr:last-child td { border-bottom: none; }
+.rtc-table tr { cursor: pointer; transition: background 0.1s; }
+.rtc-table tr:hover td  { background: var(--grey-50); }
+.rtc-table tr.selected td { background: var(--wsp-red-light); }
+
+/* RTC status badges */
+.rtc-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px; font-weight: 500;
+  white-space: nowrap;
+}
+.rtc-badge--active   { background: var(--green-light);  color: var(--green-dark); }
+.rtc-badge--review   { background: var(--amber-light);  color: var(--amber-dark); }
+.rtc-badge--archived { background: var(--grey-100);     color: var(--grey-500);   }
+
+/* RTC action buttons */
+.rtc-actions {
+  display: flex; gap: 8px; align-items: center;
+}
+
+.btn {
+  display: inline-block; padding: 6px 14px;
+  background: var(--black); color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  font-family: var(--font-body); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: background 0.15s;
+  text-decoration: none;
+}
+.btn:hover { background: var(--wsp-red); }
+.btn:disabled { background: var(--grey-300); cursor: not-allowed; }
+
+.btn--sm { padding: 4px 10px; font-size: 11px; }
+
+.btn--secondary {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+.btn--secondary:hover {
+  background: var(--grey-50);
+  border-color: var(--border-strong);
+}
+.btn--secondary:disabled {
+  background: var(--surface);
+  color: var(--grey-300);
+  border-color: var(--grey-100);
+  cursor: not-allowed;
+}
+
+/* Open to edit link inside detail panel */
+.btn-open-rtc {
+  display: inline-block;
+  padding: 6px 14px;
+  background: var(--wsp-red);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.btn-open-rtc:hover { background: var(--wsp-red-dark); text-decoration: none; }
+
+/* Show archived toggle in filter bar */
+.filter-toggle {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--text-secondary);
+  cursor: pointer; white-space: nowrap;
+}
+.filter-toggle input[type="checkbox"] {
+  accent-color: var(--wsp-red);
+  cursor: pointer;
+}

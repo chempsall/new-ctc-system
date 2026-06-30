@@ -34,6 +34,9 @@
       <button class="topnav__tab" data-view="projects">
         Projects
       </button>
+      <button class="topnav__tab" data-view="rtcs">
+        RTCs
+      </button>
     </div>
 
     <div class="topnav__right">
@@ -120,6 +123,29 @@
         </select>
       </span>
 
+      <!-- RTC filters — only shown in RTCs view -->
+      <span id="rtc-only-filters" style="display:none">
+        <select id="filter-rtc-pm">
+          <option value="">All project managers</option>
+        </select>
+
+        <select id="filter-rtc-pd">
+          <option value="">All project directors</option>
+        </select>
+
+        <select id="filter-rtc-status">
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="needs_review">Needs review</option>
+          <option value="archived">Archived</option>
+        </select>
+
+        <label class="filter-toggle">
+          <input type="checkbox" id="filter-rtc-archived">
+          Show archived
+        </label>
+      </span>
+
       <div class="filter-bar__sep"></div>
 
       <input type="text" id="filter-search"
@@ -187,6 +213,45 @@
             </thead>
             <tbody id="project-tbody">
               <tr><td colspan="6">
+                <div class="empty-state">Loading...</div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         RTCs VIEW
+         =================================================================== -->
+    <div id="rtcs-panel" class="hidden">
+      <div class="card">
+        <div class="card__header">
+          <span class="card__title">Resource to Complete</span>
+          <div class="rtc-actions">
+            <button class="btn btn--sm" id="btn-create-rtc">
+              + New RTC
+            </button>
+            <button class="btn btn--sm btn--secondary" id="btn-duplicate-rtc" disabled>
+              Duplicate selected
+            </button>
+          </div>
+        </div>
+        <div class="card__body">
+          <table class="rtc-table">
+            <thead>
+              <tr>
+                <th>Project / Task</th>
+                <th>Cost Centre</th>
+                <th>PM</th>
+                <th>Status</th>
+                <th class="right">This month</th>
+                <th>Last updated</th>
+                <th>Last opened</th>
+              </tr>
+            </thead>
+            <tbody id="rtc-tbody">
+              <tr><td colspan="7">
                 <div class="empty-state">Loading...</div>
               </td></tr>
             </tbody>

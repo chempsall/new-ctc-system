@@ -74,15 +74,15 @@ def build(department: str = None) -> dict:
             r["availability_fraction"]
 
     # Allocations per person per project per period.
-    # Join through ctc_files to get project context.
+    # Join through rtcs to get project context.
     # A project is "linked" (fee-earning) if it has a real project_status
     # of "Active" from the PAR import — i.e. it exists in Horizon.
     alloc_rows = conn.execute("""
-        SELECT a.horizon_person_number, cf.project_id, a.period_start, a.days,
-               p.project_status, cf.department, cf.ctc_id
+        SELECT a.horizon_person_number, r.project_id, a.period_start, a.days,
+               p.project_status, r.department, r.rtc_id
         FROM allocations a
-        JOIN ctc_files cf ON cf.ctc_id = a.ctc_id
-        JOIN projects p   ON p.project_id = cf.project_id
+        JOIN rtcs r     ON r.rtc_id = a.rtc_id
+        JOIN projects p ON p.project_id = r.project_id
         WHERE a.period_start IN ({})
     """.format(",".join("?" * len(period_starts))), period_starts).fetchall()
 
@@ -172,28 +172,26 @@ def build(department: str = None) -> dict:
         })
 
     # -- Projects ------------------------------------------------------------
-    # Query projects that have at least one CTC file (i.e. are being worked on).
-    # Join ctc_files to get office/team context.
-    # Filter by office if specified — shows only projects this office is working on.
+    # Query projects that have at least one RTC (i.e. are being worked on).
+    # Filter by department if specified.
     if department:
         proj_rows = conn.execute("""
-            SELECT DISTINCT p.*, cf.department, cf.ctc_id,
-                   cf.ctc_start_date, cf.conflict_flag, cf.start_date_changed,
-                   cf.last_pushed
+            SELECT DISTINCT p.*, r.department, r.rtc_id,
+                   r.start_date, r.last_updated_at
             FROM projects p
-            JOIN ctc_files cf ON cf.project_id = p.project_id
-            WHERE cf.department = ?
+            JOIN rtcs r ON r.project_id = p.project_id
+            WHERE r.department = ? AND r.is_archived = 0
         """, (department,)).fetchall()
     else:
         proj_rows = conn.execute("""
-            SELECT DISTINCT p.*, cf.department, cf.ctc_id,
-                   cf.ctc_start_date, cf.conflict_flag, cf.start_date_changed,
-                   cf.last_pushed
+            SELECT DISTINCT p.*, r.department, r.rtc_id,
+                   r.start_date, r.last_updated_at
             FROM projects p
-            JOIN ctc_files cf ON cf.project_id = p.project_id
+            JOIN rtcs r ON r.project_id = p.project_id
+            WHERE r.is_archived = 0
         """).fetchall()
 
-    # Total allocated days per project per period (across all ctc_files)
+    # Total allocated days per project per period (across all RTCs)
     proj_days_map = {}  # project_id -> period_start -> days
     for r in alloc_rows:
         pd = proj_days_map.setdefault(r["project_id"], {})
@@ -220,31 +218,26 @@ def build(department: str = None) -> dict:
         )
 
         projects_list.append({
-            "project_id":         project_id,
-            "ctc_id":             p["ctc_id"] if "ctc_id" in p.keys() else None,
-            "number":             proj_number,
-            "task_order":         task_order,
-            "name":               p["project_name"] or "No Horizon Record Found",
-            "task_name":          p["task_name"] or "No Horizon Record Found",
-            "organisation":       p["project_organisation"] or "No Horizon Record Found",
-            "horizon_status":     horizon_status,
-            "project_type":       p["project_type"] or "",
-            "department":         p["department"] if "department" in p.keys() else "",
-            "pm":                 p["project_manager"],
-            "director":           p["project_director"],
-            "task_start_date":    p["task_start_date"],
-            "task_end_date":      p["task_end_date"],
-            "reporting_period":   p["reporting_period"],
-            "ctc_start_date":     p["ctc_start_date"] if "ctc_start_date" in p.keys() else None,
-            "conflict_flag":      bool(p["conflict_flag"]) if "conflict_flag" in p.keys() else False,
-            "start_date_changed": bool(p["start_date_changed"]) if "start_date_changed" in p.keys() else False,
-            "last_pushed":        p["last_pushed"] if "last_pushed" in p.keys() else None,
-            "last_imported":      p["last_imported"],
-            "total_days":         period_days,
+            "project_id":       project_id,
+            "rtc_id":           p["rtc_id"] if "rtc_id" in p.keys() else None,
+            "number":           proj_number,
+            "task_order":       task_order,
+            "name":             p["project_name"] or "No Horizon Record Found",
+            "task_name":        p["task_name"] or "No Horizon Record Found",
+            "organisation":     p["project_organisation"] or "No Horizon Record Found",
+            "horizon_status":   horizon_status,
+            "project_type":     p["project_type"] or "",
+            "department":       p["department"] if "department" in p.keys() else "",
+            "pm":               p["project_manager"],
+            "director":         p["project_director"],
+            "task_start_date":  p["task_start_date"],
+            "task_end_date":    p["task_end_date"],
+            "reporting_period": p["reporting_period"],
+            "start_date":       p["start_date"] if "start_date" in p.keys() else None,
+            "last_updated_at":  p["last_updated_at"] if "last_updated_at" in p.keys() else None,
+            "last_imported":    p["last_imported"],
+            "total_days":       period_days,
         })
-
-    # -- Conflict warnings ---------------------------------------------------
-    conflicts = [p for p in projects_list if p["conflict_flag"]]
 
     # -- Assemble final payload ----------------------------------------------
     summary = {
@@ -253,7 +246,6 @@ def build(department: str = None) -> dict:
         "working_days":  working_days,
         "staff":         staff_list,
         "projects":      projects_list,
-        "conflicts":     conflicts,
         "departments":   _get_departments(conn),
         "job_functions": _get_job_functions(conn),
         "last_imports":  _get_last_imports(conn)

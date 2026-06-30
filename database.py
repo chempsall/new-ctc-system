@@ -36,7 +36,6 @@ def initialise_database():
     # Lookup table for job functions.
     # Derived from the suffix after the comma in Horizon job titles.
     # e.g. "Lead Professional, Mechanical Engineering" -> "Mechanical Engineering"
-    # Maintained here rather than in a spreadsheet.
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS disciplines (
@@ -55,8 +54,7 @@ def initialise_database():
     # job_family   = broad category e.g. "Engineering"
     # job_function = discipline, derived from job title suffix
     #                e.g. "Mechanical Engineering"
-    # department   = Horizon cost centre, replaces office
-    #                e.g. "UK010117"
+    # department   = Horizon cost centre e.g. "UK010117"
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS staff (
@@ -75,7 +73,6 @@ def initialise_database():
 
     # Per-period availability overrides.
     # Used for joiners, leavers, and temporary part-time arrangements.
-    # The staff.availability column holds the default (1.0 for full time).
     c.execute("""
         CREATE TABLE IF NOT EXISTS staff_availability (
             id                      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,8 +85,8 @@ def initialise_database():
 
     # ------------------------------------------------------------------
     # PROJECTS
-    # Pure Horizon/PAR project identity data — no financial figures,
-    # no department, team, or CTC-specific columns here.
+    # Pure Horizon/PAR project identity data.
+    # No financial figures, no department or team columns here.
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS projects (
@@ -113,45 +110,63 @@ def initialise_database():
     """)
 
     # ------------------------------------------------------------------
-    # CTC FILES
-    # One row per CTC Excel file pushed to the system.
-    # Represents one team's engagement with a project/task.
-    # department replaces office as the grouping field.
+    # RTCs  (Resource to Complete)
+    # One row per RTC. Represents one team's resourcing engagement
+    # with a project/task, entered directly via the web interface.
+    #
+    # Identity notes:
+    #   - rtc_id is the sole, server-assigned identity. No GUIDs, no
+    #     file paths, no external identifiers. Clean and unambiguous.
+    #   - created_by / last_updated_by / last_opened_by are all set
+    #     from get_current_user() in app.py, which is a lightweight
+    #     placeholder now and will be replaced with proper corporate
+    #     auth (e.g. Microsoft SSO) when the system moves to the
+    #     WSP corporate environment.
+    #
+    # Status / lifecycle:
+    #   - last_opened is updated every time any user loads the RTC.
+    #     An RTC not opened in 30+ days is considered "needs review".
+    #   - is_archived is set by the admin Supersede action, which
+    #     targets RTCs with no future allocations AND last_opened
+    #     more than 30 days ago. Archived RTCs are hidden by default
+    #     but never deleted — their data is permanently preserved.
     # ------------------------------------------------------------------
     c.execute("""
-        CREATE TABLE IF NOT EXISTS ctc_files (
-            ctc_id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-            ctc_guid                TEXT    NOT NULL UNIQUE,
-            project_id              INTEGER NOT NULL REFERENCES projects(project_id),
-            department              TEXT    NOT NULL,
-            ctc_start_date          TEXT,
-            file_path               TEXT    NOT NULL,
-            conflict_flag           INTEGER NOT NULL DEFAULT 0,
-            start_date_changed      INTEGER NOT NULL DEFAULT 0,
-            previous_ctc_start_date TEXT,
-            last_pushed             TEXT,
-            last_updated_by         TEXT
+        CREATE TABLE IF NOT EXISTS rtcs (
+            rtc_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id      INTEGER NOT NULL REFERENCES projects(project_id),
+            department      TEXT    NOT NULL,
+            start_date      TEXT    NOT NULL,
+            created_by      TEXT,
+            created_at      TEXT,
+            last_updated_by TEXT,
+            last_updated_at TEXT,
+            last_opened_by  TEXT,
+            last_opened     TEXT,
+            is_archived     INTEGER NOT NULL DEFAULT 0
         )
     """)
 
     # ------------------------------------------------------------------
     # ALLOCATIONS
-    # The resource forecast. One row per person x CTC file x month.
+    # One row per person x RTC x month. The core resourcing data.
+    # Cascade-deletes when the parent RTC is deleted.
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS allocations (
             allocation_id           INTEGER PRIMARY KEY AUTOINCREMENT,
             horizon_person_number   TEXT    NOT NULL REFERENCES staff(horizon_person_number),
-            ctc_id                  INTEGER NOT NULL REFERENCES ctc_files(ctc_id) ON DELETE CASCADE,
+            rtc_id                  INTEGER NOT NULL REFERENCES rtcs(rtc_id) ON DELETE CASCADE,
             period_start            TEXT    NOT NULL,
             days                    REAL    NOT NULL DEFAULT 0,
-            pushed_at               TEXT    NOT NULL,
-            UNIQUE(horizon_person_number, ctc_id, period_start)
+            last_updated            TEXT    NOT NULL,
+            UNIQUE(horizon_person_number, rtc_id, period_start)
         )
     """)
 
     # ------------------------------------------------------------------
     # REPORTING PERIODS
+    # Pre-seeded calendar of months with working-day counts.
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS reporting_periods (
@@ -164,7 +179,7 @@ def initialise_database():
     """)
 
     # ------------------------------------------------------------------
-    # AUDIT
+    # AUDIT / CACHE
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS import_log (
@@ -220,7 +235,7 @@ def _seed_disciplines(c):
 def _seed_reporting_periods(c):
     QUARTER_START = {1, 4, 7, 10}
     current = date(2025, 1, 1)
-    end     = date(2029, 12, 1)
+    end     = date(2030, 12, 1)
     while current <= end:
         m   = current.month
         nxt = current + relativedelta(months=1)

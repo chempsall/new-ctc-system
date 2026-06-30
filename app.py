@@ -7,21 +7,15 @@ environment variables). Nothing is hardcoded here.
 
 To start the development server:
     python app.py
-
-To start with a specific environment:
-    set RF_ENV=beta       (Windows)
-    export RF_ENV=beta    (Mac/Linux)
-    python app.py
 """
 
-import os
 import json
 import secrets
-from datetime import datetime, timezone
+import threading
+from datetime import datetime, timezone, date, timedelta
 from functools import wraps
 from pathlib import Path
 
-# Load .env file if present (install with: pip install python-dotenv)
 try:
     from dotenv import load_dotenv
     _env_path = Path(__file__).parent / ".env"
@@ -30,14 +24,11 @@ try:
         print(f"Loaded configuration from {_env_path}")
     else:
         print("No .env file found — using environment variables and config.py defaults.")
-        print(f"To create one: copy .env.template .env")
 except ImportError:
     print("python-dotenv not installed — using environment variables only.")
-    print("Install with: pip install python-dotenv")
 
 import config
 
-# Validate configuration before starting
 try:
     config.validate()
 except ValueError as e:
@@ -53,7 +44,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 import database
 import summary as summary_module
-from imports import staff_list  as staff_import
+from imports import staff_list as staff_import
 from imports import par_import
 
 app = Flask(__name__)
@@ -61,7 +52,21 @@ app.secret_key = config.SECRET_KEY
 
 
 # ---------------------------------------------------------------------------
-# AUTH
+# IDENTITY
+# Lightweight placeholder — returns a hardcoded user name for now.
+# Replace this single function when WSP corporate auth is available
+# (Microsoft SSO or equivalent). Every part of the codebase that needs
+# to know "who is doing this" calls get_current_user() and nothing else.
+# ---------------------------------------------------------------------------
+
+def get_current_user() -> str:
+    """Returns the current user's display name."""
+    # TODO: replace with real auth when corporate SSO is available
+    return "Test User"
+
+
+# ---------------------------------------------------------------------------
+# AUTH (admin routes)
 # ---------------------------------------------------------------------------
 
 def require_admin(f):
@@ -80,97 +85,27 @@ def require_admin(f):
     return decorated
 
 
-def _cleanup_deleted_ctc_files() -> dict:
-    """
-    Checks every row in ctc_files to see whether its source file still
-    exists on disk. If a file has been deleted (or moved — moves are
-    indistinguishable from delete+recreate, which is an accepted limitation
-    for now), its ctc_files row is removed, and ON DELETE CASCADE removes
-    the associated allocations automatically.
-
-    Returns a summary dict, and also writes a full record (including which
-    files were removed) to import_log as import_type "cleanup".
-    """
-    started_at = datetime.now(timezone.utc).isoformat()
-    conn = database.get_connection()
-    c    = conn.cursor()
-
-    rows = c.execute("""
-        SELECT cf.ctc_id, cf.file_path, p.project_number, p.project_name,
-               (SELECT COUNT(*) FROM allocations a WHERE a.ctc_id = cf.ctc_id) AS alloc_count
-        FROM ctc_files cf
-        JOIN projects p ON p.project_id = cf.project_id
-    """).fetchall()
-
-    removed = []
-    for row in rows:
-        if not Path(row["file_path"]).exists():
-            c.execute("DELETE FROM ctc_files WHERE ctc_id = ?", (row["ctc_id"],))
-            removed.append({
-                "ctc_id":         row["ctc_id"],
-                "file_path":      row["file_path"],
-                "project_number": row["project_number"],
-                "project_name":   row["project_name"],
-                "allocations_removed": row["alloc_count"],
-            })
-
-    completed_at = datetime.now(timezone.utc).isoformat()
-
-    c.execute("""
-        INSERT INTO import_log
-            (import_type, filename, started_at, completed_at,
-             rows_processed, rows_inserted, rows_updated, errors)
-        VALUES (?,?,?,?,?,?,?,?)
-    """, ("cleanup", None, started_at, completed_at,
-          len(rows), 0, 0, json.dumps(removed)))
-
-    conn.commit()
-    conn.close()
-
-    if removed:
-        summary_module.build()
-
-    return {
-        "files_checked": len(rows),
-        "files_removed": len(removed),
-        "removed":       removed,
-    }
-
-
 # ---------------------------------------------------------------------------
 # SCHEDULED JOBS
 # ---------------------------------------------------------------------------
 
 def _nightly_imports():
     """
-    Runs at the time configured in config.py (default midnight).
-    Imports all three data sources, cleans up deleted CTC files,
-    then rebuilds the summary cache. Paths come from config — no hardcoding.
+    Runs at the configured time (default midnight).
+    Re-imports staff and PAR data then rebuilds the summary cache.
     """
     print(f"[{datetime.now(timezone.utc).isoformat()}] Starting nightly import")
 
-    # Staff list import
     if config.STAFF_LIST_PATH and Path(config.STAFF_LIST_PATH).exists():
         r = staff_import.run(str(config.STAFF_LIST_PATH))
         print(f"  Staff list: {r['rows_processed']} rows, "
-              f"{r['rows_inserted']} inserted, {r['rows_updated']} updated"
-              + (f", {len(r['errors'])} errors" if r["errors"] else ""))
+              f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
     else:
         print(f"  Staff list: path not found ({config.STAFF_LIST_PATH})")
 
-    # PAR actuals — source is SharePoint or local UK_PAR file (see config)
     r = par_import.run()
     print(f"  PAR import: {r['rows_processed']} rows, "
-          f"{r['rows_inserted']} inserted, {r['rows_updated']} updated"
-          + (f", {len(r['errors'])} errors" if r["errors"] else ""))
-
-    # Remove CTC files that no longer exist on disk
-    cleanup = _cleanup_deleted_ctc_files()
-    print(f"  Cleanup: {cleanup['files_checked']} files checked, "
-          f"{cleanup['files_removed']} removed")
-    for item in cleanup["removed"]:
-        print(f"    Removed: {item['file_path']} "
-              f"({item['project_number']} — {item['allocations_removed']} allocation rows)")
+          f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
 
     summary_module.build()
     print(f"  Summary cache rebuilt")
@@ -188,10 +123,7 @@ def index():
 
 @app.route("/api/summary")
 def api_summary():
-    """
-    Pre-built summary JSON — the only endpoint the dashboard calls on load.
-    Financial statistics are included as computed figures. Rates never exposed.
-    """
+    """Pre-built summary JSON — the only endpoint the dashboard calls on load."""
     cached = summary_module.get_cached()
     if not cached:
         summary_module.build()
@@ -211,8 +143,7 @@ def api_summary():
 @app.route("/api/offices")
 @app.route("/api/departments")
 def api_offices():
-    """Returns distinct departments from staff. Supports /api/offices
-    for macro backwards compatibility."""
+    """Returns distinct departments from staff."""
     conn = database.get_connection()
     rows = conn.execute("""
         SELECT DISTINCT department
@@ -228,8 +159,7 @@ def api_offices():
 @app.route("/api/teams")
 @app.route("/api/job-functions")
 def api_teams():
-    """Returns distinct job functions (disciplines) from staff.
-    Supports /api/teams for macro backwards compatibility."""
+    """Returns distinct job functions from staff."""
     department = request.args.get("office") or request.args.get("department")
     conn = database.get_connection()
     if department:
@@ -253,10 +183,10 @@ def api_teams():
 
 @app.route("/api/staff")
 def api_staff():
-    """Staff list for macro dropdowns. No financial data."""
+    """Staff list for RTC staff picker."""
     department = request.args.get("office") or request.args.get("department")
-    today  = datetime.now(timezone.utc).date().isoformat()
-    conn   = database.get_connection()
+    today = datetime.now(timezone.utc).date().isoformat()
+    conn = database.get_connection()
     if department:
         rows = conn.execute("""
             SELECT horizon_person_number, name, job_title, job_family,
@@ -277,19 +207,11 @@ def api_staff():
     return jsonify([dict(r) for r in rows])
 
 
-
-
-# ---------------------------------------------------------------------------
-# PROJECT LOOKUP ENDPOINT
-# ---------------------------------------------------------------------------
-
 @app.route("/api/project")
 def api_project():
     """
     Returns project metadata for a given project_number + task_order_number.
-    Called by the macro when project number and task order are entered.
-    Returns project details from the PAR-populated projects table.
-    Returns empty object {} if not found.
+    Called by the RTC editor when project details are entered.
     """
     project_number    = request.args.get("project_number", "").strip()
     task_order_number = request.args.get("task_order_number", "").strip()
@@ -313,212 +235,453 @@ def api_project():
 
     return jsonify(dict(row))
 
+
 # ---------------------------------------------------------------------------
-# MACRO PUSH ENDPOINT
+# RTC API
 # ---------------------------------------------------------------------------
 
-@app.route("/api/push", methods=["POST"])
-def api_push():
+@app.route("/api/rtcs")
+def api_rtcs():
     """
-    Receives allocation data pushed by the Excel macro on file save.
+    Returns the list of RTCs for the front page.
 
-    The push identifies the project via project_number + task_order_number,
-    looks it up in the projects table (populated by PAR import), then
-    creates/updates a ctc_files row for this specific file, and upserts
-    the allocation rows belonging to that ctc_file.
+    Query params:
+      department  — filter by cost centre
+      pm          — filter by project manager (partial match)
+      pd          — filter by project director (partial match)
+      search      — free text across project number and name
+      archived    — "1" to include archived RTCs (default: exclude)
 
-    If the project is not yet in the database (PAR not yet run, or project
-    is genuinely new and pending Horizon setup), a minimal project row is
-    created as a placeholder and will be enriched by the next PAR import.
+    Sorted by current-month allocation hours descending, then project name.
+    Slightly stale is acceptable — uses the same cached approach as summary.
+    """
+    conn = database.get_connection()
+    now  = datetime.now(timezone.utc)
+    today = now.date().isoformat()
+    current_period = now.date().replace(day=1).isoformat()
+    thirty_days_ago = (now.date() - timedelta(days=30)).isoformat()
+
+    dept    = request.args.get("department", "").strip()
+    pm      = request.args.get("pm", "").strip()
+    pd_arg  = request.args.get("pd", "").strip()
+    search  = request.args.get("search", "").strip()
+    archived = request.args.get("archived", "0").strip()
+
+    rows = conn.execute("""
+        SELECT
+            r.rtc_id,
+            r.department,
+            r.start_date,
+            r.created_by,
+            r.created_at,
+            r.last_updated_by,
+            r.last_updated_at,
+            r.last_opened_by,
+            r.last_opened,
+            r.is_archived,
+            p.project_id,
+            p.project_number,
+            p.task_order_number,
+            p.project_name,
+            p.task_name,
+            p.project_director,
+            p.project_manager,
+            p.project_status,
+            COALESCE((
+                SELECT SUM(a.days)
+                FROM allocations a
+                WHERE a.rtc_id = r.rtc_id
+                AND a.period_start = ?
+            ), 0) AS current_month_days,
+            COALESCE((
+                SELECT SUM(a.days)
+                FROM allocations a
+                WHERE a.rtc_id = r.rtc_id
+                AND a.period_start > ?
+            ), 0) AS future_days
+        FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE 1=1
+        AND (? = '1' OR r.is_archived = 0)
+    """, (current_period, today, archived)).fetchall()
+
+    conn.close()
+
+    # Apply filters in Python (simpler than building dynamic SQL)
+    result = []
+    for r in rows:
+        row = dict(r)
+        if dept   and row["department"] != dept:           continue
+        if pm     and pm.lower() not in (row["project_manager"] or "").lower():  continue
+        if pd_arg and pd_arg.lower() not in (row["project_director"] or "").lower(): continue
+        if search:
+            q = search.lower()
+            if q not in (row["project_number"] or "").lower() and \
+               q not in (row["project_name"] or "").lower() and \
+               q not in (row["task_name"] or "").lower():
+                continue
+
+        # Compute status
+        last_opened = row["last_opened"]
+        if row["is_archived"]:
+            status = "archived"
+        elif not last_opened or last_opened[:10] < thirty_days_ago:
+            status = "needs_review"
+        else:
+            status = "active"
+
+        row["status"] = status
+        result.append(row)
+
+    # Sort: current_month_days descending, then project_name ascending
+    result.sort(key=lambda r: (-r["current_month_days"], r["project_name"] or ""))
+    return jsonify(result)
+
+
+@app.route("/api/rtcs", methods=["POST"])
+def api_create_rtc():
+    """
+    Creates a new blank RTC.
+
+    Required body fields:
+      project_number, task_order_number, department, start_date
+
+    The project must already exist in the projects table (from PAR import).
+    If not found, a placeholder project row is created.
     """
     data = request.get_json(silent=True, force=True)
     if not data:
-        print(f"Push rejected: invalid JSON body ({len(request.data)} bytes received)")
         return jsonify({"error": "No JSON body"}), 400
 
-    missing = [f for f in ["ctc_guid", "file_path", "ctc_start_date", "allocations"]
-               if f not in data]
+    missing = [f for f in ["project_number", "task_order_number",
+                            "department", "start_date"] if f not in data]
     if missing:
-        print(f"Push rejected: missing fields {missing}")
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
 
-    ctc_guid       = data["ctc_guid"]
-    file_path      = data["file_path"]
-    file_name      = os.path.basename(file_path)
-    # Department is derived from project_organisation (from PAR data)
-    # not sent by the macro — it's the Horizon organisation that owns the project
-    department     = data.get("project_organisation", "")
-    project_number = data.get("project_number", "").strip()
-    task_order     = data.get("task_order_number", "").strip()
-    ctc_start_date = data.get("ctc_start_date")
-
+    user = get_current_user()
+    now  = datetime.now(timezone.utc).isoformat()
     conn = database.get_connection()
     c    = conn.cursor()
-    now  = datetime.now(timezone.utc).isoformat()
-    warnings = []
 
-    # ------------------------------------------------------------------
-    # Step 1: Find or create the project row
-    # ------------------------------------------------------------------
-    project_row = None
-    if not _is_placeholder(project_number) and task_order:
-        project_row = c.execute("""
-            SELECT project_id FROM projects
-            WHERE project_number = ? AND task_order_number = ?
-        """, (project_number, task_order)).fetchone()
-
-    if project_row:
-        project_id = project_row["project_id"]
-    else:
-        # Project not yet in database — create a placeholder.
-        # The nightly PAR import will enrich this row when the Horizon
-        # record becomes available.
-        if _is_placeholder(project_number):
-            warnings.append(
-                f"Project number '{project_number}' looks like a placeholder. "
-                "Please update it with the Horizon number when available."
-            )
-        c.execute("""
-            INSERT INTO projects (
-                project_number, task_order_number,
-                project_name, task_name, project_status, last_imported
-            ) VALUES (?,?,?,?,?,?)
-            ON CONFLICT(project_number, task_order_number) DO UPDATE SET
-                last_imported = excluded.last_imported
-        """, (
-            project_number or "UNKNOWN", task_order or "UNKNOWN",
-            data.get("project_name", "No Horizon Record Found"),
-            data.get("task_name",    "No Horizon Record Found"),
-            "Pending",
-            now
-        ))
-        project_id = c.execute("""
-            SELECT project_id FROM projects
-            WHERE project_number = ? AND task_order_number = ?
-        """, (project_number or "UNKNOWN", task_order or "UNKNOWN")).fetchone()["project_id"]
-
-    # ------------------------------------------------------------------
-    # Step 2: Conflict detection
-    # Two different files with same name and placeholder project number
-    # ------------------------------------------------------------------
-    conflict = False
-    if _is_placeholder(project_number):
-        dup = c.execute("""
-            SELECT ctc_id FROM ctc_files
-            WHERE file_path != ? AND file_path LIKE ?
-            AND project_id IN (
-                SELECT project_id FROM projects
-                WHERE project_number = ?
-            )
-        """, (file_path, f"%{file_name}", project_number)).fetchone()
-        if dup:
-            conflict = True
-            warnings.append(
-                f"Conflict: '{file_name}' exists at another path with the "
-                "same placeholder project number. Flagged for review."
-            )
-
-    # ------------------------------------------------------------------
-    # Step 3: Upsert ctc_files row
-    # Keyed on ctc_guid (a permanent ID generated once by the macro), NOT
-    # file_path. This is deliberate: file_path changes if someone renames
-    # or moves the file, but the GUID doesn't — so a rename/move correctly
-    # updates the existing row instead of creating a duplicate that would
-    # double-count the same allocations under two different ctc_id values.
-    # ------------------------------------------------------------------
-    existing_ctc = c.execute(
-        "SELECT ctc_id, ctc_start_date FROM ctc_files WHERE ctc_guid = ?",
-        (ctc_guid,)
-    ).fetchone()
-
-    start_date_changed = False
-    previous_start     = None
-
-    if existing_ctc:
-        ctc_id = existing_ctc["ctc_id"]
-        if (ctc_start_date and existing_ctc["ctc_start_date"]
-                and ctc_start_date != existing_ctc["ctc_start_date"]):
-            start_date_changed = True
-            previous_start = existing_ctc["ctc_start_date"]
-            warnings.append(
-                f"CTC start date changed from {previous_start} to "
-                f"{ctc_start_date}. Please verify allocations are correct."
-            )
-        c.execute("""
-            UPDATE ctc_files SET
-                project_id=?, department=?, ctc_start_date=?,
-                file_path=?, conflict_flag=?, start_date_changed=?,
-                previous_ctc_start_date = CASE WHEN ? THEN ? ELSE previous_ctc_start_date END,
-                last_pushed=?, last_updated_by=?
-            WHERE ctc_id=?
-        """, (
-            project_id, department, ctc_start_date,
-            file_path,
-            1 if conflict else 0,
-            1 if start_date_changed else 0,
-            start_date_changed, previous_start,
-            now, data.get("last_updated_by", ""),
-            ctc_id
-        ))
-    else:
-        c.execute("""
-            INSERT INTO ctc_files (
-                ctc_guid, project_id, department, ctc_start_date,
-                file_path, conflict_flag, start_date_changed,
-                last_pushed, last_updated_by
-            ) VALUES (?,?,?,?,?,?,?,?,?)
-        """, (
-            ctc_guid, project_id, department, ctc_start_date,
-            file_path, 1 if conflict else 0, 0,
-            now, data.get("last_updated_by", "")
-        ))
-        ctc_id = c.lastrowid
-
-    # ------------------------------------------------------------------
-    # Step 4: Upsert allocations (now keyed to ctc_id not project_id)
-    # ------------------------------------------------------------------
-    alloc_count = 0
-    for alloc in data.get("allocations", []):
-        person_id    = str(alloc.get("horizon_person_number", "")).strip()
-        period_start = alloc.get("period_start")
-        days         = alloc.get("days", 0)
-        if not person_id or not period_start:
-            continue
-        if not c.execute(
-            "SELECT 1 FROM staff WHERE horizon_person_number=?", (person_id,)
-        ).fetchone():
-            warnings.append(f"Person {person_id} not in staff list — skipped")
-            continue
-        c.execute("""
-            INSERT INTO allocations
-                (horizon_person_number, ctc_id, period_start, days, pushed_at)
-            VALUES (?,?,?,?,?)
-            ON CONFLICT(horizon_person_number, ctc_id, period_start)
-            DO UPDATE SET days=excluded.days, pushed_at=excluded.pushed_at
-        """, (person_id, ctc_id, period_start, days, now))
-        alloc_count += 1
+    project_id = _get_or_create_project(c, data, now)
 
     c.execute("""
-        INSERT INTO import_log
-            (import_type, filename, started_at, completed_at,
-             rows_processed, rows_inserted, rows_updated, errors)
-        VALUES (?,?,?,?,?,?,?,?)
-    """, ("xlsm_push", file_name, now, now, alloc_count, alloc_count, 0,
-          json.dumps(warnings)))
+        INSERT INTO rtcs (project_id, department, start_date,
+                          created_by, created_at,
+                          last_updated_by, last_updated_at,
+                          last_opened_by, last_opened,
+                          is_archived)
+        VALUES (?,?,?,?,?,?,?,?,?,0)
+    """, (project_id, data["department"], data["start_date"],
+          user, now, user, now, user, now))
+
+    rtc_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    threading.Thread(target=summary_module.build, daemon=True).start()
+    return jsonify({"rtc_id": rtc_id}), 201
+
+
+@app.route("/api/rtcs/<int:rtc_id>/duplicate", methods=["POST"])
+def api_duplicate_rtc(rtc_id):
+    """
+    Creates a new RTC by duplicating the staff list from an existing one.
+    Project details, start date, and allocations are NOT copied —
+    everything except the staff list must be re-entered for the new RTC.
+
+    Required body fields:
+      project_number, task_order_number, department, start_date
+    """
+    data = request.get_json(silent=True, force=True)
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    missing = [f for f in ["project_number", "task_order_number",
+                            "department", "start_date"] if f not in data]
+    if missing:
+        return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+
+    user = get_current_user()
+    now  = datetime.now(timezone.utc).isoformat()
+    conn = database.get_connection()
+    c    = conn.cursor()
+
+    # Confirm the source RTC exists
+    source = c.execute(
+        "SELECT rtc_id FROM rtcs WHERE rtc_id = ?", (rtc_id,)
+    ).fetchone()
+    if not source:
+        conn.close()
+        return jsonify({"error": f"RTC {rtc_id} not found"}), 404
+
+    project_id = _get_or_create_project(c, data, now)
+
+    c.execute("""
+        INSERT INTO rtcs (project_id, department, start_date,
+                          created_by, created_at,
+                          last_updated_by, last_updated_at,
+                          last_opened_by, last_opened,
+                          is_archived)
+        VALUES (?,?,?,?,?,?,?,?,?,0)
+    """, (project_id, data["department"], data["start_date"],
+          user, now, user, now, user, now))
+
+    new_rtc_id = c.lastrowid
+
+    # Copy the distinct set of people who appear in the source RTC,
+    # but create NO allocation rows — they start from zero in the new RTC.
+    staff_members = c.execute("""
+        SELECT DISTINCT horizon_person_number
+        FROM allocations
+        WHERE rtc_id = ?
+    """, (rtc_id,)).fetchall()
+
+    # Insert zero-allocation rows for the new RTC's start month only,
+    # so the staff appear in the editor ready to be allocated.
+    for s in staff_members:
+        c.execute("""
+            INSERT OR IGNORE INTO allocations
+                (horizon_person_number, rtc_id, period_start, days, last_updated)
+            VALUES (?, ?, ?, 0, ?)
+        """, (s["horizon_person_number"], new_rtc_id, data["start_date"], now))
 
     conn.commit()
     conn.close()
 
-    import threading
     threading.Thread(target=summary_module.build, daemon=True).start()
+    return jsonify({"rtc_id": new_rtc_id, "staff_copied": len(staff_members)}), 201
+
+
+@app.route("/api/rtcs/<int:rtc_id>")
+def api_get_rtc(rtc_id):
+    """
+    Returns full RTC detail including all allocations.
+    Also updates last_opened and last_opened_by.
+    Called when the editing screen loads.
+    """
+    user = get_current_user()
+    now  = datetime.now(timezone.utc).isoformat()
+    conn = database.get_connection()
+    c    = conn.cursor()
+
+    # Update last_opened
+    c.execute("""
+        UPDATE rtcs SET last_opened_by = ?, last_opened = ?
+        WHERE rtc_id = ?
+    """, (user, now, rtc_id))
+    conn.commit()
+
+    rtc = c.execute("""
+        SELECT r.*, p.project_number, p.task_order_number, p.project_name,
+               p.task_name, p.project_organisation, p.project_customer,
+               p.project_director, p.project_manager, p.project_status
+        FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE r.rtc_id = ?
+    """, (rtc_id,)).fetchone()
+
+    if not rtc:
+        conn.close()
+        return jsonify({"error": f"RTC {rtc_id} not found"}), 404
+
+    # Fetch all allocations, grouped by person
+    alloc_rows = c.execute("""
+        SELECT a.horizon_person_number, a.period_start, a.days,
+               s.name, s.job_title, s.job_function
+        FROM allocations a
+        JOIN staff s ON s.horizon_person_number = a.horizon_person_number
+        WHERE a.rtc_id = ?
+        ORDER BY s.name, a.period_start
+    """, (rtc_id,)).fetchall()
+
+    # Fetch reporting periods from start_date forward (36 months)
+    periods = c.execute("""
+        SELECT period_start, label, working_days
+        FROM reporting_periods
+        WHERE period_start >= ?
+        ORDER BY period_start
+        LIMIT 36
+    """, (rtc["start_date"],)).fetchall()
+
+    conn.close()
+
+    # Build person-keyed allocation structure
+    people = {}
+    for row in alloc_rows:
+        pid = row["horizon_person_number"]
+        if pid not in people:
+            people[pid] = {
+                "horizon_person_number": pid,
+                "name":         row["name"],
+                "job_title":    row["job_title"],
+                "job_function": row["job_function"],
+                "allocations":  {}
+            }
+        people[pid]["allocations"][row["period_start"]] = row["days"]
 
     return jsonify({
-        "status":   "ok",
-        "ctc_id":   ctc_id,
-        "project_id": project_id,
-        "allocations": alloc_count,
-        "warnings":    warnings
+        "rtc":     dict(rtc),
+        "periods": [dict(p) for p in periods],
+        "staff":   list(people.values()),
     })
+
+
+@app.route("/api/rtcs/<int:rtc_id>", methods=["PATCH"])
+def api_update_rtc(rtc_id):
+    """
+    Updates RTC allocations and/or project details.
+    Accepts partial updates — only provided fields are changed.
+
+    Body may contain:
+      allocations: [{horizon_person_number, period_start, days}, ...]
+      project_number, task_order_number (triggers re-linking to projects table)
+      start_date, department
+    """
+    data = request.get_json(silent=True, force=True)
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    user = get_current_user()
+    now  = datetime.now(timezone.utc).isoformat()
+    conn = database.get_connection()
+    c    = conn.cursor()
+
+    rtc = c.execute(
+        "SELECT rtc_id FROM rtcs WHERE rtc_id = ?", (rtc_id,)
+    ).fetchone()
+    if not rtc:
+        conn.close()
+        return jsonify({"error": f"RTC {rtc_id} not found"}), 404
+
+    # Update scalar fields if provided
+    updates = {}
+    for field in ["start_date", "department"]:
+        if field in data:
+            updates[field] = data[field]
+
+    if "project_number" in data and "task_order_number" in data:
+        project_id = _get_or_create_project(c, data, now)
+        updates["project_id"] = project_id
+
+    if updates:
+        updates["last_updated_by"] = user
+        updates["last_updated_at"] = now
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        c.execute(f"UPDATE rtcs SET {set_clause} WHERE rtc_id = ?",
+                  list(updates.values()) + [rtc_id])
+
+    # Upsert allocations
+    alloc_count = 0
+    for alloc in data.get("allocations", []):
+        pid    = str(alloc.get("horizon_person_number", "")).strip()
+        period = alloc.get("period_start")
+        days   = alloc.get("days", 0)
+        if not pid or not period:
+            continue
+        c.execute("""
+            INSERT INTO allocations
+                (horizon_person_number, rtc_id, period_start, days, last_updated)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(horizon_person_number, rtc_id, period_start)
+            DO UPDATE SET days = excluded.days, last_updated = excluded.last_updated
+        """, (pid, rtc_id, period, days, now))
+        alloc_count += 1
+
+    # Update last_updated_by on the RTC itself
+    c.execute("""
+        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
+        WHERE rtc_id = ?
+    """, (user, now, rtc_id))
+
+    conn.commit()
+    conn.close()
+
+    threading.Thread(target=summary_module.build, daemon=True).start()
+    return jsonify({"status": "ok", "allocations_updated": alloc_count})
+
+
+@app.route("/api/rtcs/<int:rtc_id>/staff", methods=["POST"])
+def api_add_rtc_staff(rtc_id):
+    """
+    Adds a staff member to an RTC (creates zero-allocation rows
+    for the RTC's period range so they appear in the grid).
+    """
+    data = request.get_json(silent=True, force=True)
+    if not data or "horizon_person_number" not in data:
+        return jsonify({"error": "horizon_person_number required"}), 400
+
+    pid  = str(data["horizon_person_number"]).strip()
+    user = get_current_user()
+    now  = datetime.now(timezone.utc).isoformat()
+    conn = database.get_connection()
+    c    = conn.cursor()
+
+    rtc = c.execute(
+        "SELECT rtc_id, start_date FROM rtcs WHERE rtc_id = ?", (rtc_id,)
+    ).fetchone()
+    if not rtc:
+        conn.close()
+        return jsonify({"error": f"RTC {rtc_id} not found"}), 404
+
+    # Confirm person exists in staff
+    if not c.execute(
+        "SELECT 1 FROM staff WHERE horizon_person_number = ?", (pid,)
+    ).fetchone():
+        conn.close()
+        return jsonify({"error": f"Staff member {pid} not found"}), 404
+
+    # Get the periods for this RTC
+    periods = c.execute("""
+        SELECT period_start FROM reporting_periods
+        WHERE period_start >= ?
+        ORDER BY period_start LIMIT 36
+    """, (rtc["start_date"],)).fetchall()
+
+    added = 0
+    for p in periods:
+        try:
+            c.execute("""
+                INSERT OR IGNORE INTO allocations
+                    (horizon_person_number, rtc_id, period_start, days, last_updated)
+                VALUES (?, ?, ?, 0, ?)
+            """, (pid, rtc_id, p["period_start"], now))
+            added += c.rowcount
+        except Exception:
+            pass
+
+    c.execute("""
+        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
+        WHERE rtc_id = ?
+    """, (user, now, rtc_id))
+
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "periods_added": added})
+
+
+@app.route("/api/rtcs/<int:rtc_id>/staff/<person_id>", methods=["DELETE"])
+def api_remove_rtc_staff(rtc_id, person_id):
+    """Removes a staff member from an RTC (deletes all their allocation rows)."""
+    user = get_current_user()
+    now  = datetime.now(timezone.utc).isoformat()
+    conn = database.get_connection()
+    c    = conn.cursor()
+
+    c.execute("""
+        DELETE FROM allocations
+        WHERE rtc_id = ? AND horizon_person_number = ?
+    """, (rtc_id, person_id))
+    deleted = c.rowcount
+
+    c.execute("""
+        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
+        WHERE rtc_id = ?
+    """, (user, now, rtc_id))
+
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "rows_deleted": deleted})
 
 
 # ---------------------------------------------------------------------------
@@ -527,17 +690,13 @@ def api_push():
 
 @app.route("/admin")
 def admin_index():
-    # No @require_admin here — this just serves the page, which prompts
-    # for the token via JavaScript. Every actual action triggered from
-    # this page (imports, cleanup, viewing logs, etc.) calls a separate
-    # /admin/* endpoint that DOES require the token, so nothing sensitive
-    # is exposed by leaving the page itself open.
     return render_template("admin.html")
 
 
 @app.route("/admin/import/staff", methods=["POST"])
 @require_admin
 def admin_import_staff():
+    from pathlib import Path
     path = (request.json or {}).get("file_path") or str(config.STAFF_LIST_PATH)
     if not path or not Path(path).exists():
         return jsonify({"error": f"File not found: {path}"}), 400
@@ -546,10 +705,10 @@ def admin_import_staff():
     return jsonify(result)
 
 
-
 @app.route("/admin/import/par", methods=["POST"])
 @require_admin
 def admin_import_par():
+    from pathlib import Path
     path = (request.json or {}).get("file_path") or str(config.PAR_ACTUALS_PATH)
     if not path or not Path(path).exists():
         return jsonify({"error": f"File not found: {path}"}), 400
@@ -576,90 +735,74 @@ def admin_import_log():
     return jsonify(result)
 
 
-@app.route("/admin/conflicts")
-@require_admin
-def admin_conflicts():
-    conn = database.get_connection()
-    rows = conn.execute("""
-        SELECT cf.ctc_id, cf.file_path, cf.department,
-               cf.last_pushed, p.project_number, p.task_order_number,
-               p.project_name
-        FROM ctc_files cf
-        JOIN projects p ON p.project_id = cf.project_id
-        WHERE cf.conflict_flag = 1
-        ORDER BY cf.last_pushed DESC
-    """).fetchall()
-    conn.close()
-    return jsonify([dict(r) for r in rows])
-
-
-@app.route("/admin/start-date-changes")
-@require_admin
-def admin_start_date_changes():
-    conn = database.get_connection()
-    rows = conn.execute("""
-        SELECT cf.ctc_id, cf.file_path, cf.ctc_start_date,
-               cf.previous_ctc_start_date, cf.last_pushed,
-               p.project_number, p.project_name
-        FROM ctc_files cf
-        JOIN projects p ON p.project_id = cf.project_id
-        WHERE cf.start_date_changed = 1
-        ORDER BY cf.last_pushed DESC
-    """).fetchall()
-    conn.close()
-    return jsonify([dict(r) for r in rows])
-
-
 @app.route("/admin/rebuild-summary", methods=["POST"])
 @require_admin
 def admin_rebuild_summary():
     summary_module.build()
-    return jsonify({"status": "ok", "rebuilt_at": datetime.now(timezone.utc).isoformat()})
+    return jsonify({"status": "ok",
+                    "rebuilt_at": datetime.now(timezone.utc).isoformat()})
 
 
 @app.route("/admin/run-cleanup", methods=["POST"])
 @require_admin
 def admin_run_cleanup():
     """
-    Manually triggers the deleted-CTC-file cleanup that normally only runs
-    as part of the nightly job. Checks every ctc_files row against disk and
-    removes any whose source file no longer exists (cascades to allocations).
-    Intended for admins who need this run immediately rather than waiting
-    for the next scheduled pass — this check is intentionally NOT run on
-    every push, as it scales poorly once files live on SharePoint.
+    Archives RTCs that have no future allocations and haven't been
+    opened in 30+ days. Data is preserved — RTCs are never deleted,
+    just hidden from the default list view.
     """
-    result = _cleanup_deleted_ctc_files()
-    return jsonify(result)
+    now         = datetime.now(timezone.utc)
+    today       = now.date().isoformat()
+    cutoff      = (now.date() - timedelta(days=30)).isoformat()
 
-
-@app.route("/admin/clear-flag/conflict/<int:ctc_id>", methods=["POST"])
-@require_admin
-def admin_clear_conflict(ctc_id):
     conn = database.get_connection()
-    conn.execute("UPDATE ctc_files SET conflict_flag=0 WHERE ctc_id=?", (ctc_id,))
+    c    = conn.cursor()
+
+    # Find eligible RTCs: no future days AND last_opened before cutoff
+    eligible = c.execute("""
+        SELECT r.rtc_id, p.project_number, p.project_name,
+               r.last_opened, r.department
+        FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE r.is_archived = 0
+        AND (r.last_opened IS NULL OR r.last_opened < ?)
+        AND COALESCE((
+            SELECT SUM(a.days)
+            FROM allocations a
+            WHERE a.rtc_id = r.rtc_id AND a.period_start > ?
+        ), 0) = 0
+    """, (cutoff, today)).fetchall()
+
+    archived = []
+    for row in eligible:
+        c.execute(
+            "UPDATE rtcs SET is_archived = 1 WHERE rtc_id = ?",
+            (row["rtc_id"],)
+        )
+        archived.append({
+            "rtc_id":        row["rtc_id"],
+            "project_number": row["project_number"],
+            "project_name":   row["project_name"],
+            "last_opened":    row["last_opened"],
+        })
+
     conn.commit()
     conn.close()
-    summary_module.build()
-    return jsonify({"status": "ok"})
 
+    if archived:
+        summary_module.build()
 
-@app.route("/admin/clear-flag/start-date/<int:ctc_id>", methods=["POST"])
-@require_admin
-def admin_clear_start_date_flag(ctc_id):
-    conn = database.get_connection()
-    conn.execute("""
-        UPDATE ctc_files SET start_date_changed=0, previous_ctc_start_date=NULL
-        WHERE ctc_id=?
-    """, (ctc_id,))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "archived_count": len(archived),
+        "archived":       archived,
+    })
 
 
 @app.route("/admin/config")
 @require_admin
 def admin_config():
     """Returns non-sensitive config summary for diagnostics."""
+    from pathlib import Path
     return jsonify({
         "environment":       config.ENV,
         "base_dir":          str(config.BASE_DIR),
@@ -671,6 +814,7 @@ def admin_config():
         "scheduler":         f"{config.SCHEDULER_HOUR:02d}:{config.SCHEDULER_MINUTE:02d}",
         "forecast_months":   config.FORECAST_HORIZON_MONTHS,
         "staff_list_exists": Path(config.STAFF_LIST_PATH).exists(),
+        "current_user":      get_current_user(),
     })
 
 
@@ -679,6 +823,7 @@ def admin_config():
 # ---------------------------------------------------------------------------
 
 PLACEHOLDER_PATTERNS = {"xxxxxxxx", "12345678", "00000000", "tbc", "tbd", "n/a", ""}
+
 
 def _is_placeholder(s: str) -> bool:
     if not s:
@@ -689,6 +834,45 @@ def _is_placeholder(s: str) -> bool:
     if all(ch == "x" for ch in c) or all(ch == "0" for ch in c):
         return True
     return False
+
+
+def _get_or_create_project(cursor, data: dict, now: str) -> int:
+    """
+    Looks up a project by project_number + task_order_number.
+    Creates a placeholder row if not found (will be enriched by next PAR import).
+    Returns the project_id.
+    """
+    proj_num  = data.get("project_number", "").strip()
+    task_order = data.get("task_order_number", "").strip()
+
+    if not _is_placeholder(proj_num) and task_order:
+        row = cursor.execute("""
+            SELECT project_id FROM projects
+            WHERE project_number = ? AND task_order_number = ?
+        """, (proj_num, task_order)).fetchone()
+        if row:
+            return row["project_id"]
+
+    # Create placeholder — nightly PAR import will enrich it
+    cursor.execute("""
+        INSERT INTO projects (
+            project_number, task_order_number,
+            project_name, task_name, project_status, last_imported
+        ) VALUES (?,?,?,?,?,?)
+        ON CONFLICT(project_number, task_order_number) DO UPDATE SET
+            last_imported = excluded.last_imported
+    """, (
+        proj_num  or "UNKNOWN",
+        task_order or "UNKNOWN",
+        data.get("project_name", "No Horizon Record Found"),
+        data.get("task_name",    "No Horizon Record Found"),
+        "Pending", now
+    ))
+    row = cursor.execute("""
+        SELECT project_id FROM projects
+        WHERE project_number = ? AND task_order_number = ?
+    """, (proj_num or "UNKNOWN", task_order or "UNKNOWN")).fetchone()
+    return row["project_id"]
 
 
 # ---------------------------------------------------------------------------
