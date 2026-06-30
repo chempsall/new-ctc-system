@@ -46,22 +46,6 @@ def initialise_database():
     """)
 
     # ------------------------------------------------------------------
-    # GRADE RATES
-    # Used only for server-side financial calculations.
-    # Never returned by any API endpoint.
-    # Keyed on job_title which is the same as Horizon's technical grade.
-    # Rates will need extending when offices beyond London are added.
-    # ------------------------------------------------------------------
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS grade_rates (
-            job_title       TEXT PRIMARY KEY,
-            raw_cost        REAL NOT NULL,
-            burdened_cost   REAL NOT NULL,
-            utilisation     REAL NOT NULL
-        )
-    """)
-
-    # ------------------------------------------------------------------
     # STAFF
     # Populated from the staff list Excel file (interim solution).
     # Future: direct Horizon API connection.
@@ -104,8 +88,8 @@ def initialise_database():
 
     # ------------------------------------------------------------------
     # PROJECTS
-    # Pure Horizon/PAR data only.
-    # No department, team, or CTC-specific columns here.
+    # Pure Horizon/PAR project identity data — no financial figures,
+    # no department, team, or CTC-specific columns here.
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS projects (
@@ -123,16 +107,6 @@ def initialise_database():
             task_start_date         TEXT,
             task_end_date           TEXT,
             reporting_period        TEXT,
-            budget_baseline_date    TEXT,
-            funding_value           REAL,
-            current_budget_dlm      REAL,
-            current_budget_raw_labor REAL,
-            current_budget_nr       REAL,
-            actual_itd_dlm          REAL,
-            actual_itd_raw_labor    REAL,
-            actual_itd_nr           REAL,
-            actual_period_dlm       REAL,
-            actual_period_raw_labor REAL,
             last_imported           TEXT,
             UNIQUE(project_number, task_order_number)
         )
@@ -185,8 +159,7 @@ def initialise_database():
             period_start    TEXT NOT NULL UNIQUE,
             period_end      TEXT NOT NULL,
             working_days    INTEGER NOT NULL,
-            label           TEXT NOT NULL UNIQUE,
-            financial_year  TEXT NOT NULL
+            label           TEXT NOT NULL UNIQUE
         )
     """)
 
@@ -217,7 +190,6 @@ def initialise_database():
 
     conn.commit()
     _seed_disciplines(c)
-    _seed_grade_rates(c)
     _seed_reporting_periods(c)
     conn.commit()
     conn.close()
@@ -245,52 +217,20 @@ def _seed_disciplines(c):
         """, (d,))
 
 
-def _seed_grade_rates(c):
-    """
-    Grade rates for server-side financial calculations.
-    Keyed on job_title (Horizon's technical grade field).
-    London rates only for now — will need extending for other offices.
-    """
-    rates = [
-        ("L3 - Director",                               532.07, 1261.008, 0.67),
-        ("P7 - Director",                               455.75, 1080.119, 0.75),
-        ("P6 - Technical Director",                     338.91,  803.208, 0.87),
-        ("P5 - Associate/Associate Director",           266.46,  631.512, 0.87),
-        ("P4 - Principal Engineer/Consultant",          221.52,  525.000, 0.93),
-        ("P3 - Senior Engineer/Consultant",             183.59,  435.120, 0.93),
-        ("P2 - Engineer/Consultant",                    146.95,  348.264, 0.93),
-        ("P1 - Graduate/Assistant Engineer/Consultant", 119.42,  283.035, 0.93),
-        ("P0 - Undergraduate Engineer/Consultant",       94.86,  224.815, 0.93),
-        ("T4 - Senior Technician",                      195.36,  463.008, 0.93),
-        ("T3 - Experienced Technician",                 195.72,  463.848, 0.93),
-        ("T2 - Intermediate Technician",                103.21,  244.600, 0.93),
-        ("T1 - Assistant Technician",                    68.98,  163.477, 0.93),
-        ("T0 - Technician in Training",                  95.42,  226.154, 0.93),
-    ]
-    for job_title, raw, burdened, util in rates:
-        c.execute("""
-            INSERT OR IGNORE INTO grade_rates
-                (job_title, raw_cost, burdened_cost, utilisation)
-            VALUES (?, ?, ?, ?)
-        """, (job_title, raw, burdened, util))
-
-
 def _seed_reporting_periods(c):
     QUARTER_START = {1, 4, 7, 10}
     current = date(2025, 1, 1)
     end     = date(2029, 12, 1)
     while current <= end:
         m   = current.month
-        y   = current.year
         nxt = current + relativedelta(months=1)
-        fy  = f"{y}-{str(y+1)[-2:]}" if m >= 4 else f"{y-1}-{str(y)[-2:]}"
         c.execute("""
             INSERT OR IGNORE INTO reporting_periods
-                (period_start, period_end, working_days, label, financial_year)
-            VALUES (?, ?, ?, ?, ?)
+                (period_start, period_end, working_days, label)
+            VALUES (?, ?, ?, ?)
         """, (current.isoformat(), (nxt - timedelta(days=1)).isoformat(),
               25 if m in QUARTER_START else 20,
-              current.strftime("%b-%Y"), fy))
+              current.strftime("%b-%Y")))
         current = nxt
 
 

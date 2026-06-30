@@ -82,8 +82,7 @@
 /* Disable any slashed-zero glyph variant for consistency — without
    this, numbers can render with or without a slash through the zero
    depending on font fallback, which looks inconsistent on the page. */
-.mono, [class*="mono"], .alloc-days, .proj-number, .detail-proj-days,
-.fin-table td:last-child {
+.mono, [class*="mono"], .alloc-days, .proj-number, .detail-proj-days {
   font-variant-numeric: normal;
   font-feature-settings: "zero" 0, "slashed-zero" 0;
 }
@@ -93,7 +92,7 @@
    -------------------------------------------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { font-size: 14px; scrollbar-gutter: stable;}
+html { font-size: 14px; scrollbar-gutter: stable; }
 
 body {
   font-family: var(--font-body);
@@ -644,21 +643,6 @@ a:hover { text-decoration: underline; }
   font-family: var(--font-mono);
   font-size: 11px; color: var(--text-secondary);
   white-space: nowrap;
-}
-
-/* Financial table */
-.fin-table { width: 100%; font-size: 11px; border-collapse: collapse; }
-.fin-table td { padding: 4px 0; }
-.fin-table td:first-child { color: var(--text-secondary); }
-.fin-table td:last-child {
-  text-align: right;
-  font-family: var(--font-mono);
-  font-weight: 500;
-}
-.fin-table .fin-total td {
-  border-top: 1px solid var(--border);
-  padding-top: 6px;
-  font-weight: 600;
 }
 
 /* Warning strip */

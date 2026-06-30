@@ -52,16 +52,6 @@ PAR_COLUMNS = {
     "task_start_date":          "Task Start Date",
     "task_end_date":            "Task End Date",
     "reporting_period":         "Reporting Period",
-    "budget_baseline_date":     "Current Budget Baseline Date",
-    "funding_value":            "Funding Value (Contract Currency)",
-    "current_budget_dlm":       "Current Budget DLM",
-    "current_budget_raw_labor": "Current Budget Raw Labor",
-    "current_budget_nr":        "Current Budget NR",
-    "actual_itd_dlm":           "Actual ITD DLM",
-    "actual_itd_raw_labor":     "Actual ITD Raw Labor",
-    "actual_itd_nr":            "Actual ITD NR",
-    "actual_period_dlm":        "Actual Period DLM",
-    "actual_period_raw_labor":  "Actual Period Raw Labor",
 }
 
 # Three indirect rows always added — replicates the original M code ManualRows
@@ -129,15 +119,6 @@ def _parse_date(val):
         except ValueError:
             continue
     return s if s else None
-
-
-def _num(val):
-    if val is None:
-        return None
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return None
 
 
 # ---------------------------------------------------------------------------
@@ -308,16 +289,6 @@ def _upsert_projects(data_rows, now):
             _parse_date(d.get("task_start_date")),
             _parse_date(d.get("task_end_date")),
             _clean(d.get("reporting_period")),
-            _parse_date(d.get("budget_baseline_date")),
-            _num(d.get("funding_value")),
-            _num(d.get("current_budget_dlm")),
-            _num(d.get("current_budget_raw_labor")),
-            _num(d.get("current_budget_nr")),
-            _num(d.get("actual_itd_dlm")),
-            _num(d.get("actual_itd_raw_labor")),
-            _num(d.get("actual_itd_nr")),
-            _num(d.get("actual_period_dlm")),
-            _num(d.get("actual_period_raw_labor")),
             now,
         )
 
@@ -333,11 +304,6 @@ def _upsert_projects(data_rows, now):
                     project_organisation=?, project_customer=?,
                     project_status=?, project_director=?, project_manager=?,
                     task_start_date=?, task_end_date=?, reporting_period=?,
-                    budget_baseline_date=?, funding_value=?,
-                    current_budget_dlm=?, current_budget_raw_labor=?,
-                    current_budget_nr=?, actual_itd_dlm=?,
-                    actual_itd_raw_labor=?, actual_itd_nr=?,
-                    actual_period_dlm=?, actual_period_raw_labor=?,
                     last_imported=?
                 WHERE project_id=?
             """, vals + (existing["project_id"],))
@@ -350,12 +316,8 @@ def _upsert_projects(data_rows, now):
                     project_organisation, project_customer, project_status,
                     project_director, project_manager,
                     task_start_date, task_end_date, reporting_period,
-                    budget_baseline_date, funding_value,
-                    current_budget_dlm, current_budget_raw_labor,
-                    current_budget_nr, actual_itd_dlm, actual_itd_raw_labor,
-                    actual_itd_nr, actual_period_dlm, actual_period_raw_labor,
                     last_imported
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (proj_num, task_num) + vals)
             inserted += 1
 

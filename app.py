@@ -690,15 +690,6 @@ def _is_placeholder(s: str) -> bool:
         return True
     return False
 
-def _resolve_staff_id(cursor, name_string):
-    if not name_string:
-        return None
-    clean = str(name_string).split("(")[0].strip()
-    row = cursor.execute(
-        "SELECT horizon_person_number FROM staff WHERE name=?", (clean,)
-    ).fetchone()
-    return row["horizon_person_number"] if row else None
-
 
 # ---------------------------------------------------------------------------
 # STARTUP

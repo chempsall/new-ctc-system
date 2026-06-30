@@ -6,8 +6,9 @@ Called after every import run and after every macro push.
 The frontend receives one payload on page load and does all filtering
 in JavaScript — zero additional server requests for any dashboard interaction.
 
-Resourcing data only. Financial calculations are parked pending resourcing
-working reliably — grade_rates table is retained in the database but unused here.
+Resourcing data only — this is a pure resourcing system, not a financial
+one. Financial figures (rates, budgets, costs) have been removed from the
+database entirely, not just from this module.
 """
 
 import json
@@ -21,13 +22,13 @@ HORIZON_MONTHS = 6   # How many future months to include in the summary
 def _get_active_periods(conn, from_date=None):
     """
     Return the next HORIZON_MONTHS reporting periods from today (or from_date).
-    Returns list of dicts with period_start, label, working_days, financial_year.
+    Returns list of dicts with period_start, label, working_days.
     """
     if from_date is None:
         from_date = date.today().replace(day=1).isoformat()
 
     rows = conn.execute("""
-        SELECT period_start, period_end, working_days, label, financial_year
+        SELECT period_start, period_end, working_days, label
         FROM reporting_periods
         WHERE period_start >= ?
         ORDER BY period_start
