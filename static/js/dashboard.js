@@ -776,8 +776,15 @@ function switchView(view) {
     monthTabs.style.display = view === "rtcs" ? "none" : "";
   }
 
-  // Load RTCs fresh when switching to that view
-  if (view === "rtcs") loadRtcs();
+  // Reload data fresh on every tab switch so changes made on one tab
+  // are reflected immediately on the others without needing a page refresh
+  if (view === "rtcs") {
+    loadRtcs();
+  } else {
+    // Reload the summary cache for staff/projects views
+    loadSummary().then(() => renderView());
+    return; // renderView() called inside loadSummary chain above
+  }
 
   renderView();
 }
@@ -928,6 +935,9 @@ function openRtcModal(mode) {
     document.getElementById("rtc-task-name").value = "";
   document.getElementById("rtc-start-date").value  = "";
   document.getElementById("rtc-department").value  = "";
+  document.getElementById("rtc-pd").value           = "";
+  document.getElementById("rtc-pm").value           = "";
+  document.getElementById("rtc-pm-external").checked = false;
   clearProjectLookup();
   document.getElementById("rtc-form-error").textContent = "";
   document.getElementById("rtc-form-error").classList.add("hidden");
@@ -940,6 +950,10 @@ function openRtcModal(mode) {
     deptSel.appendChild(opt);
   });
 
+  // Clear PD/PM until a cost centre is chosen
+  populatePersonDropdown("rtc-pd", null);
+  populatePersonDropdown("rtc-pm", null);
+
   const now = new Date();
   _rtcPickerYear  = now.getFullYear();
   _rtcPickerMonth = now.getMonth() + 1;
@@ -947,8 +961,42 @@ function openRtcModal(mode) {
     `${_rtcPickerYear}-${String(_rtcPickerMonth).padStart(2,"0")}-01`;
   renderMonthPicker();
 
+  // Wire cost centre change -> repopulate PD/PM
+  document.getElementById("rtc-department").onchange = () => {
+    const dept = document.getElementById("rtc-department").value;
+    const external = document.getElementById("rtc-pm-external").checked;
+    populatePersonDropdown("rtc-pd", dept);
+    populatePersonDropdown("rtc-pm", external ? null : dept);
+  };
+
+  // Wire external PM checkbox
+  document.getElementById("rtc-pm-external").onchange = () => {
+    const dept = document.getElementById("rtc-department").value;
+    const external = document.getElementById("rtc-pm-external").checked;
+    populatePersonDropdown("rtc-pm", external ? null : dept);
+  };
+
   document.getElementById("rtc-modal-overlay").classList.remove("hidden");
   document.getElementById("rtc-proj-number").focus();
+}
+
+// Populate a person dropdown filtered by department (null = all staff)
+function populatePersonDropdown(selectId, department) {
+  const sel = document.getElementById(selectId);
+  const label = selectId === "rtc-pd" ? "Select project director\u2026" : "Select project manager\u2026";
+  sel.innerHTML = `<option value="">${label}</option>`;
+
+  const staff = state.summary?.staff || [];
+  const filtered = department
+    ? staff.filter(s => s.department === department)
+    : staff;
+
+  // Sort by name
+  [...filtered].sort((a, b) => (a.name || "").localeCompare(b.name || "")).forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.name; opt.textContent = s.name;
+    sel.appendChild(opt);
+  });
 }
 
 function closeRtcModal() {
@@ -1019,6 +1067,8 @@ async function submitRtcModal() {
   const dept      = document.getElementById("rtc-department").value;
   const projName  = document.getElementById("rtc-proj-name")?.value.trim() || "";
   const taskName  = document.getElementById("rtc-task-name")?.value.trim() || "";
+  const pd        = document.getElementById("rtc-pd")?.value.trim() || "";
+  const pm        = document.getElementById("rtc-pm")?.value.trim() || "";
   const errorEl   = document.getElementById("rtc-form-error");
   const submitBtn = document.getElementById("rtc-modal-submit");
 
@@ -1044,6 +1094,8 @@ async function submitRtcModal() {
     department:        dept,
     project_name:      projName || undefined,
     task_name:         taskName || undefined,
+    project_director:  pd       || undefined,
+    project_manager:   pm       || undefined,
   };
 
   try {

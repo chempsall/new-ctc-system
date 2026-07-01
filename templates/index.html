@@ -344,9 +344,9 @@
         <div class="form-lookup-row"><span class="form-lookup-label">PD</span><span class="form-lookup-value" id="rtc-lookup-pd">—</span></div>
       </div>
       <div class="form-lookup-placeholder hidden" id="rtc-lookup-placeholder">
-        <strong>No Horizon record found.</strong> This RTC will be created as a placeholder.
-        You can fill in the project name and task name below, and link it to a real Horizon
-        record later once it becomes available.
+        <strong>No Horizon record found.</strong> You must complete the project
+        and task names below — these will be overwritten automatically once the
+        Horizon record becomes available and is linked to this RTC.
       </div>
       <div class="form-row hidden" id="rtc-manual-fields">
         <div class="form-group">
@@ -376,6 +376,25 @@
             <div class="month-picker__grid" id="rtc-month-grid"></div>
           </div>
           <input type="hidden" id="rtc-start-date">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="rtc-pd">Project Director</label>
+          <select class="form-input" id="rtc-pd">
+            <option value="">Select project director…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="rtc-pm">Project Manager</label>
+          <select class="form-input" id="rtc-pm">
+            <option value="">Select project manager…</option>
+          </select>
+          <label class="form-checkbox-label" style="margin-top:5px">
+            <input type="checkbox" id="rtc-pm-external">
+            Project manager from another cost centre?
+          </label>
         </div>
       </div>
     </div>

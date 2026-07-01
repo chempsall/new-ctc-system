@@ -984,12 +984,16 @@ def _get_or_create_project(cursor, data: dict, now: str) -> int:
     cursor.execute("""
         INSERT INTO projects (
             project_number, task_order_number,
-            project_name, task_name, project_status, last_imported
-        ) VALUES (?,?,?,?,?,?)
+            project_name, task_name,
+            project_director, project_manager,
+            project_status, last_imported
+        ) VALUES (?,?,?,?,?,?,?,?)
     """, (
         unique_proj, unique_task,
         data.get("project_name", "Placeholder \u2014 awaiting Horizon record"),
         data.get("task_name",    ""),
+        data.get("project_director", None),
+        data.get("project_manager",  None),
         "Placeholder", now
     ))
     row = cursor.execute("""

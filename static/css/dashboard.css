@@ -980,3 +980,12 @@ a:hover { text-decoration: underline; }
   background: var(--wsp-red); color: #fff;
   border-color: var(--wsp-red); font-weight: 500;
 }
+
+.form-checkbox-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-secondary);
+  cursor: pointer;
+}
+.form-checkbox-label input[type="checkbox"] {
+  accent-color: var(--wsp-red); cursor: pointer;
+}
