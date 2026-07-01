@@ -211,7 +211,13 @@ def api_staff():
 def api_project():
     """
     Returns project metadata for a given project_number + task_order_number.
-    Called by the RTC editor when project details are entered.
+    Called by the RTC modal when project details are entered.
+
+    Returns one of three shapes:
+      { "match_type": "full", ...fields }   — exact project+task match found
+      { "match_type": "project_only", ...fields, "task_name": null }
+                                            — project found, task order unknown
+      {}                                    — project number not found at all
     """
     project_number    = request.args.get("project_number", "").strip()
     task_order_number = request.args.get("task_order_number", "").strip()
@@ -220,20 +226,48 @@ def api_project():
         return jsonify({})
 
     conn = database.get_connection()
-    row  = conn.execute("""
+
+    # Try exact match first
+    row = conn.execute("""
         SELECT project_number, task_order_number, project_name, task_name,
                project_organisation, project_customer, project_director,
                project_manager, project_status, project_type,
                task_start_date, task_end_date
         FROM projects
         WHERE project_number = ? AND task_order_number = ?
+        AND project_status NOT IN ('Placeholder')
     """, (project_number, task_order_number)).fetchone()
+
+    if row:
+        conn.close()
+        result = dict(row)
+        result["match_type"] = "full"
+        return jsonify(result)
+
+    # Try project-number-only match — known project, unknown task order
+    row = conn.execute("""
+        SELECT project_number, project_name,
+               project_organisation, project_customer, project_director,
+               project_manager, project_status, project_type
+        FROM projects
+        WHERE project_number = ?
+        AND project_status NOT IN ('Placeholder')
+        ORDER BY last_imported DESC
+        LIMIT 1
+    """, (project_number,)).fetchone()
+
     conn.close()
 
-    if not row:
-        return jsonify({})
+    if row:
+        result = dict(row)
+        result["match_type"]       = "project_only"
+        result["task_order_number"] = task_order_number
+        result["task_name"]        = None   # unknown — must be entered manually
+        result["task_start_date"]  = None
+        result["task_end_date"]    = None
+        return jsonify(result)
 
-    return jsonify(dict(row))
+    return jsonify({})
 
 
 # ---------------------------------------------------------------------------

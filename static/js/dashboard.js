@@ -939,6 +939,7 @@ function openRtcModal(mode) {
   document.getElementById("rtc-department").value  = "";
   document.getElementById("rtc-pd").value           = "";
   document.getElementById("rtc-pm").value           = "";
+  document.getElementById("rtc-pd-external").checked = false;
   document.getElementById("rtc-pm-external").checked = false;
   clearProjectLookup();
   document.getElementById("rtc-form-error").textContent = "";
@@ -965,17 +966,25 @@ function openRtcModal(mode) {
 
   // Wire cost centre change -> repopulate PD/PM
   document.getElementById("rtc-department").onchange = () => {
-    const dept = document.getElementById("rtc-department").value;
-    const external = document.getElementById("rtc-pm-external").checked;
-    populatePersonDropdown("rtc-pd", dept);
-    populatePersonDropdown("rtc-pm", external ? null : dept);
+    const dept       = document.getElementById("rtc-department").value;
+    const pdExternal = document.getElementById("rtc-pd-external").checked;
+    const pmExternal = document.getElementById("rtc-pm-external").checked;
+    populatePersonDropdown("rtc-pd", pdExternal ? null : dept);
+    populatePersonDropdown("rtc-pm", pmExternal ? null : dept);
   };
 
-  // Wire external PM checkbox
+  // Wire PD external checkbox
+  document.getElementById("rtc-pd-external").onchange = () => {
+    const dept       = document.getElementById("rtc-department").value;
+    const pdExternal = document.getElementById("rtc-pd-external").checked;
+    populatePersonDropdown("rtc-pd", pdExternal ? null : dept);
+  };
+
+  // Wire PM external checkbox
   document.getElementById("rtc-pm-external").onchange = () => {
-    const dept = document.getElementById("rtc-department").value;
-    const external = document.getElementById("rtc-pm-external").checked;
-    populatePersonDropdown("rtc-pm", external ? null : dept);
+    const dept       = document.getElementById("rtc-department").value;
+    const pmExternal = document.getElementById("rtc-pm-external").checked;
+    populatePersonDropdown("rtc-pm", pmExternal ? null : dept);
   };
 
   document.getElementById("rtc-modal-overlay").classList.remove("hidden");
@@ -1030,30 +1039,84 @@ async function triggerProjectLookup(projNum, taskNum) {
       `/api/project?project_number=${encodeURIComponent(projNum)}&task_order_number=${encodeURIComponent(taskNum || "")}`
     );
     const d = await r.json();
-    const result      = document.getElementById("rtc-lookup-result");
-    const placeholder = document.getElementById("rtc-lookup-placeholder");
-    const manualFields = document.getElementById("rtc-manual-fields");
+    const resultEl      = document.getElementById("rtc-lookup-result");
+    const placeholderEl = document.getElementById("rtc-lookup-placeholder");
+    const manualFields  = document.getElementById("rtc-manual-fields");
 
-    if (d.project_name) {
-      document.getElementById("rtc-lookup-name").textContent = d.project_name      || "\u2014";
-      document.getElementById("rtc-lookup-task").textContent = d.task_name         || "\u2014";
-      document.getElementById("rtc-lookup-pm").textContent   = d.project_manager   || "\u2014";
-      document.getElementById("rtc-lookup-pd").textContent   = d.project_director  || "\u2014";
-      result.classList.remove("hidden");
-      if (placeholder) placeholder.classList.add("hidden");
-      if (manualFields) manualFields.classList.add("hidden");
-      if (d.project_organisation) {
-        const sel = document.getElementById("rtc-department");
-        for (const opt of sel.options) {
-          if (opt.value === d.project_organisation) { sel.value = opt.value; break; }
-        }
-      }
+    if (d.match_type === "full") {
+      // Exact match — auto-fill everything, no manual fields needed
+      document.getElementById("rtc-lookup-name").textContent = d.project_name     || "\u2014";
+      document.getElementById("rtc-lookup-task").textContent = d.task_name        || "\u2014";
+      document.getElementById("rtc-lookup-pm").textContent   = d.project_manager  || "\u2014";
+      document.getElementById("rtc-lookup-pd").textContent   = d.project_director || "\u2014";
+      resultEl.classList.remove("hidden");
+      placeholderEl.classList.add("hidden");
+      manualFields.classList.add("hidden");
+      // Auto-fill cost centre if it matches a known department
+      _autoFillDepartment(d.project_organisation);
+
+    } else if (d.match_type === "project_only") {
+      // Project known, task order new — auto-fill project-level fields,
+      // but show task name as the only required manual entry
+      document.getElementById("rtc-lookup-name").textContent = d.project_name     || "\u2014";
+      document.getElementById("rtc-lookup-task").textContent = "New task \u2014 enter name below";
+      document.getElementById("rtc-lookup-pm").textContent   = d.project_manager  || "\u2014";
+      document.getElementById("rtc-lookup-pd").textContent   = d.project_director || "\u2014";
+      resultEl.classList.remove("hidden");
+
+      // Show a more specific message
+      placeholderEl.innerHTML = "<strong>Project found in Horizon \u2014 task order not yet available.</strong> "
+        + "The task name below will be updated automatically when this task order appears in the next PAR import. "
+        + "All other details have been auto-filled and can be adjusted if needed.";
+      placeholderEl.classList.remove("hidden");
+
+      // Show only the task name field; pre-fill the others from PAR data
+      manualFields.classList.remove("hidden");
+      if (document.getElementById("rtc-proj-name"))
+        document.getElementById("rtc-proj-name").value = d.project_name || "";
+      if (document.getElementById("rtc-task-name"))
+        document.getElementById("rtc-task-name").value = "";  // only unknown field
+      if (document.getElementById("rtc-customer"))
+        document.getElementById("rtc-customer").value  = d.project_customer || "";
+      _autoFillDepartment(d.project_organisation);
+      // Pre-select PD and PM in their dropdowns once dept is set
+      _preselectPerson("rtc-pd", d.project_director);
+      _preselectPerson("rtc-pm", d.project_manager);
+
     } else {
-      result.classList.add("hidden");
-      if (placeholder) placeholder.classList.remove("hidden");
-      if (manualFields) manualFields.classList.remove("hidden");
+      // No match at all — full placeholder, all fields manual
+      resultEl.classList.add("hidden");
+      placeholderEl.innerHTML = "<strong>No Horizon record found.</strong> Please complete all the "
+        + "fields below \u2014 they will be overwritten automatically once the Horizon record "
+        + "becomes available and is linked to this RTC.";
+      placeholderEl.classList.remove("hidden");
+      manualFields.classList.remove("hidden");
     }
   } catch(e) { console.error("Project lookup failed:", e); }
+}
+
+function _autoFillDepartment(organisation) {
+  if (!organisation) return;
+  const sel = document.getElementById("rtc-department");
+  for (const opt of sel.options) {
+    if (opt.value === organisation) {
+      sel.value = organisation;
+      // Trigger the onchange to populate PD/PM dropdowns
+      sel.dispatchEvent(new Event("change"));
+      break;
+    }
+  }
+}
+
+function _preselectPerson(selectId, name) {
+  if (!name) return;
+  const sel = document.getElementById(selectId);
+  // Wait a tick for populatePersonDropdown to finish
+  setTimeout(() => {
+    for (const opt of sel.options) {
+      if (opt.value === name) { sel.value = name; break; }
+    }
+  }, 50);
 }
 
 function clearProjectLookup() {
@@ -1075,8 +1138,11 @@ async function submitRtcModal() {
   const errorEl   = document.getElementById("rtc-form-error");
   const submitBtn = document.getElementById("rtc-modal-submit");
 
-  const isPlaceholder = !document.getElementById("rtc-lookup-result") ||
-    document.getElementById("rtc-lookup-result").classList.contains("hidden");
+  const isFullMatch       = !document.getElementById("rtc-lookup-result")?.classList.contains("hidden");
+  const isProjectOnly     = isFullMatch && document.getElementById("rtc-lookup-task")?.textContent.startsWith("New task");
+  const isFullPlaceholder = document.getElementById("rtc-lookup-placeholder") &&
+    !document.getElementById("rtc-lookup-placeholder").classList.contains("hidden") &&
+    !isProjectOnly;
 
   const errors = [];
   if (!projNum)   errors.push("Project number is required.");
@@ -1086,8 +1152,13 @@ async function submitRtcModal() {
   if (!pd)        errors.push("Project Director is required.");
   if (!pm)        errors.push("Project Manager is required.");
 
-  // Additional required fields when no Horizon record found
-  if (isPlaceholder) {
+  // For project_only: task name is the only unknown field
+  if (isProjectOnly && !taskName) {
+    errors.push("Task name is required.");
+  }
+
+  // For full placeholder: project name, task name and customer all required
+  if (isFullPlaceholder) {
     if (!projName) errors.push("Project name is required.");
     if (!taskName) errors.push("Task name is required.");
     if (!customer) errors.push("Project customer is required.");
