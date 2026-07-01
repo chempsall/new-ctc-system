@@ -687,19 +687,13 @@ def api_remove_rtc_staff(rtc_id, person_id):
 @app.route("/api/rtcs/<int:rtc_id>/check-horizon")
 def api_check_horizon(rtc_id):
     """
-    Called when an RTC is opened in the detail panel.
-    If the RTC has a Placeholder project, checks whether a real PAR record
-    now exists that might match it (by looking for projects with the same
-    name, or by letting the user supply a now-known project number).
-
-    Returns:
-      { "is_placeholder": true/false,
-        "match": { project details } or null }
+    Silently checks whether a placeholder RTC now has a matching PAR record.
+    Called when the detail panel opens. Returns is_placeholder and a match
+    if one is found, so the frontend can offer to link them.
     """
     conn = database.get_connection()
     rtc  = conn.execute("""
-        SELECT r.rtc_id, p.project_status, p.project_number,
-               p.task_order_number, p.project_name, p.project_id
+        SELECT r.rtc_id, p.project_status, p.project_name, p.project_id
         FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
         WHERE r.rtc_id = ?
@@ -709,17 +703,14 @@ def api_check_horizon(rtc_id):
         conn.close()
         return jsonify({"error": "Not found"}), 404
 
-    is_placeholder = rtc["project_status"] == "Placeholder"
-
-    if not is_placeholder:
+    if rtc["project_status"] != "Placeholder":
         conn.close()
         return jsonify({"is_placeholder": False, "match": None})
 
-    # Look for a real PAR record whose project name is similar
-    # (case-insensitive partial match on the stored placeholder name)
+    # Look for a real PAR record with a similar project name
     stored_name = (rtc["project_name"] or "").strip()
     match = None
-    if stored_name and stored_name != "Placeholder — awaiting Horizon record":
+    if stored_name and stored_name != "Placeholder \u2014 awaiting Horizon record":
         row = conn.execute("""
             SELECT project_id, project_number, task_order_number,
                    project_name, task_name, project_manager, project_director
@@ -738,11 +729,8 @@ def api_check_horizon(rtc_id):
 @app.route("/api/rtcs/<int:rtc_id>/link-horizon", methods=["POST"])
 def api_link_horizon(rtc_id):
     """
-    Links a placeholder RTC to a real Horizon project.
-    The client sends the confirmed project_number + task_order_number,
-    which must exist in the projects table (from PAR import).
-    Updates the rtc's project_id to point at the real project row,
-    and marks the old placeholder project for cleanup.
+    Links a placeholder RTC to a confirmed real Horizon project.
+    Re-points the RTC's project_id and cleans up the placeholder row.
     """
     data = request.get_json(silent=True, force=True)
     if not data:
@@ -750,14 +738,12 @@ def api_link_horizon(rtc_id):
 
     proj_num   = data.get("project_number", "").strip()
     task_order = data.get("task_order_number", "").strip()
-
     if not proj_num or not task_order:
         return jsonify({"error": "project_number and task_order_number required"}), 400
 
     conn = database.get_connection()
     c    = conn.cursor()
 
-    # Confirm the real project exists
     real_project = c.execute("""
         SELECT project_id FROM projects
         WHERE project_number = ? AND task_order_number = ?
@@ -768,7 +754,6 @@ def api_link_horizon(rtc_id):
         conn.close()
         return jsonify({"error": "Project not found in PAR data"}), 404
 
-    # Get the current (placeholder) project_id before we overwrite it
     rtc = c.execute(
         "SELECT project_id FROM rtcs WHERE rtc_id = ?", (rtc_id,)
     ).fetchone()
@@ -777,16 +762,15 @@ def api_link_horizon(rtc_id):
         return jsonify({"error": "RTC not found"}), 404
 
     old_project_id = rtc["project_id"]
-
-    # Re-point the RTC at the real project
     now  = datetime.now(timezone.utc).isoformat()
     user = get_current_user()
+
     c.execute("""
         UPDATE rtcs SET project_id = ?, last_updated_by = ?, last_updated_at = ?
         WHERE rtc_id = ?
     """, (real_project["project_id"], user, now, rtc_id))
 
-    # Clean up the old placeholder project row if nothing else references it
+    # Clean up orphaned placeholder project row
     other_refs = c.execute(
         "SELECT COUNT(*) FROM rtcs WHERE project_id = ?", (old_project_id,)
     ).fetchone()[0]
@@ -795,7 +779,6 @@ def api_link_horizon(rtc_id):
 
     conn.commit()
     conn.close()
-
     threading.Thread(target=summary_module.build, daemon=True).start()
     return jsonify({"status": "ok", "project_id": real_project["project_id"]})
 
@@ -952,25 +935,19 @@ def _is_placeholder(s: str) -> bool:
     return False
 
 
-def _get_or_create_project(cursor, data: dict, now: str, rtc_id: int = None) -> int:
+def _get_or_create_project(cursor, data: dict, now: str) -> int:
     """
     Looks up a project by project_number + task_order_number.
 
-    For real project numbers (non-placeholder): finds the existing PAR row
-    and returns its project_id. If the project isn't in the database yet,
-    creates a placeholder that the nightly PAR import will enrich.
-
-    For placeholder project numbers (00000000, 12345678, anything that looks
-    made-up): deliberately does NOT share project rows between RTCs, because
-    two RTCs with the same placeholder number are almost certainly different
-    real projects that don't have Horizon numbers yet. Each placeholder RTC
-    gets its own project row, keyed by a unique combination of project_number
-    + task_order_number + the RTC's creation timestamp, so they never collide.
+    Real project numbers: find or create a shared PAR row.
+    Placeholder numbers (00000000, 12345678, etc.): always create a NEW
+    unique project row per RTC, so two RTCs using the same placeholder
+    never collide or share data. Keyed by a timestamp suffix.
     """
     proj_num   = data.get("project_number", "").strip()
     task_order = data.get("task_order_number", "").strip()
 
-    # Real project number — look up or create a shared project row
+    # Real project number — look up the shared PAR row
     if not _is_placeholder(proj_num) and task_order:
         row = cursor.execute("""
             SELECT project_id FROM projects
@@ -979,7 +956,7 @@ def _get_or_create_project(cursor, data: dict, now: str, rtc_id: int = None) -> 
         if row:
             return row["project_id"]
 
-        # Not in database yet — create a placeholder that PAR will enrich
+        # Not in DB yet — create a shared pending row the PAR import will enrich
         cursor.execute("""
             INSERT INTO projects (
                 project_number, task_order_number,
@@ -999,13 +976,10 @@ def _get_or_create_project(cursor, data: dict, now: str, rtc_id: int = None) -> 
         """, (proj_num, task_order)).fetchone()
         return row["project_id"]
 
-    # Placeholder project number — create a unique project row for this RTC
-    # so multiple RTCs with the same placeholder don't share data.
-    # Use a timestamp-derived suffix to guarantee uniqueness in the UNIQUE
-    # constraint on (project_number, task_order_number).
-    unique_suffix = now.replace(":", "").replace("-", "").replace(".", "")[:20]
-    unique_proj   = f"{proj_num or 'PLACEHOLDER'}_{unique_suffix}"
-    unique_task   = f"{task_order or '000'}_{unique_suffix}"
+    # Placeholder number — create a unique row so RTCs never share placeholder data
+    suffix       = now.replace(":", "").replace("-", "").replace(".", "")[:20]
+    unique_proj  = f"{proj_num or 'PLACEHOLDER'}_{suffix}"
+    unique_task  = f"{task_order or '000'}_{suffix}"
 
     cursor.execute("""
         INSERT INTO projects (
@@ -1014,7 +988,7 @@ def _get_or_create_project(cursor, data: dict, now: str, rtc_id: int = None) -> 
         ) VALUES (?,?,?,?,?,?)
     """, (
         unique_proj, unique_task,
-        data.get("project_name", "Placeholder — awaiting Horizon record"),
+        data.get("project_name", "Placeholder \u2014 awaiting Horizon record"),
         data.get("task_name",    ""),
         "Placeholder", now
     ))

@@ -28,14 +28,14 @@
     </div>
 
     <div class="topnav__tabs">
-      <button class="topnav__tab active" data-view="staff">
+      <button class="topnav__tab active" data-view="rtcs">
+        RTCs
+      </button>
+      <button class="topnav__tab" data-view="staff">
         People
       </button>
       <button class="topnav__tab" data-view="projects">
         Projects
-      </button>
-      <button class="topnav__tab" data-view="rtcs">
-        RTCs
       </button>
     </div>
 
@@ -89,72 +89,70 @@
       </div>
     </div>
 
-    <!-- Month tabs -->
+    <!-- Filter bar — two rows:
+         Row 1: label + all dropdowns + reset button
+         Row 2: search input, aligned under the cost centre dropdown -->
+    <div class="filter-bar">
+
+      <!-- Row 1: dropdowns -->
+      <div class="filter-bar__row filter-bar__row--dropdowns">
+        <span class="filter-bar__label">Filter</span>
+
+        <select id="filter-department">
+          <option value="all">All cost centres</option>
+        </select>
+
+        <span id="staff-only-filters">
+          <select id="filter-job-title">
+            <option value="all">All job titles</option>
+          </select>
+          <select id="filter-job-function">
+            <option value="all">All job functions</option>
+          </select>
+        </span>
+
+        <span id="horizon-filter-wrap" style="display:none">
+          <select id="filter-horizon">
+            <option value="all">All Horizon statuses</option>
+            <option value="linked">Linked only</option>
+            <option value="norecord">No record only</option>
+          </select>
+        </span>
+
+        <span id="rtc-only-filters" style="display:none">
+          <select id="filter-rtc-pm">
+            <option value="">All project managers</option>
+          </select>
+          <select id="filter-rtc-pd">
+            <option value="">All project directors</option>
+          </select>
+          <select id="filter-rtc-status">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="needs_review">Needs review</option>
+            <option value="archived">Archived</option>
+          </select>
+        </span>
+
+        <button type="button" id="filter-reset" class="filter-reset-btn">
+          Reset filters
+        </button>
+      </div>
+
+      <!-- Row 2: search input aligned under cost centre -->
+      <div class="filter-bar__row filter-bar__row--search">
+        <span class="filter-bar__label-spacer"></span>
+        <input type="text" id="filter-search"
+               placeholder="Search name, project..." autocomplete="off">
+      </div>
+
+    </div>
+
+    <!-- Month tabs — below the filter bar -->
     <div class="month-tabs" id="month-tabs">
       <!-- Populated by JavaScript -->
     </div>
 
-    <!-- Filter bar -->
-    <div class="filter-bar">
-      <span class="filter-bar__label">Filter</span>
-
-      <select id="filter-department">
-        <option value="all">All cost centres</option>
-      </select>
-
-      <!-- Job title / job function only make sense for the People view —
-           hidden on Projects via JS (see switchView in dashboard.js) -->
-      <span id="staff-only-filters">
-        <select id="filter-job-title">
-          <option value="all">All job titles</option>
-        </select>
-
-        <select id="filter-job-function">
-          <option value="all">All job functions</option>
-        </select>
-      </span>
-
-      <!-- Horizon filter — only shown in Projects view -->
-      <span id="horizon-filter-wrap" style="display:none">
-        <select id="filter-horizon">
-          <option value="all">All Horizon statuses</option>
-          <option value="linked">Linked only</option>
-          <option value="norecord">No record only</option>
-        </select>
-      </span>
-
-      <!-- RTC filters — only shown in RTCs view -->
-      <span id="rtc-only-filters" style="display:none">
-        <select id="filter-rtc-pm">
-          <option value="">All project managers</option>
-        </select>
-
-        <select id="filter-rtc-pd">
-          <option value="">All project directors</option>
-        </select>
-
-        <select id="filter-rtc-status">
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="needs_review">Needs review</option>
-          <option value="archived">Archived</option>
-        </select>
-
-        <label class="filter-toggle">
-          <input type="checkbox" id="filter-rtc-archived">
-          Show archived
-        </label>
-      </span>
-
-      <div class="filter-bar__sep"></div>
-
-      <input type="text" id="filter-search"
-             placeholder="Search name, project..." autocomplete="off">
-
-      <button type="button" id="filter-reset" class="filter-reset-btn">
-        Reset filters
-      </button>
-    </div>
 
     <!-- ===================================================================
          PEOPLE VIEW
@@ -321,89 +319,54 @@
 </div>
 
 
-<!-- =========================================================================
-     CREATE / DUPLICATE RTC MODAL
-     ========================================================================= -->
+<!-- CREATE / DUPLICATE RTC MODAL -->
 <div class="modal-overlay hidden" id="rtc-modal-overlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rtc-modal-title">
-
     <div class="modal__header">
       <h2 class="modal__title" id="rtc-modal-title">New RTC</h2>
       <button class="modal__close" id="rtc-modal-close" aria-label="Close">✕</button>
     </div>
-
     <div class="modal__body">
-
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label" for="rtc-proj-number">
-            Project number <span class="form-required">*</span>
-          </label>
-          <input class="form-input" type="text" id="rtc-proj-number"
-                 placeholder="e.g. UK0041867" autocomplete="off">
+          <label class="form-label" for="rtc-proj-number">Project number <span class="form-required">*</span></label>
+          <input class="form-input" type="text" id="rtc-proj-number" placeholder="e.g. UK0041867" autocomplete="off">
         </div>
         <div class="form-group">
-          <label class="form-label" for="rtc-task-number">
-            Task order number
-          </label>
-          <input class="form-input" type="text" id="rtc-task-number"
-                 placeholder="e.g. 9081" autocomplete="off">
+          <label class="form-label" for="rtc-task-number">Task order number</label>
+          <input class="form-input" type="text" id="rtc-task-number" placeholder="e.g. 9081" autocomplete="off">
         </div>
       </div>
-
       <div class="form-lookup-result hidden" id="rtc-lookup-result">
-        <div class="form-lookup-row">
-          <span class="form-lookup-label">Project</span>
-          <span class="form-lookup-value" id="rtc-lookup-name">—</span>
-        </div>
-        <div class="form-lookup-row">
-          <span class="form-lookup-label">Task</span>
-          <span class="form-lookup-value" id="rtc-lookup-task">—</span>
-        </div>
-        <div class="form-lookup-row">
-          <span class="form-lookup-label">PM</span>
-          <span class="form-lookup-value" id="rtc-lookup-pm">—</span>
-        </div>
-        <div class="form-lookup-row">
-          <span class="form-lookup-label">PD</span>
-          <span class="form-lookup-value" id="rtc-lookup-pd">—</span>
-        </div>
+        <div class="form-lookup-row"><span class="form-lookup-label">Project</span><span class="form-lookup-value" id="rtc-lookup-name">—</span></div>
+        <div class="form-lookup-row"><span class="form-lookup-label">Task</span><span class="form-lookup-value" id="rtc-lookup-task">—</span></div>
+        <div class="form-lookup-row"><span class="form-lookup-label">PM</span><span class="form-lookup-value" id="rtc-lookup-pm">—</span></div>
+        <div class="form-lookup-row"><span class="form-lookup-label">PD</span><span class="form-lookup-value" id="rtc-lookup-pd">—</span></div>
       </div>
-
-      <!-- Shown when using a placeholder project number -->
       <div class="form-lookup-placeholder hidden" id="rtc-lookup-placeholder">
-        <strong>No Horizon record found.</strong> This RTC will be created as a
-        placeholder. You can fill in the project name and task name below, and
-        link it to a real Horizon record later once it becomes available.
+        <strong>No Horizon record found.</strong> This RTC will be created as a placeholder.
+        You can fill in the project name and task name below, and link it to a real Horizon
+        record later once it becomes available.
       </div>
-
-      <!-- Manual name fields — shown when no Horizon record found -->
       <div class="form-row hidden" id="rtc-manual-fields">
         <div class="form-group">
           <label class="form-label" for="rtc-proj-name">Project name</label>
-          <input class="form-input" type="text" id="rtc-proj-name"
-                 placeholder="Enter project name" autocomplete="off">
+          <input class="form-input" type="text" id="rtc-proj-name" placeholder="Enter project name" autocomplete="off">
         </div>
         <div class="form-group">
           <label class="form-label" for="rtc-task-name">Task name</label>
-          <input class="form-input" type="text" id="rtc-task-name"
-                 placeholder="Enter task name" autocomplete="off">
+          <input class="form-input" type="text" id="rtc-task-name" placeholder="Enter task name" autocomplete="off">
         </div>
       </div>
-
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label" for="rtc-department">
-            Cost centre <span class="form-required">*</span>
-          </label>
+          <label class="form-label" for="rtc-department">Cost centre <span class="form-required">*</span></label>
           <select class="form-input" id="rtc-department">
             <option value="">Select cost centre…</option>
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">
-            Start month <span class="form-required">*</span>
-          </label>
+          <label class="form-label">Start month <span class="form-required">*</span></label>
           <div class="month-picker" id="rtc-month-picker">
             <div class="month-picker__header">
               <button type="button" class="month-picker__arrow" id="rtc-year-prev">&#8249;</button>
@@ -415,23 +378,16 @@
           <input type="hidden" id="rtc-start-date">
         </div>
       </div>
-
     </div>
-
     <div class="modal__footer">
       <div class="form-error hidden" id="rtc-form-error"></div>
       <button class="btn btn--secondary" id="rtc-modal-cancel">Cancel</button>
       <button class="btn" id="rtc-modal-submit">Create RTC</button>
     </div>
-
   </div>
 </div>
 
-<!-- =========================================================================
-     LINK TO HORIZON MODAL
-     Shown when opening an RTC that has a placeholder project number
-     and a matching real project now exists in the PAR data.
-     ========================================================================= -->
+<!-- LINK TO HORIZON MODAL -->
 <div class="modal-overlay hidden" id="link-modal-overlay">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal__header">

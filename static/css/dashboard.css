@@ -201,7 +201,6 @@ a:hover { text-decoration: underline; }
   box-shadow: var(--shadow-sm);
 }
 
-/* Row 1: label + dropdowns + reset */
 .filter-bar__row {
   display: flex;
   align-items: center;
@@ -246,9 +245,7 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 0 0 3px rgba(44,114,199,0.12);
 }
 
-.filter-bar__row--search input[type="text"] {
-  width: 200px;
-}
+.filter-bar__row--search input[type="text"] { width: 200px; }
 
 .filter-bar__sep { display: none; }
 
@@ -865,4 +862,121 @@ a:hover { text-decoration: underline; }
 .filter-toggle input[type="checkbox"] {
   accent-color: var(--wsp-red);
   cursor: pointer;
+}
+
+
+/* --------------------------------------------------------------------------
+   Modal
+   -------------------------------------------------------------------------- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  width: 100%; max-width: 540px;
+  display: flex; flex-direction: column;
+  max-height: 90vh; overflow: hidden;
+}
+.modal__header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modal__title { font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.modal__close {
+  background: none; border: none;
+  font-size: 16px; color: var(--text-tertiary);
+  cursor: pointer; padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, color 0.15s;
+}
+.modal__close:hover { background: var(--grey-100); color: var(--text-primary); }
+.modal__body { padding: 20px; overflow-y: auto; flex: 1; }
+.modal__footer {
+  display: flex; align-items: center; gap: 8px;
+  justify-content: flex-end;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Form elements */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.form-required { color: var(--wsp-red); }
+.form-input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body); font-size: 13px;
+  color: var(--text-primary); background: var(--surface);
+  transition: border-color 0.15s;
+  width: 100%; box-sizing: border-box;
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--wsp-red);
+  box-shadow: 0 0 0 2px var(--wsp-red-light);
+}
+.form-lookup-result {
+  background: var(--grey-50); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 16px;
+}
+.form-lookup-row { display: flex; gap: 8px; font-size: 12px; line-height: 1.8; }
+.form-lookup-label { color: var(--text-tertiary); min-width: 52px; flex-shrink: 0; }
+.form-lookup-value { color: var(--text-primary); }
+.form-lookup-placeholder {
+  background: var(--amber-light); border: 1px solid var(--amber);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+  font-size: 11px; color: var(--amber-dark); line-height: 1.5; margin-bottom: 16px;
+}
+.form-error { font-size: 12px; color: var(--status-red); flex: 1; }
+
+/* Custom month picker */
+.month-picker {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+.month-picker__header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--grey-50);
+  border-bottom: 1px solid var(--border);
+}
+.month-picker__year { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.month-picker__arrow {
+  background: none; border: none;
+  font-size: 18px; line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer; padding: 0 6px;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s, color 0.12s;
+}
+.month-picker__arrow:hover { background: var(--grey-100); color: var(--text-primary); }
+.month-picker__grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 2px; padding: 6px;
+}
+.month-picker__btn {
+  padding: 5px 4px;
+  font-family: var(--font-body); font-size: 11px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none; color: var(--text-primary);
+  cursor: pointer; text-align: center;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.month-picker__btn:hover { background: var(--grey-100); border-color: var(--border); }
+.month-picker__btn.selected {
+  background: var(--wsp-red); color: #fff;
+  border-color: var(--wsp-red); font-weight: 500;
 }

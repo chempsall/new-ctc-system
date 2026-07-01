@@ -13,7 +13,7 @@
 const state = {
   summary:        null,    // Full summary payload from /api/summary
   activePeriod:   null,    // Currently selected month label e.g. "Apr-2026"
-  activeView:     "staff", // "staff" | "projects" | "rtcs"
+  activeView:     "rtcs", // "rtcs" | "staff" | "projects"
   filters: {
     job_function: "all",
     job_title:    "all",
@@ -29,7 +29,6 @@ const state = {
     pm:       "",
     pd:       "",
     status:   "",
-    archived: false,
   },
 };
 
@@ -99,10 +98,10 @@ function init() {
   buildMonthTabs();
   buildFilterOptions();
   renderMetrics();
-  renderConflictBanner();
   renderView();
   wireEvents();
   updateStatusBar();
+  loadRtcs();
 }
 
 function buildMonthTabs() {
@@ -396,18 +395,18 @@ function renderProjectTable() {
 // ---------------------------------------------------------------------------
 
 async function loadRtcs() {
-  const archived = state.rtcFilters.archived ? "1" : "0";
   const dept     = state.filters.department !== "all" ? state.filters.department : "";
   const search   = state.filters.search || "";
   const pm       = state.rtcFilters.pm  || "";
   const pd       = state.rtcFilters.pd  || "";
+  const includeArchived = state.rtcFilters.status === "archived" ? "1" : "0";
 
   const params = new URLSearchParams();
-  if (dept)    params.set("department", dept);
-  if (pm)      params.set("pm", pm);
-  if (pd)      params.set("pd", pd);
-  if (search)  params.set("search", search);
-  if (archived === "1") params.set("archived", "1");
+  if (dept)                 params.set("department", dept);
+  if (pm)                   params.set("pm", pm);
+  if (pd)                   params.set("pd", pd);
+  if (search)               params.set("search", search);
+  if (includeArchived === "1") params.set("archived", "1");
 
   try {
     const r = await fetch(`/api/rtcs?${params}`);
@@ -513,7 +512,7 @@ function showRtcDetail(rtc) {
   document.getElementById("dp-role").textContent =
     [rtc.task_name, rtc.department].filter(Boolean).join(" · ");
 
-  // Stats
+  // Stats: show current month days, future days, and last opened
   document.getElementById("dp-stat-alloc").textContent =
     fmt.days(rtc.current_month_days || 0) + "d";
   document.getElementById("dp-stat-cap").textContent =
@@ -526,44 +525,44 @@ function showRtcDetail(rtc) {
 
   // Hide KPI badge and no-record warning (not applicable for RTCs)
   const kpiEl = document.getElementById("dp-kpi");
-  if (kpiEl) { kpiEl.className = "kpi kpi--ok"; kpiEl.textContent = ""; }
+  if (kpiEl) kpiEl.className = "kpi kpi--ok"; kpiEl.textContent = "";
   const warnEl = document.getElementById("dp-norec-warn");
   if (warnEl) warnEl.classList.add("hidden");
 
-  // Format start date as "July 2026" rather than "2026-07-01"
+  // Format start date as "July 2026" not "2026-07-01"
   const startFmt = rtc.start_date
     ? new Date(rtc.start_date + "T12:00:00").toLocaleDateString("en-GB", {
         month: "long", year: "numeric"
       })
-    : "—";
+    : "\u2014";
 
   // Project details
   const projContainer = document.getElementById("dp-projects");
   projContainer.innerHTML = `
     <div style="font-size:11px;line-height:1.8;color:var(--text-secondary)">
-      <div><strong>Project</strong> ${escHtml(rtc.project_number || "—")} / ${escHtml(rtc.task_order_number || "—")}</div>
-      <div><strong>PM</strong> ${escHtml(rtc.project_manager || "—")}</div>
-      <div><strong>PD</strong> ${escHtml(rtc.project_director || "—")}</div>
+      <div><strong>Project</strong> ${escHtml(rtc.project_number || "\u2014")} / ${escHtml(rtc.task_order_number || "\u2014")}</div>
+      <div><strong>PM</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
+      <div><strong>PD</strong> ${escHtml(rtc.project_director || "\u2014")}</div>
       <div><strong>Start</strong> ${escHtml(startFmt)}</div>
-      <div><strong>Created by</strong> ${escHtml(rtc.created_by || "—")}</div>
+      <div><strong>Created by</strong> ${escHtml(rtc.created_by || "\u2014")}</div>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-        <a href="/rtc/${rtc.rtc_id}" class="btn-open-rtc">Open to edit →</a>
+        <a href="/rtc/${rtc.rtc_id}" class="btn-open-rtc">Open to edit \u2192</a>
         <button class="btn btn--sm btn--secondary"
                 onclick="openRtcModal('duplicate')"
                 style="font-size:11px">Duplicate</button>
       </div>
     </div>`;
 
-  // Relabel the stat headings for RTC context
+  // Check for linkable Horizon record
+  checkHorizonLink(rtc.rtc_id);
+
+  // Relabel the stat headings for the RTC context
   const labels = document.querySelectorAll(".detail-stat__label");
   if (labels[0]) labels[0].textContent = "This month";
   if (labels[1]) labels[1].textContent = "Future days";
   if (labels[2]) labels[2].textContent = "Last opened";
 
   panel.classList.add("open");
-
-  // Check whether this placeholder RTC can now be linked to a Horizon record
-  checkHorizonLink(rtc.rtc_id);
 }
 
 // ---------------------------------------------------------------------------
@@ -838,7 +837,6 @@ function resetFilters() {
   state.rtcFilters.pm        = "";
   state.rtcFilters.pd        = "";
   state.rtcFilters.status    = "";
-  state.rtcFilters.archived  = false;
 
   const deptSel  = document.getElementById("filter-department");
   const titleSel = document.getElementById("filter-job-title");
@@ -848,7 +846,6 @@ function resetFilters() {
   const pmSel     = document.getElementById("filter-rtc-pm");
   const pdSel     = document.getElementById("filter-rtc-pd");
   const statusSel = document.getElementById("filter-rtc-status");
-  const archChk   = document.getElementById("filter-rtc-archived");
 
   if (deptSel)    deptSel.value    = "all";
   if (titleSel)   titleSel.value   = "all";
@@ -858,7 +855,6 @@ function resetFilters() {
   if (pmSel)      pmSel.value      = "";
   if (pdSel)      pdSel.value      = "";
   if (statusSel)  statusSel.value  = "";
-  if (archChk)    archChk.checked  = false;
 
   if (state.activeView === "rtcs") {
     loadRtcs();
@@ -868,7 +864,7 @@ function resetFilters() {
 }
 
 // ---------------------------------------------------------------------------
-// Horizon link check — runs silently when an RTC detail panel opens
+// Horizon link check
 // ---------------------------------------------------------------------------
 
 async function checkHorizonLink(rtcId) {
@@ -877,29 +873,15 @@ async function checkHorizonLink(rtcId) {
     const d = await r.json();
     if (!d.is_placeholder || !d.match) return;
 
-    // A potential Horizon match was found — show the link modal
     const details = document.getElementById("link-modal-details");
     if (details) {
       details.innerHTML = `
-        <div class="form-lookup-row">
-          <span class="form-lookup-label">Project</span>
-          <span class="form-lookup-value">${escHtml(d.match.project_name)}</span>
-        </div>
-        <div class="form-lookup-row">
-          <span class="form-lookup-label">Task</span>
-          <span class="form-lookup-value">${escHtml(d.match.task_name || "—")}</span>
-        </div>
-        <div class="form-lookup-row">
-          <span class="form-lookup-label">PM</span>
-          <span class="form-lookup-value">${escHtml(d.match.project_manager || "—")}</span>
-        </div>
-        <div class="form-lookup-row">
-          <span class="form-lookup-label">Number</span>
-          <span class="form-lookup-value">${escHtml(d.match.project_number)} / ${escHtml(d.match.task_order_number)}</span>
-        </div>`;
+        <div class="form-lookup-row"><span class="form-lookup-label">Project</span><span class="form-lookup-value">${escHtml(d.match.project_name)}</span></div>
+        <div class="form-lookup-row"><span class="form-lookup-label">Task</span><span class="form-lookup-value">${escHtml(d.match.task_name || "\u2014")}</span></div>
+        <div class="form-lookup-row"><span class="form-lookup-label">PM</span><span class="form-lookup-value">${escHtml(d.match.project_manager || "\u2014")}</span></div>
+        <div class="form-lookup-row"><span class="form-lookup-label">Number</span><span class="form-lookup-value">${escHtml(d.match.project_number)} / ${escHtml(d.match.task_order_number)}</span></div>`;
     }
 
-    // Wire up the confirm/skip buttons
     document.getElementById("link-modal-confirm").onclick = async () => {
       document.getElementById("link-modal-overlay").classList.add("hidden");
       await fetch(`/api/rtcs/${rtcId}/link-horizon`, {
@@ -915,11 +897,8 @@ async function checkHorizonLink(rtcId) {
     document.getElementById("link-modal-skip").onclick = () => {
       document.getElementById("link-modal-overlay").classList.add("hidden");
     };
-
     document.getElementById("link-modal-overlay").classList.remove("hidden");
-  } catch(e) {
-    // Silent fail — this check is non-critical
-  }
+  } catch(e) { /* silent fail — non-critical */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -935,34 +914,32 @@ const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun",
 
 function openRtcModal(mode) {
   _rtcModalMode = mode;
-
   document.getElementById("rtc-modal-title").textContent =
     mode === "duplicate" ? "Duplicate RTC" : "New RTC";
   document.getElementById("rtc-modal-submit").textContent =
     mode === "duplicate" ? "Duplicate RTC" : "Create RTC";
   document.getElementById("rtc-modal-submit").disabled = false;
 
-  // Reset fields
   document.getElementById("rtc-proj-number").value = "";
   document.getElementById("rtc-task-number").value = "";
-  document.getElementById("rtc-proj-name").value   = "";
-  document.getElementById("rtc-task-name").value   = "";
+  if (document.getElementById("rtc-proj-name"))
+    document.getElementById("rtc-proj-name").value = "";
+  if (document.getElementById("rtc-task-name"))
+    document.getElementById("rtc-task-name").value = "";
   document.getElementById("rtc-start-date").value  = "";
   document.getElementById("rtc-department").value  = "";
   clearProjectLookup();
   document.getElementById("rtc-form-error").textContent = "";
   document.getElementById("rtc-form-error").classList.add("hidden");
 
-  // Populate cost centre dropdown
   const deptSel = document.getElementById("rtc-department");
-  deptSel.innerHTML = '<option value="">Select cost centre\u2026</option>';
+  deptSel.innerHTML = "<option value=\"\">Select cost centre\u2026</option>";
   (state.summary?.departments || []).forEach(d => {
     const opt = document.createElement("option");
     opt.value = d.department; opt.textContent = d.department;
     deptSel.appendChild(opt);
   });
 
-  // Initialise month picker to current month
   const now = new Date();
   _rtcPickerYear  = now.getFullYear();
   _rtcPickerMonth = now.getMonth() + 1;
@@ -985,10 +962,8 @@ function renderMonthPicker() {
   grid.innerHTML = MONTH_ABBR.map((name, i) => {
     const month = i + 1;
     const sel   = month === _rtcPickerMonth ? "selected" : "";
-    return `<button type="button" class="month-picker__btn ${sel}"
-              data-month="${month}">${name}</button>`;
+    return `<button type="button" class="month-picker__btn ${sel}" data-month="${month}">${name}</button>`;
   }).join("");
-
   grid.querySelectorAll(".month-picker__btn").forEach(btn => {
     btn.addEventListener("click", () => {
       _rtcPickerMonth = parseInt(btn.dataset.month);
@@ -1002,8 +977,7 @@ function renderMonthPicker() {
 async function triggerProjectLookup(projNum, taskNum) {
   try {
     const r = await fetch(
-      `/api/project?project_number=${encodeURIComponent(projNum)}`+
-      `&task_order_number=${encodeURIComponent(taskNum)}`
+      `/api/project?project_number=${encodeURIComponent(projNum)}&task_order_number=${encodeURIComponent(taskNum || "")}`
     );
     const d = await r.json();
     const result      = document.getElementById("rtc-lookup-result");
@@ -1011,15 +985,13 @@ async function triggerProjectLookup(projNum, taskNum) {
     const manualFields = document.getElementById("rtc-manual-fields");
 
     if (d.project_name) {
-      // Real Horizon record found
-      document.getElementById("rtc-lookup-name").textContent = d.project_name  || "—";
-      document.getElementById("rtc-lookup-task").textContent = d.task_name     || "—";
-      document.getElementById("rtc-lookup-pm").textContent   = d.project_manager  || "—";
-      document.getElementById("rtc-lookup-pd").textContent   = d.project_director || "—";
+      document.getElementById("rtc-lookup-name").textContent = d.project_name      || "\u2014";
+      document.getElementById("rtc-lookup-task").textContent = d.task_name         || "\u2014";
+      document.getElementById("rtc-lookup-pm").textContent   = d.project_manager   || "\u2014";
+      document.getElementById("rtc-lookup-pd").textContent   = d.project_director  || "\u2014";
       result.classList.remove("hidden");
-      placeholder.classList.add("hidden");
-      manualFields.classList.add("hidden");
-      // Auto-fill department if it matches
+      if (placeholder) placeholder.classList.add("hidden");
+      if (manualFields) manualFields.classList.add("hidden");
       if (d.project_organisation) {
         const sel = document.getElementById("rtc-department");
         for (const opt of sel.options) {
@@ -1027,10 +999,9 @@ async function triggerProjectLookup(projNum, taskNum) {
         }
       }
     } else {
-      // No record found — show placeholder message and manual name fields
       result.classList.add("hidden");
-      placeholder.classList.remove("hidden");
-      manualFields.classList.remove("hidden");
+      if (placeholder) placeholder.classList.remove("hidden");
+      if (manualFields) manualFields.classList.remove("hidden");
     }
   } catch(e) { console.error("Project lookup failed:", e); }
 }
@@ -1080,13 +1051,13 @@ async function submitRtcModal() {
                 ? `/api/rtcs/${state.selectedRtc}/duplicate`
                 : "/api/rtcs";
     const r   = await fetch(url, {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(body),
     });
     const d = await r.json();
     if (!r.ok) {
-      errorEl.textContent = d.error || "Server error — please try again.";
+      errorEl.textContent = d.error || "Server error \u2014 please try again.";
       errorEl.classList.remove("hidden");
       submitBtn.disabled = false;
       submitBtn.textContent = _rtcModalMode === "duplicate" ? "Duplicate RTC" : "Create RTC";
@@ -1171,12 +1142,12 @@ function wireEvents() {
     if (state.activeView === "rtcs") loadRtcs();
   });
 
-  // RTC action buttons — open the modal
+  // RTC action buttons
   document.getElementById("btn-create-rtc")?.addEventListener("click", () => {
     openRtcModal("create");
   });
 
-  // Modal close / cancel
+  // Modal wiring
   document.getElementById("rtc-modal-close")?.addEventListener("click", closeRtcModal);
   document.getElementById("rtc-modal-cancel")?.addEventListener("click", closeRtcModal);
   document.getElementById("rtc-modal-overlay")?.addEventListener("click", e => {
@@ -1184,7 +1155,7 @@ function wireEvents() {
   });
   document.getElementById("rtc-modal-submit")?.addEventListener("click", submitRtcModal);
 
-  // Project lookup on blur of either field
+  // Project lookup on blur
   const lookupTrigger = () => {
     const projNum = document.getElementById("rtc-proj-number")?.value.trim();
     const taskNum = document.getElementById("rtc-task-number")?.value.trim();
@@ -1196,13 +1167,12 @@ function wireEvents() {
 
   // Month picker year arrows
   document.getElementById("rtc-year-prev")?.addEventListener("click", () => {
-    _rtcPickerYear--;
-    renderMonthPicker();
+    _rtcPickerYear--; renderMonthPicker();
   });
   document.getElementById("rtc-year-next")?.addEventListener("click", () => {
-    _rtcPickerYear++;
-    renderMonthPicker();
+    _rtcPickerYear++; renderMonthPicker();
   });
+
 
   // Close detail panel
   document.getElementById("dp-close")?.addEventListener("click", closeDetailPanel);
