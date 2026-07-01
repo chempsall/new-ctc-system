@@ -50,6 +50,21 @@
        =================================================================== -->
   <main class="main">
 
+    <!-- Conflict banner (hidden if no conflicts) -->
+    <div class="alert-banner hidden" id="conflict-banner">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1L15 14H1L8 1Z" stroke="currentColor" stroke-width="1.5"
+              stroke-linejoin="round"/>
+        <path d="M8 6v4M8 11.5v.5" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round"/>
+      </svg>
+      <span>
+        <span class="alert-banner__count" id="conflict-count">0</span>
+        project files have filename conflicts and need attention
+      </span>
+      <span style="margin-left:auto;font-size:11px">View in admin panel →</span>
+    </div>
+
     <!-- Metric cards -->
     <div class="metrics">
       <div class="metric-card">
@@ -306,6 +321,93 @@
     </div>
   </div>
 
+</div>
+
+<!-- =========================================================================
+     CREATE / DUPLICATE RTC MODAL
+     ========================================================================= -->
+<div class="modal-overlay hidden" id="rtc-modal-overlay">
+  <div class="modal" id="rtc-modal" role="dialog" aria-modal="true"
+       aria-labelledby="rtc-modal-title">
+
+    <div class="modal__header">
+      <h2 class="modal__title" id="rtc-modal-title">New RTC</h2>
+      <button class="modal__close" id="rtc-modal-close" aria-label="Close">✕</button>
+    </div>
+
+    <div class="modal__body">
+
+      <!-- Project lookup -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="rtc-proj-number">
+            Project number <span class="form-required">*</span>
+          </label>
+          <input class="form-input" type="text" id="rtc-proj-number"
+                 placeholder="e.g. UK0041867" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="rtc-task-number">
+            Task order number
+          </label>
+          <input class="form-input" type="text" id="rtc-task-number"
+                 placeholder="e.g. 9081" autocomplete="off">
+        </div>
+      </div>
+
+      <!-- Auto-filled from PAR lookup -->
+      <div class="form-lookup-result hidden" id="rtc-lookup-result">
+        <div class="form-lookup-row">
+          <span class="form-lookup-label">Project</span>
+          <span class="form-lookup-value" id="rtc-lookup-name">—</span>
+        </div>
+        <div class="form-lookup-row">
+          <span class="form-lookup-label">Task</span>
+          <span class="form-lookup-value" id="rtc-lookup-task">—</span>
+        </div>
+        <div class="form-lookup-row">
+          <span class="form-lookup-label">PM</span>
+          <span class="form-lookup-value" id="rtc-lookup-pm">—</span>
+        </div>
+        <div class="form-lookup-row">
+          <span class="form-lookup-label">PD</span>
+          <span class="form-lookup-value" id="rtc-lookup-pd">—</span>
+        </div>
+      </div>
+
+      <div class="form-lookup-missing hidden" id="rtc-lookup-missing">
+        No Horizon record found for this project number and task order.
+        The RTC will be created as a placeholder and linked automatically
+        when the project appears in the next PAR import.
+      </div>
+
+      <!-- Department and start date -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="rtc-department">
+            Cost centre <span class="form-required">*</span>
+          </label>
+          <select class="form-input" id="rtc-department">
+            <option value="">Select cost centre…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="rtc-start-date">
+            Start month <span class="form-required">*</span>
+          </label>
+          <input class="form-input" type="month" id="rtc-start-date">
+        </div>
+      </div>
+
+    </div>
+
+    <div class="modal__footer">
+      <div class="form-error hidden" id="rtc-form-error"></div>
+      <button class="btn btn--secondary" id="rtc-modal-cancel">Cancel</button>
+      <button class="btn" id="rtc-modal-submit">Create RTC</button>
+    </div>
+
+  </div>
 </div>
 
 <script src="/static/js/dashboard.js"></script>

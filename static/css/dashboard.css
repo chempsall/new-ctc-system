@@ -852,3 +852,129 @@ a:hover { text-decoration: underline; }
   accent-color: var(--wsp-red);
   cursor: pointer;
 }
+
+
+/* --------------------------------------------------------------------------
+   Modal
+   -------------------------------------------------------------------------- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  width: 100%; max-width: 540px;
+  display: flex; flex-direction: column;
+  max-height: 90vh; overflow: hidden;
+}
+
+.modal__header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal__title {
+  font-size: 15px; font-weight: 600;
+  color: var(--text-primary); margin: 0;
+}
+
+.modal__close {
+  background: none; border: none;
+  font-size: 16px; color: var(--text-tertiary);
+  cursor: pointer; padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, color 0.15s;
+}
+.modal__close:hover { background: var(--grey-100); color: var(--text-primary); }
+
+.modal__body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal__footer {
+  display: flex; align-items: center; gap: 8px;
+  justify-content: flex-end;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Form elements */
+.form-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px; margin-bottom: 16px;
+}
+
+.form-group {
+  display: flex; flex-direction: column; gap: 5px;
+}
+
+.form-label {
+  font-size: 12px; font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.form-required { color: var(--wsp-red); }
+
+.form-input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body); font-size: 13px;
+  color: var(--text-primary);
+  background: var(--surface);
+  transition: border-color 0.15s;
+  width: 100%; box-sizing: border-box;
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--wsp-red);
+  box-shadow: 0 0 0 2px var(--wsp-red-light);
+}
+.form-input:disabled { background: var(--grey-50); color: var(--text-tertiary); }
+
+/* PAR lookup result */
+.form-lookup-result {
+  background: var(--grey-50);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+
+.form-lookup-row {
+  display: flex; gap: 8px;
+  font-size: 12px; line-height: 1.8;
+}
+
+.form-lookup-label {
+  color: var(--text-tertiary);
+  min-width: 52px; flex-shrink: 0;
+}
+
+.form-lookup-value { color: var(--text-primary); }
+
+.form-lookup-missing {
+  background: var(--amber-light);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--amber-dark);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.form-error {
+  font-size: 12px; color: var(--status-red);
+  flex: 1;
+}

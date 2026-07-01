@@ -99,6 +99,7 @@ function init() {
   buildMonthTabs();
   buildFilterOptions();
   renderMetrics();
+  renderConflictBanner();
   renderView();
   wireEvents();
   updateStatusBar();
@@ -174,6 +175,7 @@ function renderMetrics() {
   const overCount = staff.filter(ps => ps.kpi[p] === "over").length;
   const noRecDays = staff.reduce((sum, ps) =>
     sum + (ps.no_record_days[p] || 0), 0);
+  const conflicts = s.conflicts ? s.conflicts.length : 0;
   const noRecProj = projects.filter(pr => pr.horizon_status !== "linked").length;
 
   document.getElementById("metric-staff").textContent  = staff.length;
@@ -190,6 +192,17 @@ function renderMetrics() {
 // ---------------------------------------------------------------------------
 // Conflict banner
 // ---------------------------------------------------------------------------
+function renderConflictBanner() {
+  const banner = document.getElementById("conflict-banner");
+  const count  = state.summary.conflicts ? state.summary.conflicts.length : 0;
+  if (count === 0) {
+    banner.classList.add("hidden");
+    return;
+  }
+  banner.classList.remove("hidden");
+  document.getElementById("conflict-count").textContent = count;
+}
+
 // ---------------------------------------------------------------------------
 // Filtered data
 // ---------------------------------------------------------------------------
@@ -343,13 +356,16 @@ function renderProjectTable() {
     const days       = proj.total_days[p] || 0;
     const linked     = proj.horizon_status === "linked";
     const isSelected = String(proj.project_id) === String(state.selectedProject);
+    const conflict   = proj.conflict_flag
+      ? `<span title="Filename conflict" style="color:var(--amber-dark);margin-left:4px">⚠</span>`
+      : "";
 
     return `<tr data-id="${proj.project_id}" class="${isSelected ? "selected" : ""}">
       <td>
         <div class="proj-number">${escHtml(proj.number || "—")}</div>
       </td>
       <td>
-        <div class="proj-name">${escHtml(proj.name)}</div>
+        <div class="proj-name">${escHtml(proj.name)}${conflict}</div>
         <div class="proj-task">${escHtml(proj.task_name || "")}</div>
       </td>
       <td><span class="team-badge">${escHtml(proj.department || "—")}</span></td>
@@ -839,6 +855,163 @@ function resetFilters() {
 }
 
 // ---------------------------------------------------------------------------
+// Create / Duplicate RTC modal
+// ---------------------------------------------------------------------------
+
+// Tracks whether the modal was opened for "create" or "duplicate"
+let _rtcModalMode = "create";
+
+function openRtcModal(mode) {
+  _rtcModalMode = mode;
+
+  // Set title
+  document.getElementById("rtc-modal-title").textContent =
+    mode === "duplicate" ? "Duplicate RTC" : "New RTC";
+  document.getElementById("rtc-modal-submit").textContent =
+    mode === "duplicate" ? "Duplicate RTC" : "Create RTC";
+
+  // Reset all fields
+  document.getElementById("rtc-proj-number").value  = "";
+  document.getElementById("rtc-task-number").value  = "";
+  document.getElementById("rtc-start-date").value   = "";
+  document.getElementById("rtc-department").value   = "";
+  clearProjectLookup();
+  document.getElementById("rtc-form-error").textContent = "";
+  document.getElementById("rtc-form-error").classList.add("hidden");
+
+  // Populate cost centre dropdown from summary data
+  const deptSel = document.getElementById("rtc-department");
+  deptSel.innerHTML = '<option value="">Select cost centre…</option>';
+  if (state.summary?.departments) {
+    state.summary.departments.forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d; opt.textContent = d;
+      deptSel.appendChild(opt);
+    });
+  }
+
+  // Default start month to current month
+  const now = new Date();
+  document.getElementById("rtc-start-date").value =
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  // Show modal
+  document.getElementById("rtc-modal-overlay").classList.remove("hidden");
+  document.getElementById("rtc-proj-number").focus();
+}
+
+function closeRtcModal() {
+  document.getElementById("rtc-modal-overlay").classList.add("hidden");
+}
+
+async function triggerProjectLookup(projNum, taskNum) {
+  try {
+    const r = await fetch(
+      `/api/project?project_number=${encodeURIComponent(projNum)}&task_order_number=${encodeURIComponent(taskNum)}`
+    );
+    const d = await r.json();
+    const result  = document.getElementById("rtc-lookup-result");
+    const missing = document.getElementById("rtc-lookup-missing");
+
+    if (d.project_name) {
+      document.getElementById("rtc-lookup-name").textContent = d.project_name || "—";
+      document.getElementById("rtc-lookup-task").textContent = d.task_name    || "—";
+      document.getElementById("rtc-lookup-pm").textContent   = d.project_manager || "—";
+      document.getElementById("rtc-lookup-pd").textContent   = d.project_director || "—";
+      result.classList.remove("hidden");
+      missing.classList.add("hidden");
+
+      // Auto-fill department if we can infer it
+      if (d.project_organisation) {
+        const deptSel = document.getElementById("rtc-department");
+        for (const opt of deptSel.options) {
+          if (opt.value === d.project_organisation) {
+            deptSel.value = d.project_organisation;
+            break;
+          }
+        }
+      }
+    } else {
+      result.classList.add("hidden");
+      missing.classList.remove("hidden");
+    }
+  } catch(e) {
+    console.error("Project lookup failed:", e);
+  }
+}
+
+function clearProjectLookup() {
+  document.getElementById("rtc-lookup-result").classList.add("hidden");
+  document.getElementById("rtc-lookup-missing").classList.add("hidden");
+}
+
+async function submitRtcModal() {
+  const projNum   = document.getElementById("rtc-proj-number").value.trim();
+  const taskNum   = document.getElementById("rtc-task-number").value.trim();
+  const monthVal  = document.getElementById("rtc-start-date").value;   // "YYYY-MM"
+  const dept      = document.getElementById("rtc-department").value;
+  const errorEl   = document.getElementById("rtc-form-error");
+  const submitBtn = document.getElementById("rtc-modal-submit");
+
+  // Validate
+  const errors = [];
+  if (!projNum)  errors.push("Project number is required.");
+  if (!monthVal) errors.push("Start month is required.");
+  if (!dept)     errors.push("Cost centre is required.");
+
+  if (errors.length) {
+    errorEl.textContent = errors.join(" ");
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  errorEl.classList.add("hidden");
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Saving…";
+
+  // Convert "YYYY-MM" to "YYYY-MM-01" for the API
+  const startDate = monthVal + "-01";
+
+  const body = {
+    project_number:    projNum,
+    task_order_number: taskNum || "",
+    start_date:        startDate,
+    department:        dept,
+  };
+
+  try {
+    const url    = _rtcModalMode === "duplicate"
+                   ? `/api/rtcs/${state.selectedRtc}/duplicate`
+                   : "/api/rtcs";
+    const r      = await fetch(url, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(body),
+    });
+    const d = await r.json();
+
+    if (!r.ok) {
+      errorEl.textContent = d.error || "Server error — please try again.";
+      errorEl.classList.remove("hidden");
+      submitBtn.disabled = false;
+      submitBtn.textContent = _rtcModalMode === "duplicate" ? "Duplicate RTC" : "Create RTC";
+      return;
+    }
+
+    // Success — close modal, reload list, select the new RTC
+    closeRtcModal();
+    await loadRtcs();
+    if (d.rtc_id) selectRtc(d.rtc_id);
+
+  } catch(e) {
+    errorEl.textContent = "Could not reach the server. Please try again.";
+    errorEl.classList.remove("hidden");
+    submitBtn.disabled = false;
+    submitBtn.textContent = _rtcModalMode === "duplicate" ? "Duplicate RTC" : "Create RTC";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Wire up events
 // ---------------------------------------------------------------------------
 function wireEvents() {
@@ -906,61 +1079,33 @@ function wireEvents() {
     if (state.activeView === "rtcs") loadRtcs();
   });
 
-  // RTC action buttons
+  // RTC action buttons — open the modal
   document.getElementById("btn-create-rtc")?.addEventListener("click", () => {
-    // Simple prompt-based creation for now — will be replaced by a proper
-    // create form once the RTC editing screen is built
-    const projNum  = prompt("Project number:");
-    const taskNum  = prompt("Task order number:");
-    const startDate = prompt("Start date (YYYY-MM-01):");
-    const dept     = prompt("Cost centre (department):");
-    if (!projNum || !startDate || !dept) return;
-
-    fetch("/api/rtcs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        project_number:    projNum,
-        task_order_number: taskNum || "",
-        start_date:        startDate,
-        department:        dept,
-      })
-    })
-    .then(r => r.json())
-    .then(d => {
-      if (d.rtc_id) {
-        loadRtcs();
-      }
-    })
-    .catch(console.error);
+    openRtcModal("create");
   });
 
   document.getElementById("btn-duplicate-rtc")?.addEventListener("click", () => {
     if (!state.selectedRtc) return;
-    const projNum  = prompt("Project number for new RTC:");
-    const taskNum  = prompt("Task order number:");
-    const startDate = prompt("Start date (YYYY-MM-01):");
-    const dept     = prompt("Cost centre (department):");
-    if (!projNum || !startDate || !dept) return;
-
-    fetch(`/api/rtcs/${state.selectedRtc}/duplicate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        project_number:    projNum,
-        task_order_number: taskNum || "",
-        start_date:        startDate,
-        department:        dept,
-      })
-    })
-    .then(r => r.json())
-    .then(d => {
-      if (d.rtc_id) {
-        loadRtcs();
-      }
-    })
-    .catch(console.error);
+    openRtcModal("duplicate");
   });
+
+  // Modal wiring
+  document.getElementById("rtc-modal-close")?.addEventListener("click", closeRtcModal);
+  document.getElementById("rtc-modal-cancel")?.addEventListener("click", closeRtcModal);
+  document.getElementById("rtc-modal-overlay")?.addEventListener("click", e => {
+    if (e.target.id === "rtc-modal-overlay") closeRtcModal();
+  });
+  document.getElementById("rtc-modal-submit")?.addEventListener("click", submitRtcModal);
+
+  // Project lookup — fires when both fields are filled
+  const lookupTrigger = () => {
+    const projNum = document.getElementById("rtc-proj-number")?.value.trim();
+    const taskNum = document.getElementById("rtc-task-number")?.value.trim();
+    if (projNum && taskNum) triggerProjectLookup(projNum, taskNum);
+    else clearProjectLookup();
+  };
+  document.getElementById("rtc-proj-number")?.addEventListener("blur", lookupTrigger);
+  document.getElementById("rtc-task-number")?.addEventListener("blur", lookupTrigger);
 
   // Close detail panel
   document.getElementById("dp-close")?.addEventListener("click", closeDetailPanel);
