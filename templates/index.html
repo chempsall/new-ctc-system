@@ -327,46 +327,112 @@
       <button class="modal__close" id="rtc-modal-close" aria-label="Close">✕</button>
     </div>
     <div class="modal__body">
+
+      <!-- Row 1: Horizon lookup -->
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label" for="rtc-proj-number">Project number <span class="form-required">*</span></label>
-          <input class="form-input" type="text" id="rtc-proj-number" placeholder="e.g. UK0041867" autocomplete="off">
+          <label class="form-label" for="rtc-proj-number">
+            Project number <span class="form-required">*</span>
+          </label>
+          <input class="form-input" type="text" id="rtc-proj-number"
+                 placeholder="e.g. UK0041867" autocomplete="off">
         </div>
         <div class="form-group">
-          <label class="form-label" for="rtc-task-number">Task order number</label>
-          <input class="form-input" type="text" id="rtc-task-number" placeholder="e.g. 9081" autocomplete="off">
+          <label class="form-label" for="rtc-task-number">
+            Task order number <span class="form-required">*</span>
+          </label>
+          <input class="form-input" type="text" id="rtc-task-number"
+                 placeholder="e.g. 9081" autocomplete="off">
         </div>
       </div>
+
+      <!-- Lookup result: shown when a real Horizon record is found -->
       <div class="form-lookup-result hidden" id="rtc-lookup-result">
-        <div class="form-lookup-row"><span class="form-lookup-label">Project</span><span class="form-lookup-value" id="rtc-lookup-name">—</span></div>
-        <div class="form-lookup-row"><span class="form-lookup-label">Task</span><span class="form-lookup-value" id="rtc-lookup-task">—</span></div>
-        <div class="form-lookup-row"><span class="form-lookup-label">PM</span><span class="form-lookup-value" id="rtc-lookup-pm">—</span></div>
-        <div class="form-lookup-row"><span class="form-lookup-label">PD</span><span class="form-lookup-value" id="rtc-lookup-pd">—</span></div>
+        <div class="form-lookup-row">
+          <span class="form-lookup-label">Project</span>
+          <span class="form-lookup-value" id="rtc-lookup-name">—</span>
+        </div>
+        <div class="form-lookup-row">
+          <span class="form-lookup-label">Task</span>
+          <span class="form-lookup-value" id="rtc-lookup-task">—</span>
+        </div>
+        <div class="form-lookup-row">
+          <span class="form-lookup-label">PM</span>
+          <span class="form-lookup-value" id="rtc-lookup-pm">—</span>
+        </div>
+        <div class="form-lookup-row">
+          <span class="form-lookup-label">PD</span>
+          <span class="form-lookup-value" id="rtc-lookup-pd">—</span>
+        </div>
       </div>
+
+      <!-- Placeholder notice + manual fields: shown when no Horizon record found.
+           Hidden initially; only revealed after both project number AND task order
+           have been entered and the lookup has run. -->
       <div class="form-lookup-placeholder hidden" id="rtc-lookup-placeholder">
-        <strong>No Horizon record found.</strong> You must complete the project
-        and task names below — these will be overwritten automatically once the
-        Horizon record becomes available and is linked to this RTC.
+        <strong>No Horizon record found.</strong> Please complete all the fields
+        below — they will be overwritten automatically once the Horizon record
+        becomes available and is linked to this RTC.
       </div>
-      <div class="form-row hidden" id="rtc-manual-fields">
-        <div class="form-group">
-          <label class="form-label" for="rtc-proj-name">Project name</label>
-          <input class="form-input" type="text" id="rtc-proj-name" placeholder="Enter project name" autocomplete="off">
+
+      <!-- Manual project details — only shown for placeholders -->
+      <div class="hidden" id="rtc-manual-fields">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="rtc-proj-name">
+              Project name <span class="form-required">*</span>
+            </label>
+            <input class="form-input" type="text" id="rtc-proj-name"
+                   placeholder="Enter project name" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="rtc-task-name">
+              Task name <span class="form-required">*</span>
+            </label>
+            <input class="form-input" type="text" id="rtc-task-name"
+                   placeholder="Enter task name" autocomplete="off">
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="rtc-task-name">Task name</label>
-          <input class="form-input" type="text" id="rtc-task-name" placeholder="Enter task name" autocomplete="off">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="rtc-customer">
+              Project customer <span class="form-required">*</span>
+            </label>
+            <input class="form-input" type="text" id="rtc-customer"
+                   placeholder="Enter customer name" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <!-- spacer -->
+          </div>
         </div>
       </div>
+
+      <!-- Row: Cost centre / PD -->
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label" for="rtc-department">Cost centre <span class="form-required">*</span></label>
+          <label class="form-label" for="rtc-department">
+            Cost centre <span class="form-required">*</span>
+          </label>
           <select class="form-input" id="rtc-department">
             <option value="">Select cost centre…</option>
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Start month <span class="form-required">*</span></label>
+          <label class="form-label" for="rtc-pd">
+            Project Director <span class="form-required">*</span>
+          </label>
+          <select class="form-input" id="rtc-pd">
+            <option value="">Select cost centre first…</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Row: Start month / PM -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">
+            Start month <span class="form-required">*</span>
+          </label>
           <div class="month-picker" id="rtc-month-picker">
             <div class="month-picker__header">
               <button type="button" class="month-picker__arrow" id="rtc-year-prev">&#8249;</button>
@@ -377,26 +443,20 @@
           </div>
           <input type="hidden" id="rtc-start-date">
         </div>
-      </div>
-
-      <div class="form-row">
         <div class="form-group">
-          <label class="form-label" for="rtc-pd">Project Director</label>
-          <select class="form-input" id="rtc-pd">
-            <option value="">Select project director…</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="rtc-pm">Project Manager</label>
+          <label class="form-label" for="rtc-pm">
+            Project Manager <span class="form-required">*</span>
+          </label>
           <select class="form-input" id="rtc-pm">
-            <option value="">Select project manager…</option>
+            <option value="">Select cost centre first…</option>
           </select>
-          <label class="form-checkbox-label" style="margin-top:5px">
+          <label class="form-checkbox-label" style="margin-top:6px">
             <input type="checkbox" id="rtc-pm-external">
             Project manager from another cost centre?
           </label>
         </div>
       </div>
+
     </div>
     <div class="modal__footer">
       <div class="form-error hidden" id="rtc-form-error"></div>

@@ -933,6 +933,8 @@ function openRtcModal(mode) {
     document.getElementById("rtc-proj-name").value = "";
   if (document.getElementById("rtc-task-name"))
     document.getElementById("rtc-task-name").value = "";
+  if (document.getElementById("rtc-customer"))
+    document.getElementById("rtc-customer").value = "";
   document.getElementById("rtc-start-date").value  = "";
   document.getElementById("rtc-department").value  = "";
   document.getElementById("rtc-pd").value           = "";
@@ -1067,15 +1069,29 @@ async function submitRtcModal() {
   const dept      = document.getElementById("rtc-department").value;
   const projName  = document.getElementById("rtc-proj-name")?.value.trim() || "";
   const taskName  = document.getElementById("rtc-task-name")?.value.trim() || "";
+  const customer  = document.getElementById("rtc-customer")?.value.trim() || "";
   const pd        = document.getElementById("rtc-pd")?.value.trim() || "";
   const pm        = document.getElementById("rtc-pm")?.value.trim() || "";
   const errorEl   = document.getElementById("rtc-form-error");
   const submitBtn = document.getElementById("rtc-modal-submit");
 
+  const isPlaceholder = !document.getElementById("rtc-lookup-result") ||
+    document.getElementById("rtc-lookup-result").classList.contains("hidden");
+
   const errors = [];
   if (!projNum)   errors.push("Project number is required.");
+  if (!taskNum)   errors.push("Task order number is required.");
   if (!startDate) errors.push("Start month is required.");
   if (!dept)      errors.push("Cost centre is required.");
+  if (!pd)        errors.push("Project Director is required.");
+  if (!pm)        errors.push("Project Manager is required.");
+
+  // Additional required fields when no Horizon record found
+  if (isPlaceholder) {
+    if (!projName) errors.push("Project name is required.");
+    if (!taskName) errors.push("Task name is required.");
+    if (!customer) errors.push("Project customer is required.");
+  }
 
   if (errors.length) {
     errorEl.textContent = errors.join(" ");
@@ -1088,14 +1104,15 @@ async function submitRtcModal() {
   submitBtn.textContent = "Saving\u2026";
 
   const body = {
-    project_number:    projNum,
-    task_order_number: taskNum || "",
-    start_date:        startDate,
-    department:        dept,
-    project_name:      projName || undefined,
-    task_name:         taskName || undefined,
-    project_director:  pd       || undefined,
-    project_manager:   pm       || undefined,
+    project_number:      projNum,
+    task_order_number:   taskNum || "",
+    start_date:          startDate,
+    department:          dept,
+    project_name:        projName || undefined,
+    task_name:           taskName || undefined,
+    project_customer:    customer || undefined,
+    project_director:    pd       || undefined,
+    project_manager:     pm       || undefined,
   };
 
   try {
@@ -1207,15 +1224,26 @@ function wireEvents() {
   });
   document.getElementById("rtc-modal-submit")?.addEventListener("click", submitRtcModal);
 
-  // Project lookup on blur
+  // Project lookup — only fires when BOTH fields are non-empty
+  // and the user moves focus away from the task number field or
+  // clicks elsewhere below. This prevents the "no record" warning
+  // from appearing before the user has had a chance to enter both.
   const lookupTrigger = () => {
     const projNum = document.getElementById("rtc-proj-number")?.value.trim();
     const taskNum = document.getElementById("rtc-task-number")?.value.trim();
-    if (projNum) triggerProjectLookup(projNum, taskNum || "");
-    else clearProjectLookup();
+    if (projNum && taskNum) {
+      triggerProjectLookup(projNum, taskNum);
+    } else {
+      clearProjectLookup();
+    }
   };
-  document.getElementById("rtc-proj-number")?.addEventListener("blur", lookupTrigger);
+  // Only trigger on blur of task number (the second field), or on
+  // blur of project number IF task number already has a value
   document.getElementById("rtc-task-number")?.addEventListener("blur", lookupTrigger);
+  document.getElementById("rtc-proj-number")?.addEventListener("blur", () => {
+    const taskNum = document.getElementById("rtc-task-number")?.value.trim();
+    if (taskNum) lookupTrigger();
+  });
 
   // Month picker year arrows
   document.getElementById("rtc-year-prev")?.addEventListener("click", () => {
