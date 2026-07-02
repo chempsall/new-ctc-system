@@ -6,83 +6,169 @@
   <title>Admin — Resource Forecast</title>
   <link rel="stylesheet" href="/static/css/dashboard.css">
   <style>
-    body { font-family: var(--font-body); background: var(--bg); padding: 0; }
+    body { font-family: var(--font-body); background: var(--bg); padding: 0; scrollbar-gutter: stable; }
 
+    /* ── Top bar ─────────────────────────────────────────────────────── */
     .admin-topbar {
       height: var(--nav-h);
       background: var(--black);
       border-bottom: 2px solid var(--wsp-red);
       display: flex; align-items: center;
       padding: 0 20px;
-      margin-bottom: 24px;
+      margin-bottom: 32px;
     }
-    .admin-topbar img { height: 22px; width: auto; display: block; }
-    .admin-topbar .divider {
-      width: 1px; height: 20px;
-      background: var(--grey-700);
-      margin: 0 14px;
-    }
-    .admin-topbar .title {
-      font-size: 13px; font-weight: 500;
-      color: var(--grey-200);
-    }
+    .admin-topbar img    { height: 22px; width: auto; display: block; }
+    .admin-topbar .divider { width:1px; height:20px; background:var(--grey-700); margin:0 14px; }
+    .admin-topbar .title { font-size:13px; font-weight:500; color:var(--grey-200); }
     .admin-topbar a {
       margin-left: auto;
-      font-size: 11px; color: var(--grey-400);
-      text-decoration: none;
-      padding: 4px 10px;
-      border: 1px solid var(--grey-700);
-      border-radius: var(--radius-sm);
+      font-size:11px; color:var(--grey-400);
+      text-decoration:none; padding:4px 10px;
+      border:1px solid var(--grey-700); border-radius:var(--radius-sm);
       transition: background 0.15s, border-color 0.15s, color 0.15s;
     }
-    .admin-topbar a:hover { background: var(--wsp-red); border-color: var(--wsp-red); color: #fff; }
+    .admin-topbar a:hover { background:var(--wsp-red); border-color:var(--wsp-red); color:#fff; }
 
-    .admin-main { max-width: 1400px; margin: 0 auto; padding: 0 24px 32px; }
-
-    h1   { font-size: 18px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); }
-    .admin-intro { font-size: 12px; color: var(--text-secondary); margin-bottom: 24px; }
-
-    .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-    .admin-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius-lg); padding: 20px;
-      box-shadow: var(--shadow-sm);
+    /* ── Layout ──────────────────────────────────────────────────────── */
+    .admin-main  { max-width:1400px; margin:0 auto; padding:0 24px 48px; }
+    .admin-section-title {
+      font-size:11px; font-weight:600; color:var(--text-tertiary);
+      text-transform:uppercase; letter-spacing:0.08em;
+      margin:0 0 12px;
     }
-    .admin-card h2 { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
-    .admin-card p  { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5; }
 
+    /* ── Actions table ───────────────────────────────────────────────── */
+    .admin-actions {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 32px;
+      overflow: hidden;
+    }
+    .admin-action {
+      display: grid;
+      grid-template-columns: 200px 1fr auto;
+      align-items: start;
+      gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-action:last-child { border-bottom: none; }
+    .admin-action__name {
+      font-size: 13px; font-weight: 600;
+      color: var(--text-primary);
+      padding-top: 1px;
+    }
+    .admin-action__desc {
+      font-size: 12px; color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .admin-action__result {
+      font-size: 11px; color: var(--text-secondary);
+      margin-top: 6px; line-height: 1.5;
+    }
+    .admin-action__result.ok   { color: var(--green-dark); }
+    .admin-action__result.err  { color: var(--status-red); }
+    .admin-action__result.warn { color: var(--amber-dark); }
+
+    /* ── Buttons ─────────────────────────────────────────────────────── */
     .btn {
       display: inline-block; padding: 7px 16px;
       background: var(--black); color: #fff;
       border: none; border-radius: var(--radius-sm);
-      font-family: var(--font-body); font-size: 12px;
+      font-family: var(--font-body); font-size: 12px; font-weight: 500;
       cursor: pointer; transition: background 0.15s;
+      white-space: nowrap;
     }
-    .btn:hover { background: var(--wsp-red); }
-
-    .result {
-      margin-top: 10px; font-size: 11px; color: var(--text-secondary);
-      font-family: var(--font-mono); white-space: pre-wrap;
+    .btn:hover     { background: var(--wsp-red); }
+    .btn:disabled  { background: var(--grey-300); cursor: not-allowed; }
+    .btn--secondary {
+      background: var(--surface); color: var(--text-primary);
+      border: 1px solid var(--border);
     }
+    .btn--secondary:hover { background: var(--grey-50); border-color: var(--border-strong); }
+    .btn--danger { background: var(--status-red); }
+    .btn--danger:hover { background: var(--status-red-dark); }
+    .btn--sm { padding: 5px 12px; font-size: 11px; }
 
-    .flag-item {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      gap: 8px;
-      padding: 8px 0;
+    /* ── Delete RTC section ──────────────────────────────────────────── */
+    .delete-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .delete-panel__header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
       border-bottom: 1px solid var(--border);
-      font-family: var(--font-body);
-      font-size: 11px;
+      background: var(--surface-2);
     }
-    .flag-item:last-child { border-bottom: none; }
-    .flag-item__detail { color: var(--text-secondary); white-space: pre-wrap; }
-    .flag-item__clear {
-      flex-shrink: 0;
-      font-size: 10px; padding: 3px 9px;
-      background: var(--surface-2); color: var(--text-secondary);
+    .delete-panel__title { font-size:13px; font-weight:600; color:var(--text-primary); }
+    .delete-panel__desc  { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+    .delete-panel__body  { padding: 0; }
+
+    /* RTC list table */
+    .rtc-list-table { width:100%; border-collapse:collapse; }
+    .rtc-list-table th {
+      padding: 9px 16px;
+      font-size: 11px; font-weight:500;
+      text-align:left; white-space:nowrap;
+      background: var(--grey-50);
+      border-bottom: 2px solid var(--border);
+      color: var(--text-secondary);
+    }
+    .rtc-list-table td {
+      padding: 10px 16px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .rtc-list-table tr:last-child td { border-bottom: none; }
+    .rtc-list-table tr.confirming td { background: var(--status-red-light); }
+
+    /* Inline confirmation row */
+    .confirm-row td {
+      background: var(--status-red-light);
+      padding: 12px 16px;
+    }
+    .confirm-message {
+      font-size:12px; color:var(--status-red-dark); font-weight:500;
+      margin-bottom: 10px;
+    }
+
+    .delete-empty {
+      padding: 32px; text-align:center;
+      font-size:13px; color:var(--text-tertiary);
+    }
+
+    .delete-result {
+      padding: 12px 20px;
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .delete-result.ok  { color: var(--green-dark); background: var(--green-light); }
+    .delete-result.err { color: var(--status-red-dark); background: var(--status-red-light); }
+
+    /* Search bar above the table */
+    .delete-search {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; gap: 8px; align-items: center;
+    }
+    .delete-search input {
+      font-family: var(--font-body); font-size: 12px;
+      padding: 5px 10px;
       border: 1px solid var(--border); border-radius: var(--radius-sm);
-      cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+      background: var(--surface); color: var(--text-primary);
+      width: 260px;
     }
-    .flag-item__clear:hover { background: var(--wsp-red); border-color: var(--wsp-red); color: #fff; }
+    .delete-search input:focus {
+      outline: none; border-color: var(--wsp-red);
+      box-shadow: 0 0 0 2px var(--wsp-red-light);
+    }
   </style>
 </head>
 <body>
@@ -95,64 +181,115 @@
   </div>
 
   <div class="admin-main">
-    <h1>Admin</h1>
-    <p class="admin-intro">
-      All actions require the admin token, entered once below and reused for every request on this page.
-    </p>
 
-    <div class="admin-grid">
+    <!-- ═══════════════════════════════════════════════════════════════
+         SECTION 1 — ACTIONS
+    ════════════════════════════════════════════════════════════════ -->
+    <p class="admin-section-title">Actions</p>
+    <div class="admin-actions">
 
-      <div class="admin-card">
-        <h2>Import staff list</h2>
-        <p>Re-reads the staff list Excel file and updates the database. Rebuilds the summary cache.</p>
-        <button class="btn" onclick="triggerImport('staff')">Run import</button>
-        <div class="result" id="result-staff"></div>
+      <div class="admin-action">
+        <div class="admin-action__name">Import staff list</div>
+        <div>
+          <div class="admin-action__desc">
+            Re-reads the staff list Excel file and updates the database.
+            Rebuilds the summary cache automatically on completion.
+          </div>
+          <div class="admin-action__result" id="result-staff"></div>
+        </div>
+        <button class="btn" onclick="triggerImport('staff', this)">Run import</button>
       </div>
 
-      <div class="admin-card">
-        <h2>Import PAR actuals</h2>
-        <p>Re-reads the PAR actuals export and updates project metadata and inception-to-date figures.</p>
-        <button class="btn" onclick="triggerImport('par')">Run import</button>
-        <div class="result" id="result-par"></div>
+      <div class="admin-action">
+        <div class="admin-action__name">Import PAR actuals</div>
+        <div>
+          <div class="admin-action__desc">
+            Re-reads the PAR actuals export and updates all project metadata.
+            Rebuilds the summary cache automatically on completion.
+          </div>
+          <div class="admin-action__result" id="result-par"></div>
+        </div>
+        <button class="btn" onclick="triggerImport('par', this)">Run import</button>
       </div>
 
-      <div class="admin-card">
-        <h2>Rebuild summary cache</h2>
-        <p>Forces a full rebuild of the dashboard summary JSON. Runs automatically after imports.</p>
-        <button class="btn" onclick="rebuildSummary()">Rebuild</button>
-        <div class="result" id="result-rebuild"></div>
+      <div class="admin-action">
+        <div class="admin-action__name">Rebuild summary cache</div>
+        <div>
+          <div class="admin-action__desc">
+            Forces a full rebuild of the dashboard summary JSON.
+            Runs automatically after every import — use this if the dashboard
+            appears out of date.
+          </div>
+          <div class="admin-action__result" id="result-rebuild"></div>
+        </div>
+        <button class="btn" onclick="rebuildSummary(this)">Rebuild</button>
       </div>
 
-      <div class="admin-card">
-        <h2>Clean up deleted CTC files</h2>
-        <p>Checks every RTC on record and archives any that have no future allocations and haven't been opened in 30+ days. Runs automatically every night — use this to force it immediately.</p>
-        <button class="btn" onclick="runCleanup()">Run cleanup</button>
-        <div class="result" id="result-cleanup"></div>
+      <div class="admin-action">
+        <div class="admin-action__name">Archive old RTCs</div>
+        <div>
+          <div class="admin-action__desc">
+            Archives RTCs that have no future allocations and haven't been
+            opened in 30+ days. Archived RTCs are hidden from the default
+            list but never deleted. Runs automatically every night.
+          </div>
+          <div class="admin-action__result" id="result-cleanup"></div>
+        </div>
+        <button class="btn" onclick="runCleanup(this)">Run now</button>
       </div>
 
-      <div class="admin-card">
-        <h2>Delete RTC</h2>
-        <p>Permanently deletes an RTC and all its allocations. Load the list first, then select one to delete.</p>
-        <button class="btn" onclick="loadRtcList()">Load RTCs</button>
-        <div id="delete-rtc-list" style="margin-top:10px;max-height:200px;overflow-y:auto"></div>
-        <div class="result" id="result-delete-rtc"></div>
+      <div class="admin-action">
+        <div class="admin-action__name">Import log</div>
+        <div>
+          <div class="admin-action__desc">
+            Shows the 10 most recent import runs with row counts and errors.
+          </div>
+          <div class="admin-action__result" id="result-log"></div>
+        </div>
+        <button class="btn" onclick="loadImportLog(this)">View log</button>
       </div>
 
-      <div class="admin-card">
-        <h2>Import log</h2>
-        <p>Recent import runs with row counts and any errors.</p>
-        <button class="btn" onclick="loadImportLog()">View log</button>
-        <div class="result" id="result-log"></div>
-      </div>
-
-      <div class="admin-card">
-        <h2>Configuration</h2>
-        <p>Current server configuration (non-sensitive settings only).</p>
-        <button class="btn" onclick="loadConfig()">View config</button>
-        <div class="result" id="result-config"></div>
+      <div class="admin-action">
+        <div class="admin-action__name">Configuration</div>
+        <div>
+          <div class="admin-action__desc">
+            Current server configuration — non-sensitive settings only.
+            Useful for verifying file paths and scheduler times.
+          </div>
+          <div class="admin-action__result" id="result-config"></div>
+        </div>
+        <button class="btn" onclick="loadConfig(this)">View config</button>
       </div>
 
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         SECTION 2 — DELETE RTC
+    ════════════════════════════════════════════════════════════════ -->
+    <p class="admin-section-title">Delete RTC</p>
+    <div class="delete-panel">
+      <div class="delete-panel__header">
+        <div>
+          <div class="delete-panel__title">Permanently delete an RTC</div>
+          <div class="delete-panel__desc">
+            Removes the RTC and all its allocations. This cannot be undone.
+            Use the search box to find the RTC you want to remove.
+          </div>
+        </div>
+        <button class="btn" onclick="loadRtcList()" id="btn-load-rtcs">
+          Load RTCs
+        </button>
+      </div>
+
+      <div class="delete-panel__body" id="delete-panel-body">
+        <div class="delete-empty" id="delete-empty-state">
+          Click "Load RTCs" to show the list.
+        </div>
+      </div>
+
+      <div class="delete-result hidden" id="delete-result"></div>
+    </div>
+
   </div>
 
   <script>
@@ -168,102 +305,282 @@
       return d.innerHTML;
     }
 
-    async function triggerImport(type) {
-      const el = document.getElementById(`result-${type}`);
-      el.textContent = "Running...";
+    function setResult(id, msg, type) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = msg;
+      el.className = "admin-action__result" + (type ? " " + type : "");
+    }
+
+    // ── IMPORTS ──────────────────────────────────────────────────────────
+
+    async function triggerImport(type, btn) {
+      const id = "result-" + type;
+      setResult(id, "Running — this may take a moment…", "");
+      btn.disabled = true;
       try {
         const r = await fetch(`/admin/import/${type}`, {
           method: "POST", headers: headers(), body: JSON.stringify({})
         });
         const d = await r.json();
-        el.textContent = r.ok
-          ? `✓ ${d.rows_processed} processed, ${d.rows_inserted} inserted, ${d.rows_updated} updated`
-            + (d.errors?.length ? `\n⚠ ${d.errors.length} errors` : "")
-          : `✗ ${d.error}`;
-      } catch(e) { el.textContent = `✗ ${e.message}`; }
+        if (r.ok) {
+          const warn = d.errors?.length ? `  ⚠ ${d.errors.length} error(s)` : "";
+          setResult(id,
+            `✓  ${d.rows_processed} processed · ${d.rows_inserted} inserted · ${d.rows_updated} updated${warn}`,
+            d.errors?.length ? "warn" : "ok");
+        } else {
+          setResult(id, `✗  ${d.error}`, "err");
+        }
+      } catch(e) {
+        setResult(id, `✗  ${e.message}`, "err");
+      }
+      btn.disabled = false;
     }
 
-    async function rebuildSummary() {
-      const el = document.getElementById("result-rebuild");
-      el.textContent = "Rebuilding...";
+    // ── REBUILD ───────────────────────────────────────────────────────────
+
+    async function rebuildSummary(btn) {
+      setResult("result-rebuild", "Rebuilding…", "");
+      btn.disabled = true;
       try {
-        const r = await fetch("/admin/rebuild-summary", { method: "POST", headers: headers() });
+        const r = await fetch("/admin/rebuild-summary", { method:"POST", headers:headers() });
         const d = await r.json();
-        el.textContent = r.ok ? `✓ Rebuilt at ${d.rebuilt_at}` : `✗ ${d.error}`;
-      } catch(e) { el.textContent = `✗ ${e.message}`; }
+        setResult("result-rebuild",
+          r.ok ? `✓  Rebuilt at ${d.rebuilt_at?.slice(0,19).replace("T"," ")}` : `✗  ${d.error}`,
+          r.ok ? "ok" : "err");
+      } catch(e) { setResult("result-rebuild", `✗  ${e.message}`, "err"); }
+      btn.disabled = false;
     }
 
-    async function runCleanup() {
-      const el = document.getElementById("result-cleanup");
-      el.textContent = "Checking files on disk — this may take a moment...";
+    // ── ARCHIVE ───────────────────────────────────────────────────────────
+
+    async function runCleanup(btn) {
+      setResult("result-cleanup", "Checking…", "");
+      btn.disabled = true;
       try {
-        const r = await fetch("/admin/run-cleanup", { method: "POST", headers: headers() });
+        const r = await fetch("/admin/run-cleanup", { method:"POST", headers:headers() });
         const d = await r.json();
-        if (!r.ok) { el.textContent = `✗ ${d.error}`; return; }
-        el.textContent = d.files_removed === 0
-          ? `✓ Checked ${d.files_checked} files — none missing`
-          : `✓ Checked ${d.files_checked} files — removed ${d.files_removed}\n\n`
-            + d.removed.map(f =>
-                `${f.project_number} (${f.project_name})\n  ${f.file_path}\n  ${f.allocations_removed} allocation rows removed`
-              ).join("\n\n");
-      } catch(e) { el.textContent = `✗ ${e.message}`; }
+        if (!r.ok) { setResult("result-cleanup", `✗  ${d.error}`, "err"); btn.disabled=false; return; }
+        if (d.archived_count === 0) {
+          setResult("result-cleanup", "✓  No RTCs eligible for archiving", "ok");
+        } else {
+          const names = d.archived.map(a => `  · ${a.project_name || a.project_number}`).join("\n");
+          setResult("result-cleanup",
+            `✓  ${d.archived_count} RTC${d.archived_count!==1?"s":""} archived:\n${names}`, "ok");
+        }
+      } catch(e) { setResult("result-cleanup", `✗  ${e.message}`, "err"); }
+      btn.disabled = false;
     }
+
+    // ── IMPORT LOG ────────────────────────────────────────────────────────
+
+    async function loadImportLog(btn) {
+      setResult("result-log", "Loading…", "");
+      btn.disabled = true;
+      try {
+        const r = await fetch("/admin/import-log", { headers:headers() });
+        const d = await r.json();
+        if (!r.ok) { setResult("result-log", `✗  ${d.error}`, "err"); btn.disabled=false; return; }
+        if (!d.length) { setResult("result-log", "No imports recorded yet.", ""); btn.disabled=false; return; }
+        setResult("result-log",
+          d.slice(0,10).map(row =>
+            `${row.import_type.padEnd(6)}  ${(row.completed_at||"").slice(0,16).replace("T"," ")}  ` +
+            `${String(row.rows_processed).padStart(4)} rows` +
+            (row.errors?.length ? `  ⚠ ${row.errors.length} errors` : "")
+          ).join("\n"), "");
+      } catch(e) { setResult("result-log", `✗  ${e.message}`, "err"); }
+      btn.disabled = false;
+    }
+
+    // ── CONFIG ────────────────────────────────────────────────────────────
+
+    async function loadConfig(btn) {
+      setResult("result-config", "Loading…", "");
+      btn.disabled = true;
+      try {
+        const r = await fetch("/admin/config", { headers:headers() });
+        const d = await r.json();
+        setResult("result-config",
+          Object.entries(d).map(([k,v]) => `${k}: ${v}`).join("\n"), "");
+      } catch(e) { setResult("result-config", `✗  ${e.message}`, "err"); }
+      btn.disabled = false;
+    }
+
+    // ── DELETE RTC ────────────────────────────────────────────────────────
+
+    let _allRtcs      = [];
+    let _confirmingId = null;
 
     async function loadRtcList() {
-      const listEl = document.getElementById("delete-rtc-list");
-      const resultEl = document.getElementById("result-delete-rtc");
-      listEl.innerHTML = "Loading...";
-      resultEl.textContent = "";
+      const btn  = document.getElementById("btn-load-rtcs");
+      const body = document.getElementById("delete-panel-body");
+      const res  = document.getElementById("delete-result");
+      btn.disabled = true;
+      btn.textContent = "Loading…";
+      res.className = "delete-result hidden";
+      res.textContent = "";
+
       try {
-        const r = await fetch("/api/rtcs?archived=1", { headers: headers() });
-        const rtcs = await r.json();
-        if (!rtcs.length) { listEl.innerHTML = "No RTCs found."; return; }
-        listEl.innerHTML = rtcs.map(rtc =>
-          `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px">
-            <span><strong>${escHtml(rtc.project_name || "—")}</strong> &nbsp; ${escHtml(rtc.department || "")} &nbsp; RTC #${rtc.rtc_id}</span>
-            <button class="btn" style="font-size:10px;padding:3px 8px;background:var(--status-red)"
-              onclick="confirmDeleteRtc(${rtc.rtc_id}, '${escHtml(rtc.project_name || "this RTC")}')">Delete</button>
-          </div>`
-        ).join("");
-      } catch(e) { listEl.innerHTML = `Error: ${e.message}`; }
+        const r    = await fetch("/api/rtcs?archived=1", { headers: headers() });
+        _allRtcs   = await r.json();
+
+        if (!_allRtcs.length) {
+          body.innerHTML = '<div class="delete-empty">No RTCs found.</div>';
+          btn.disabled = false; btn.textContent = "Refresh";
+          return;
+        }
+        renderRtcDeleteList(_allRtcs);
+      } catch(e) {
+        body.innerHTML = `<div class="delete-empty">Error: ${escHtml(e.message)}</div>`;
+      }
+      btn.disabled = false;
+      btn.textContent = "Refresh";
     }
 
-    async function confirmDeleteRtc(rtcId, name) {
-      const resultEl = document.getElementById("result-delete-rtc");
-      if (!confirm(`Permanently delete "${name}" (RTC #${rtcId}) and all its allocations?\n\nThis cannot be undone.`)) return;
-      try {
-        const r = await fetch(`/admin/rtcs/${rtcId}`, { method: "DELETE", headers: headers() });
-        const d = await r.json();
-        resultEl.textContent = r.ok
-          ? `✓ RTC #${rtcId} deleted (${d.allocations_removed} allocation rows removed)`
-          : `✗ ${d.error}`;
-        if (r.ok) loadRtcList();
-      } catch(e) { resultEl.textContent = `✗ ${e.message}`; }
+    function renderRtcDeleteList(rtcs) {
+      const body = document.getElementById("delete-panel-body");
+
+      const fmtDate = iso => {
+        if (!iso) return "—";
+        return new Date(iso).toLocaleDateString("en-GB", {
+          day:"numeric", month:"short", year:"2-digit"
+        });
+      };
+
+      body.innerHTML = `
+        <div class="delete-search">
+          <input type="text" id="delete-search-input"
+                 placeholder="Search project name, customer, cost centre…"
+                 oninput="filterRtcList(this.value)">
+          <span style="font-size:11px;color:var(--text-tertiary)" id="delete-count">
+            ${rtcs.length} RTCs
+          </span>
+        </div>
+        <table class="rtc-list-table" id="delete-rtc-table">
+          <thead>
+            <tr>
+              <th>Project name</th>
+              <th>Customer</th>
+              <th>Cost centre</th>
+              <th>PD</th>
+              <th>PM</th>
+              <th>Start</th>
+              <th>Last updated</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="delete-rtc-tbody">
+          </tbody>
+        </table>`;
+
+      populateDeleteTable(rtcs);
     }
 
-    async function loadImportLog() {
-      const el = document.getElementById("result-log");
-      el.textContent = "Loading...";
-      try {
-        const r = await fetch("/admin/import-log", { headers: headers() });
-        const d = await r.json();
-        el.textContent = d.slice(0, 10).map(row =>
-          `${row.import_type} | ${row.completed_at?.slice(0,16)} | `
-          + `${row.rows_processed} rows | ${row.errors?.length ?? 0} errors`
-        ).join("\n");
-      } catch(e) { el.textContent = `✗ ${e.message}`; }
+    function populateDeleteTable(rtcs) {
+      const tbody = document.getElementById("delete-rtc-tbody");
+      if (!tbody) return;
+
+      const fmtDate = iso => {
+        if (!iso) return "—";
+        return new Date(iso).toLocaleDateString("en-GB", {
+          day:"numeric", month:"short", year:"2-digit"
+        });
+      };
+
+      tbody.innerHTML = rtcs.map(r => `
+        <tr id="rtc-row-${r.rtc_id}">
+          <td>
+            <div style="font-weight:500">${escHtml(r.project_name || "—")}</div>
+            ${r.task_name ? `<div style="font-size:11px;color:var(--text-tertiary)">${escHtml(r.task_name)}</div>` : ""}
+          </td>
+          <td style="font-size:11px">${escHtml(r.project_customer || "—")}</td>
+          <td><span class="team-badge">${escHtml(r.department || "—")}</span></td>
+          <td style="font-size:11px">${escHtml(r.project_director || "—")}</td>
+          <td style="font-size:11px">${escHtml(r.project_manager  || "—")}</td>
+          <td style="font-size:11px">${escHtml(fmtDate(r.start_date))}</td>
+          <td style="font-size:11px">
+            ${escHtml(r.last_updated_by || "—")}<br>
+            <span style="color:var(--text-tertiary)">${escHtml(fmtDate(r.last_updated_at))}</span>
+          </td>
+          <td>
+            <button class="btn btn--sm btn--danger"
+                    onclick="promptDelete(${r.rtc_id})">Delete</button>
+          </td>
+        </tr>
+        <tr class="confirm-row hidden" id="confirm-row-${r.rtc_id}">
+          <td colspan="8">
+            <div class="confirm-message">
+              Are you sure you want to permanently delete
+              "<strong>${escHtml(r.project_name || "this RTC")}</strong>"
+              and all its allocations? This cannot be undone.
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn--danger btn--sm"
+                      onclick="executeDelete(${r.rtc_id})">Yes, delete permanently</button>
+              <button class="btn btn--secondary btn--sm"
+                      onclick="cancelDelete(${r.rtc_id})">Cancel</button>
+            </div>
+          </td>
+        </tr>`).join("");
     }
 
-    async function loadConfig() {
-      const el = document.getElementById("result-config");
-      el.textContent = "Loading...";
-      try {
-        const r = await fetch("/admin/config", { headers: headers() });
-        const d = await r.json();
-        el.textContent = Object.entries(d)
-          .map(([k, v]) => `${k}: ${v}`).join("\n");
-      } catch(e) { el.textContent = `✗ ${e.message}`; }
+    function filterRtcList(query) {
+      const q = query.toLowerCase();
+      const filtered = q
+        ? _allRtcs.filter(r =>
+            (r.project_name     || "").toLowerCase().includes(q) ||
+            (r.project_customer || "").toLowerCase().includes(q) ||
+            (r.department       || "").toLowerCase().includes(q) ||
+            (r.project_director || "").toLowerCase().includes(q) ||
+            (r.project_manager  || "").toLowerCase().includes(q))
+        : _allRtcs;
+      document.getElementById("delete-count").textContent = `${filtered.length} RTCs`;
+      populateDeleteTable(filtered);
+      if (_confirmingId) cancelDelete(_confirmingId);
     }
+
+    function promptDelete(rtcId) {
+      if (_confirmingId && _confirmingId !== rtcId) cancelDelete(_confirmingId);
+      _confirmingId = rtcId;
+      document.getElementById(`confirm-row-${rtcId}`).classList.remove("hidden");
+      document.getElementById(`confirm-row-${rtcId}`).scrollIntoView({
+        behavior: "smooth", block: "nearest"
+      });
+    }
+
+    function cancelDelete(rtcId) {
+      const row = document.getElementById(`confirm-row-${rtcId}`);
+      if (row) row.classList.add("hidden");
+      if (_confirmingId === rtcId) _confirmingId = null;
+    }
+
+    async function executeDelete(rtcId) {
+      const resultEl = document.getElementById("delete-result");
+      const rtc      = _allRtcs.find(r => r.rtc_id === rtcId);
+      const name     = rtc?.project_name || `RTC #${rtcId}`;
+      cancelDelete(rtcId);
+      try {
+        const r = await fetch(`/admin/rtcs/${rtcId}`, {
+          method: "DELETE", headers: headers()
+        });
+        const d = await r.json();
+        if (r.ok) {
+          // Remove from local list and re-render
+          _allRtcs = _allRtcs.filter(r => r.rtc_id !== rtcId);
+          const searchVal = document.getElementById("delete-search-input")?.value || "";
+          filterRtcList(searchVal);
+          resultEl.textContent = `✓  "${name}" deleted (${d.allocations_removed} allocation rows removed)`;
+          resultEl.className = "delete-result ok";
+        } else {
+          resultEl.textContent = `✗  ${d.error}`;
+          resultEl.className = "delete-result err";
+        }
+      } catch(e) {
+        resultEl.textContent = `✗  ${e.message}`;
+        resultEl.className = "delete-result err";
+      }
+    }
+
   </script>
 </body>
 </html>
