@@ -46,6 +46,14 @@ def initialise_database():
         )
     """)
 
+    c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_allocations_rtc
+        ON allocations(rtc_id, period_start)
+    """)
+    c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_allocations_period
+        ON allocations(period_start)
+    """)
     # ------------------------------------------------------------------
     # STAFF
     # Populated from the staff list Excel file (interim solution).
@@ -206,6 +214,15 @@ def initialise_database():
     """)
 
     conn.commit()
+    c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_allocations_rtc
+        ON allocations(rtc_id, period_start)
+    """)
+    c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_allocations_period
+        ON allocations(period_start)
+    """)
+    
     _seed_disciplines(c)
     _seed_reporting_periods(c)
     conn.commit()
