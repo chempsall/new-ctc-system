@@ -131,6 +131,14 @@
       </div>
 
       <div class="admin-card">
+        <h2>Delete RTC</h2>
+        <p>Permanently deletes an RTC and all its allocations. Load the list first, then select one to delete.</p>
+        <button class="btn" onclick="loadRtcList()">Load RTCs</button>
+        <div id="delete-rtc-list" style="margin-top:10px;max-height:200px;overflow-y:auto"></div>
+        <div class="result" id="result-delete-rtc"></div>
+      </div>
+
+      <div class="admin-card">
         <h2>Import log</h2>
         <p>Recent import runs with row counts and any errors.</p>
         <button class="btn" onclick="loadImportLog()">View log</button>
@@ -199,6 +207,38 @@
                 `${f.project_number} (${f.project_name})\n  ${f.file_path}\n  ${f.allocations_removed} allocation rows removed`
               ).join("\n\n");
       } catch(e) { el.textContent = `✗ ${e.message}`; }
+    }
+
+    async function loadRtcList() {
+      const listEl = document.getElementById("delete-rtc-list");
+      const resultEl = document.getElementById("result-delete-rtc");
+      listEl.innerHTML = "Loading...";
+      resultEl.textContent = "";
+      try {
+        const r = await fetch("/api/rtcs?archived=1", { headers: headers() });
+        const rtcs = await r.json();
+        if (!rtcs.length) { listEl.innerHTML = "No RTCs found."; return; }
+        listEl.innerHTML = rtcs.map(rtc =>
+          `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px">
+            <span><strong>${escHtml(rtc.project_name || "—")}</strong> &nbsp; ${escHtml(rtc.department || "")} &nbsp; RTC #${rtc.rtc_id}</span>
+            <button class="btn" style="font-size:10px;padding:3px 8px;background:var(--status-red)"
+              onclick="confirmDeleteRtc(${rtc.rtc_id}, '${escHtml(rtc.project_name || "this RTC")}')">Delete</button>
+          </div>`
+        ).join("");
+      } catch(e) { listEl.innerHTML = `Error: ${e.message}`; }
+    }
+
+    async function confirmDeleteRtc(rtcId, name) {
+      const resultEl = document.getElementById("result-delete-rtc");
+      if (!confirm(`Permanently delete "${name}" (RTC #${rtcId}) and all its allocations?\n\nThis cannot be undone.`)) return;
+      try {
+        const r = await fetch(`/admin/rtcs/${rtcId}`, { method: "DELETE", headers: headers() });
+        const d = await r.json();
+        resultEl.textContent = r.ok
+          ? `✓ RTC #${rtcId} deleted (${d.allocations_removed} allocation rows removed)`
+          : `✗ ${d.error}`;
+        if (r.ok) loadRtcList();
+      } catch(e) { resultEl.textContent = `✗ ${e.message}`; }
     }
 
     async function loadImportLog() {

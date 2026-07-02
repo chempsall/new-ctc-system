@@ -122,7 +122,7 @@ function buildFilterOptions() {
 
   // Teams — from unique values in staff
   const depts = [...new Set(s.staff.map(p => p.department).filter(Boolean))].sort();
-  populateSelect("filter-department", depts, "All departments");
+  populateSelect("filter-department", depts, "All cost centres");
 
   // Job Titles — from unique values in staff
   const gradeOrder = t => {
@@ -148,6 +148,12 @@ function buildFilterOptions() {
   // Disciplines
   const funcs = [...new Set(s.staff.map(p => p.job_function).filter(Boolean))].sort();
   populateSelect("filter-job-function", funcs, "All job functions");
+
+  const pms = [...new Set((s.projects||[]).map(p => p.pm).filter(Boolean))].sort();
+  populateSelect("filter-rtc-pm", pms, "All project managers");
+
+  const pds = [...new Set((s.projects||[]).map(p => p.director).filter(Boolean))].sort();
+  populateSelect("filter-rtc-pd", pds, "All project directors");
 }
 
 function populateSelect(id, values, allLabel) {
@@ -453,9 +459,11 @@ function renderRtcTable() {
 
   tbody.innerHTML = rtcs.map(r => {
     const isSelected = String(r.rtc_id) === String(state.selectedRtc);
+    const customer = escHtml(r.project_customer || "");
     const projName = escHtml(r.project_name || "No project name");
     const taskName = escHtml(r.task_name || "");
     const dept     = escHtml(r.department || "—");
+    const pd       = escHtml(r.project_director || "—");
     const pm       = escHtml(r.project_manager || "—");
     const days     = r.current_month_days
                      ? fmt.days(r.current_month_days) + "d"
@@ -463,21 +471,19 @@ function renderRtcTable() {
 
     return `<tr data-id="${r.rtc_id}" class="${isSelected ? "selected" : ""}">
       <td>
+        ${customer ? `<div class="proj-customer">${customer}</div>` : ""}
         <div class="proj-name">${projName}</div>
         ${taskName ? `<div class="proj-task">${taskName}</div>` : ""}
         <div class="proj-number">${escHtml(r.project_number || "")} ${escHtml(r.task_order_number || "")}</div>
       </td>
       <td><span class="team-badge">${dept}</span></td>
-      <td>${pm}</td>
+      <td style="font-size:11px">${pd}</td>
+      <td style="font-size:11px">${pm}</td>
       <td>${statusBadge(r.status)}</td>
       <td class="right mono">${days}</td>
       <td class="text-tertiary" style="font-size:11px">
         ${escHtml(r.last_updated_by || "—")}<br>
         <span style="color:var(--text-tertiary)">${fmtDate(r.last_updated_at)}</span>
-      </td>
-      <td class="text-tertiary" style="font-size:11px">
-        ${escHtml(r.last_opened_by || "—")}<br>
-        <span style="color:var(--text-tertiary)">${fmtDate(r.last_opened)}</span>
       </td>
     </tr>`;
   }).join("");
@@ -541,8 +547,9 @@ function showRtcDetail(rtc) {
   projContainer.innerHTML = `
     <div style="font-size:11px;line-height:1.8;color:var(--text-secondary)">
       <div><strong>Project</strong> ${escHtml(rtc.project_number || "\u2014")} / ${escHtml(rtc.task_order_number || "\u2014")}</div>
-      <div><strong>PM</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
+      ${rtc.project_customer ? `<div><strong>Customer</strong> ${escHtml(rtc.project_customer)}</div>` : ""}
       <div><strong>PD</strong> ${escHtml(rtc.project_director || "\u2014")}</div>
+      <div><strong>PM</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
       <div><strong>Start</strong> ${escHtml(startFmt)}</div>
       <div><strong>Created by</strong> ${escHtml(rtc.created_by || "\u2014")}</div>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
@@ -1054,6 +1061,8 @@ async function triggerProjectLookup(projNum, taskNum) {
       manualFields.classList.add("hidden");
       // Auto-fill cost centre if it matches a known department
       _autoFillDepartment(d.project_organisation);
+      _preselectPerson("rtc-pd", d.project_director);
+      _preselectPerson("rtc-pm", d.project_manager);
 
     } else if (d.match_type === "project_only") {
       // Project known, task order new — auto-fill project-level fields,

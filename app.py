@@ -318,6 +318,7 @@ def api_rtcs():
             p.task_order_number,
             p.project_name,
             p.task_name,
+            p.project_customer,
             p.project_director,
             p.project_manager,
             p.project_status,
@@ -820,6 +821,32 @@ def api_link_horizon(rtc_id):
 # ---------------------------------------------------------------------------
 # ADMIN ROUTES
 # ---------------------------------------------------------------------------
+
+@app.route("/admin/rtcs/<int:rtc_id>", methods=["DELETE"])
+@require_admin
+def admin_delete_rtc(rtc_id):
+    """Permanently deletes an RTC and all its allocations."""
+    conn = database.get_connection()
+    c    = conn.cursor()
+    rtc = c.execute("SELECT project_id FROM rtcs WHERE rtc_id = ?", (rtc_id,)).fetchone()
+    if not rtc:
+        conn.close()
+        return jsonify({"error": f"RTC {rtc_id} not found"}), 404
+    project_id = rtc["project_id"]
+    c.execute("DELETE FROM allocations WHERE rtc_id = ?", (rtc_id,))
+    alloc_count = c.rowcount
+    c.execute("DELETE FROM rtcs WHERE rtc_id = ?", (rtc_id,))
+    # Clean up orphaned placeholder project
+    other_refs = c.execute("SELECT COUNT(*) FROM rtcs WHERE project_id = ?", (project_id,)).fetchone()[0]
+    if other_refs == 0:
+        proj = c.execute("SELECT project_status FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+        if proj and proj["project_status"] == "Placeholder":
+            c.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
+    conn.commit()
+    conn.close()
+    threading.Thread(target=summary_module.build, daemon=True).start()
+    return jsonify({"status": "ok", "allocations_removed": alloc_count})
+
 
 @app.route("/admin")
 def admin_index():

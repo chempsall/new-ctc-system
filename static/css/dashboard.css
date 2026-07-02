@@ -515,6 +515,16 @@ a:hover { text-decoration: underline; }
 .project-table tr:hover td { background: var(--surface-2); }
 .project-table tr.selected td { background: var(--blue-light); }
 
+.proj-customer {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .proj-number {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -764,13 +774,13 @@ a:hover { text-decoration: underline; }
    RTC table
    -------------------------------------------------------------------------- */
 .rtc-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.rtc-table th:nth-child(1) { width: 32% } /* Project / Task */
-.rtc-table th:nth-child(2) { width: 16% } /* Cost Centre */
-.rtc-table th:nth-child(3) { width: 12% } /* PM */
-.rtc-table th:nth-child(4) { width: 12% } /* Status */
-.rtc-table th:nth-child(5) { width: 8%  } /* This month */
-.rtc-table th:nth-child(6) { width: 10% } /* Last updated */
-.rtc-table th:nth-child(7) { width: 10% } /* Last opened */
+.rtc-table th:nth-child(1) { width: 28% } /* Customer / Project / Task */
+.rtc-table th:nth-child(2) { width: 14% } /* Cost Centre */
+.rtc-table th:nth-child(3) { width: 12% } /* PD */
+.rtc-table th:nth-child(4) { width: 12% } /* PM */
+.rtc-table th:nth-child(5) { width: 10% } /* Status */
+.rtc-table th:nth-child(6) { width: 8%  } /* This month */
+.rtc-table th:nth-child(7) { width: 16% } /* Last updated */
 
 .rtc-table th {
   padding: 9px 12px;
