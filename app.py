@@ -235,7 +235,7 @@ def api_project():
                task_start_date, task_end_date
         FROM projects
         WHERE project_number = ? AND task_order_number = ?
-        AND project_status NOT IN ('Placeholder')
+        AND project_status NOT IN ('Placeholder', 'Pending')
     """, (project_number, task_order_number)).fetchone()
 
     if row:
@@ -243,6 +243,16 @@ def api_project():
         result = dict(row)
         result["match_type"] = "full"
         return jsonify(result)
+
+
+    rows_debug = conn.execute("""
+        SELECT project_number, task_order_number, project_status, last_imported
+        FROM projects
+        WHERE project_number = ?
+        ORDER BY last_imported DESC
+    """, (project_number,)).fetchall()
+    print(f"DEBUG all rows: {[dict(r) for r in rows_debug]}")
+
 
     # Try project-number-only match — known project, unknown task order
     row = conn.execute("""
@@ -260,6 +270,7 @@ def api_project():
 
     if row:
         result = dict(row)
+        print(f"DEBUG project_only: {result}")
         result["match_type"]       = "project_only"
         result["task_order_number"] = task_order_number
         result["task_name"]        = None   # unknown — must be entered manually
@@ -1021,14 +1032,19 @@ def _get_or_create_project(cursor, data: dict, now: str) -> int:
         cursor.execute("""
             INSERT INTO projects (
                 project_number, task_order_number,
-                project_name, task_name, project_status, last_imported
-            ) VALUES (?,?,?,?,?,?)
+                project_name, task_name,
+                project_customer, project_director, project_manager,
+                project_status, last_imported
+            ) VALUES (?,?,?,?,?,?,?,?,?)
             ON CONFLICT(project_number, task_order_number) DO UPDATE SET
                 last_imported = excluded.last_imported
         """, (
             proj_num, task_order,
             data.get("project_name", "No Horizon Record Found"),
             data.get("task_name",    "No Horizon Record Found"),
+            data.get("project_customer", None),
+            data.get("project_director", None),
+            data.get("project_manager", None),
             "Pending", now
         ))
         row = cursor.execute("""

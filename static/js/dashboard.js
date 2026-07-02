@@ -101,7 +101,7 @@ function init() {
   renderView();
   wireEvents();
   updateStatusBar();
-  loadRtcs();
+  switchView(state.activeView);
 }
 
 function buildMonthTabs() {
@@ -159,6 +159,7 @@ function buildFilterOptions() {
 function populateSelect(id, values, allLabel) {
   const sel = document.getElementById(id);
   if (!sel) return;
+  const previous = sel.value;
   sel.innerHTML = `<option value="all">${allLabel}</option>`;
   values.forEach(v => {
     const opt = document.createElement("option");
@@ -166,6 +167,9 @@ function populateSelect(id, values, allLabel) {
     opt.textContent = v;
     sel.appendChild(opt);
   });
+  if (previous && [...sel.options].some(o => o.value === previous)) {
+    sel.value = previous;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -417,6 +421,7 @@ async function loadRtcs() {
   try {
     const r = await fetch(`/api/rtcs?${params}`);
     state.rtcs = await r.json();
+    buildFilterOptions();
     renderRtcTable();
   } catch(e) {
     console.error("Failed to load RTCs:", e);
@@ -546,12 +551,24 @@ function showRtcDetail(rtc) {
   const projContainer = document.getElementById("dp-projects");
   projContainer.innerHTML = `
     <div style="font-size:11px;line-height:1.8;color:var(--text-secondary)">
-      <div><strong>Project</strong> ${escHtml(rtc.project_number || "\u2014")} / ${escHtml(rtc.task_order_number || "\u2014")}</div>
-      ${rtc.project_customer ? `<div><strong>Customer</strong> ${escHtml(rtc.project_customer)}</div>` : ""}
-      <div><strong>PD</strong> ${escHtml(rtc.project_director || "\u2014")}</div>
-      <div><strong>PM</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
-      <div><strong>Start</strong> ${escHtml(startFmt)}</div>
-      <div><strong>Created by</strong> ${escHtml(rtc.created_by || "\u2014")}</div>
+
+
+
+
+    <div><strong>Project number</strong> ${escHtml(rtc.project_number || "\u2014")}</div>
+    <div><strong>Task number</strong> ${escHtml(rtc.task_order_number || "\u2014")}</div>
+    <div><strong>Project name</strong> ${escHtml(rtc.project_name || "\u2014")}</div>
+    <div><strong>Task name</strong> ${escHtml(rtc.task_name || "\u2014")}</div>
+    ${rtc.project_customer ? `<div><strong>Customer</strong> ${escHtml(rtc.project_customer)}</div>` : ""}
+    <div><strong>PD</strong> ${escHtml(rtc.project_director || "\u2014")}</div>
+    <div><strong>PM</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
+    <div><strong>Start</strong> ${escHtml(startFmt)}</div>
+    <div><strong>Created by</strong> ${escHtml(rtc.created_by || "\u2014")}</div>
+
+
+
+
+
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <a href="/rtc/${rtc.rtc_id}" class="btn-open-rtc">Open to edit \u2192</a>
         <button class="btn btn--sm btn--secondary"
@@ -866,8 +883,8 @@ function resetFilters() {
   if (funcSel)    funcSel.value    = "all";
   if (horizonSel) horizonSel.value = "all";
   if (searchEl)   searchEl.value   = "";
-  if (pmSel)      pmSel.value      = "";
-  if (pdSel)      pdSel.value      = "";
+  if (pmSel)      pmSel.value      = "all";
+  if (pdSel)      pdSel.value      = "all";
   if (statusSel)  statusSel.value  = "";
 
   if (state.activeView === "rtcs") {
@@ -1155,7 +1172,7 @@ async function submitRtcModal() {
 
   const errors = [];
   if (!projNum)   errors.push("Project number is required.");
-  if (!taskNum)   errors.push("Task order number is required.");
+  if (!taskNum && isFullMatch)errors.push("Task order number is required.");
   if (!startDate) errors.push("Start month is required.");
   if (!dept)      errors.push("Cost centre is required.");
   if (!pd)        errors.push("Project Director is required.");
@@ -1265,7 +1282,7 @@ function wireEvents() {
 
   // RTC-specific filters
   document.getElementById("filter-rtc-pm")?.addEventListener("change", e => {
-    state.rtcFilters.pm = e.target.value;
+    state.rtcFilters.pm = e.target.value === "all" ? "" : e.target.value;;
     if (state.activeView === "rtcs") loadRtcs();
   });
   document.getElementById("filter-rtc-pd")?.addEventListener("change", e => {
