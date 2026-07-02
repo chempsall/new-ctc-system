@@ -34,27 +34,6 @@ def initialise_database():
     c = conn.cursor()
 
     # ------------------------------------------------------------------
-    # DISCIPLINES
-    # Lookup table for job functions.
-    # Derived from the suffix after the comma in Horizon job titles.
-    # e.g. "Lead Professional, Mechanical Engineering" -> "Mechanical Engineering"
-    # ------------------------------------------------------------------
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS disciplines (
-            discipline_id   INTEGER PRIMARY KEY AUTOINCREMENT,
-            discipline_name TEXT    NOT NULL UNIQUE
-        )
-    """)
-
-    c.execute("""
-        CREATE INDEX IF NOT EXISTS idx_allocations_rtc
-        ON allocations(rtc_id, period_start)
-    """)
-    c.execute("""
-        CREATE INDEX IF NOT EXISTS idx_allocations_period
-        ON allocations(period_start)
-    """)
-    # ------------------------------------------------------------------
     # STAFF
     # Populated from the staff list Excel file (interim solution).
     # Future: direct Horizon API connection.
@@ -223,32 +202,11 @@ def initialise_database():
         ON allocations(period_start)
     """)
     
-    _seed_disciplines(c)
     _seed_reporting_periods(c)
+    _seed_generic_staff(c)
     conn.commit()
     conn.close()
     print(f"Database initialised at {DB_PATH}")
-
-
-def _seed_disciplines(c):
-    """
-    Known job functions derived from Horizon job title suffixes.
-    Add new entries here as they are discovered.
-    """
-    disciplines = [
-        "Mechanical Engineering",
-        "Electrical Engineering",
-        "Information Modelling",
-        "Building Technology Systems",
-        "Plumbing Engineering",
-        "Subsector Leadership",
-        "Utility Engineering",
-    ]
-    for d in disciplines:
-        c.execute("""
-            INSERT OR IGNORE INTO disciplines (discipline_name)
-            VALUES (?)
-        """, (d,))
 
 
 def _seed_reporting_periods(c):
@@ -266,6 +224,36 @@ def _seed_reporting_periods(c):
               25 if m in QUARTER_START else 20,
               current.strftime("%b-%Y")))
         current = nxt
+
+def _seed_generic_staff(c):
+    """
+    Generic placeholder staff for use in RTCs when a specific person
+    hasn't been identified yet. Available across all departments.
+    Identified by department = '_GENERIC'.
+    """
+    generics = [
+        ("GENERIC-UK-DIRECTOR", "UK Director", "P7 - Director"),
+        ("GENERIC-UK-TECHNICAL-DIRECTOR", "UK Technical Director", "P6 - Technical Director"),
+        ("GENERIC-UK-ASSOCIATE-DIRECTOR", "UK Associate/Associate Director", "P5 - Associate/Associate Director"),
+        ("GENERIC-UK-PRINCIPAL-ENGINEER", "UK Principal Engineer/Consultant", "P4 - Principal Engineer/Consultant"),
+        ("GENERIC-UK-SENIOR-ENGINEER", "UK Senior Engineer/Consultant", "P3 - Senior Engineer/Consultant"),
+        ("GENERIC-UK-ENGINEER", "UK Engineer/Consultant", "P2 - Engineer/Consultant"),
+        ("GENERIC-UK-GRADUATE-ENGINEER", "UK Graduate/Assistant Engineer/Consultant", "P1 - Graduate/Assistant Engineer/Consultant"),
+        ("GENERIC-UK-UNDERGRADUATE-ENGINEER", "UK Undergraduate Engineer", "P0 - Undergraduate Engineer/Consultant"),
+        ("GENERIC-UK-SENIOR-TECHNICIAN", "UK Senior Technician", "T4 - Senior Technician"),
+        ("GENERIC-UK-EXPERIENCED-TECHNICIAN", "UK Experienced Technician", "T3 - Experienced Technician"),
+        ("GENERIC-UK-INTERMEDIATE-TECHNICIAN", "UK Intermediate Technician", "T2 - Intermediate Technician"),
+        ("GENERIC-UK-ASSISTANT-TECHNICIAN", "UK Assistant Technician", "T1 - Assistant Technician"),
+        ("GENERIC-UK-TECHNICIAN-IN-TRAINING", "UK Technician in Training", "T0 - Technician in Training"),
+        ("GENERIC-UK-DOCUMENT-CONTROL", "UK Document Control", "P3 - Senior Engineer/Consultant"),
+    ]
+    for horizon_id, name, job_title in generics:
+        c.execute("""
+            INSERT OR IGNORE INTO staff (
+                horizon_person_number, name, job_title, job_family,
+                job_function, department, availability, last_imported
+            ) VALUES (?, ?, ?, 'Generic', 'Generic', '_GENERIC', 1.0, 'seeded')
+        """, (horizon_id, name, job_title))
 
 
 if __name__ == "__main__":

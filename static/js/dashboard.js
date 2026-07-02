@@ -122,7 +122,7 @@ function buildFilterOptions() {
 
   // Teams — from unique values in staff
   const depts = [...new Set(s.staff.map(p => p.department).filter(Boolean))].sort();
-  populateSelect("filter-department", depts, "All cost centres");
+  populateSelect("filter-department", depts, "All departments");
 
   // Job Titles — from unique values in staff
   const gradeOrder = t => {
@@ -228,8 +228,26 @@ function filteredStaff() {
           !person.job_title.toLowerCase().includes(q)) return false;
     }
     return true;
-  }).sort((a, b) => {
-    // Over first, then check, then ok
+}).sort((a, b) => {
+    // Generics always at the bottom
+    const aGeneric = a.department === "_GENERIC";
+    const bGeneric = b.department === "_GENERIC";
+    if (aGeneric && !bGeneric) return 1;
+    if (!aGeneric && bGeneric) return -1;
+    // Both generic — sort by job_title (P0, P1... P7, T0... T4, with Document Control last)
+    if (aGeneric && bGeneric) {
+      if (a.id === "GENERIC-UK-DOCUMENT-CONTROL") return 1;
+      if (b.id === "GENERIC-UK-DOCUMENT-CONTROL") return -1;
+      const gradeSort = t => {
+        const m = t.match(/^([PT])(\d+)/);
+        if (!m) return 999;
+        const letter = m[1] === "P" ? 0 : 1;
+        const num    = parseInt(m[2]);
+        return letter * 100 + (99 - num);
+      };
+      return gradeSort(a.job_title || "") - gradeSort(b.job_title || "");
+    }
+    // Real staff — over first, then check, then ok
     const order = { over: 0, check: 1, ok: 2, unavailable: 3 };
     const ka = order[a.kpi[p]] ?? 9;
     const kb = order[b.kpi[p]] ?? 9;
@@ -970,14 +988,14 @@ function openRtcModal(mode) {
   document.getElementById("rtc-form-error").classList.add("hidden");
 
   const deptSel = document.getElementById("rtc-department");
-  deptSel.innerHTML = "<option value=\"\">Select cost centre\u2026</option>";
+  deptSel.innerHTML = "<option value=\"\">Select department\u2026</option>";
   (state.summary?.departments || []).forEach(d => {
     const opt = document.createElement("option");
     opt.value = d.department; opt.textContent = d.department;
     deptSel.appendChild(opt);
   });
 
-  // Clear PD/PM until a cost centre is chosen
+  // Clear PD/PM until a department is chosen
   populatePersonDropdown("rtc-pd", null);
   populatePersonDropdown("rtc-pm", null);
 
@@ -988,7 +1006,7 @@ function openRtcModal(mode) {
     `${_rtcPickerYear}-${String(_rtcPickerMonth).padStart(2,"0")}-01`;
   renderMonthPicker();
 
-  // Wire cost centre change -> repopulate PD/PM
+  // Wire department change -> repopulate PD/PM
   document.getElementById("rtc-department").onchange = () => {
     const dept       = document.getElementById("rtc-department").value;
     const pdExternal = document.getElementById("rtc-pd-external").checked;
@@ -1022,16 +1040,47 @@ function populatePersonDropdown(selectId, department) {
   sel.innerHTML = `<option value="">${label}</option>`;
 
   const staff = state.summary?.staff || [];
-  const filtered = department
-    ? staff.filter(s => s.department === department)
-    : staff;
 
-  // Sort by name
-  [...filtered].sort((a, b) => (a.name || "").localeCompare(b.name || "")).forEach(s => {
+  // Real staff — filtered by department if specified, generics excluded
+  const real = staff.filter(s => s.department !== "_GENERIC" &&
+    (!department || s.department === department));
+
+  [...real].sort((a, b) => (a.name || "").localeCompare(b.name || "")).forEach(s => {
     const opt = document.createElement("option");
     opt.value = s.name; opt.textContent = s.name;
     sel.appendChild(opt);
   });
+
+  // Generic placeholders — always at the bottom in grade order,
+  // with Document Control explicitly last
+  const generics = staff
+    .filter(s => s.department === "_GENERIC")
+    .sort((a, b) => {
+      if (a.id === "GENERIC-UK-DOCUMENT-CONTROL") return 1;
+      if (b.id === "GENERIC-UK-DOCUMENT-CONTROL") return -1;
+      const gradeSort = t => {
+        const m = t.match(/^([PT])(\d+)/);
+        if (!m) return 999;
+        const letter = m[1] === "P" ? 0 : 1;
+        const num    = parseInt(m[2]);
+        return letter * 100 + (99 - num);
+      };
+      return gradeSort(a.job_title || "") - gradeSort(b.job_title || "");
+    });
+
+  if (generics.length) {
+    const divider = document.createElement("option");
+    divider.disabled = true;
+    divider.textContent = "\u2500\u2500 Generic roles \u2500\u2500";
+    sel.appendChild(divider);
+    generics.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.name;
+      opt.textContent = s.name;
+      opt.style.fontStyle = "italic";
+      sel.appendChild(opt);
+    });
+  }
 }
 
 function closeRtcModal() {
@@ -1076,7 +1125,7 @@ async function triggerProjectLookup(projNum, taskNum) {
       resultEl.classList.remove("hidden");
       placeholderEl.classList.add("hidden");
       manualFields.classList.add("hidden");
-      // Auto-fill cost centre if it matches a known department
+      // Auto-fill department if it matches a known department
       _autoFillDepartment(d.project_organisation);
       _preselectPerson("rtc-pd", d.project_director);
       _preselectPerson("rtc-pm", d.project_manager);

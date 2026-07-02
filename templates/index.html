@@ -91,7 +91,7 @@
 
     <!-- Filter bar — two rows:
          Row 1: label + all dropdowns + reset button
-         Row 2: search input, aligned under the cost centre dropdown -->
+         Row 2: search input, aligned under the department dropdown -->
     <div class="filter-bar">
 
       <!-- Row 1: dropdowns -->
@@ -99,7 +99,7 @@
         <span class="filter-bar__label">Filter</span>
 
         <select id="filter-department">
-          <option value="all">All cost centres</option>
+          <option value="all">All departments</option>
         </select>
 
         <span id="staff-only-filters">
@@ -140,7 +140,7 @@
         </button>
       </div>
 
-      <!-- Row 2: search input aligned under cost centre -->
+      <!-- Row 2: search input aligned under department -->
       <div class="filter-bar__row filter-bar__row--search">
         <span class="filter-bar__label-spacer"></span>
         <input type="text" id="filter-search"
@@ -415,7 +415,7 @@
             Cost centre <span class="form-required">*</span>
           </label>
           <select class="form-input" id="rtc-department">
-            <option value="">Select cost centre…</option>
+            <option value="">Select department…</option>
           </select>
         </div>
         <div class="form-group">
@@ -423,11 +423,11 @@
             Project Director <span class="form-required">*</span>
           </label>
           <select class="form-input" id="rtc-pd">
-            <option value="">Select cost centre first…</option>
+            <option value="">Select department first…</option>
           </select>
           <label class="form-checkbox-label" style="margin-top:6px">
             <input type="checkbox" id="rtc-pd-external">
-            Project director from another cost centre?
+            Project director from another department?
           </label>
         </div>
       </div>
@@ -453,11 +453,11 @@
             Project Manager <span class="form-required">*</span>
           </label>
           <select class="form-input" id="rtc-pm">
-            <option value="">Select cost centre first…</option>
+            <option value="">Select department first…</option>
           </select>
           <label class="form-checkbox-label" style="margin-top:6px">
             <input type="checkbox" id="rtc-pm-external">
-            Project manager from another cost centre?
+            Project manager from another department?
           </label>
         </div>
       </div>

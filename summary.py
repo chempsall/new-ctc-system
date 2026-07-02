@@ -271,6 +271,7 @@ def _get_departments(conn):
         SELECT DISTINCT department
         FROM staff
         WHERE department IS NOT NULL
+        AND department != '_GENERIC'
         ORDER BY department
     """).fetchall()
     return [{"department": r["department"]} for r in rows]
