@@ -65,7 +65,7 @@
 
   /* Fonts — Arial per WSP's documented fallback for PP Neue Montreal */
   --font-body: Arial, Helvetica, sans-serif;
-  --font-mono: 'Consolas', 'Courier New', monospace;
+  --font-mono: 'Courier New', monospace;
 
   /* Sizing */
   --nav-h:     56px;
@@ -82,9 +82,14 @@
 /* Disable any slashed-zero glyph variant for consistency — without
    this, numbers can render with or without a slash through the zero
    depending on font fallback, which looks inconsistent on the page. */
+body, input, button, select, textarea {
+  font-variant-numeric: normal;
+  font-feature-settings: "zero" 0;
+}
+
 .mono, [class*="mono"], .alloc-days, .proj-number, .detail-proj-days {
   font-variant-numeric: normal;
-  font-feature-settings: "zero" 0, "slashed-zero" 0;
+  font-feature-settings: "zero" 0;
 }
 
 /* --------------------------------------------------------------------------

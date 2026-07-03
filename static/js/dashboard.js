@@ -360,10 +360,10 @@ function renderStaffTable() {
             <div class="alloc-bar__fill alloc-bar__fill--${kpi}"
                  style="width:${pct}%"></div>
           </div>
-          <span class="alloc-days">${fmt.days(allocated)}d</span>
+          <span class="alloc-days" style="color:var(--text-tertiary)">${fmt.days(allocated)}d</span>
         </div>
       </td>
-      <td class="right">
+      <td class="right" style="vertical-align:middle;padding-top:3px">
         <span class="mono" style="font-size:11px;color:var(--text-tertiary)">
           / ${fmt.days(capacity)}d
         </span>
