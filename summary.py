@@ -307,3 +307,39 @@ def get_cached() -> dict:
     if row:
         return {"generated_at": row["generated_at"], "payload": json.loads(row["payload"])}
     return None
+
+import threading
+import time
+
+_dirty       = False
+_dirty_lock  = threading.Lock()
+_worker_started = False
+
+def mark_dirty():
+    """Signal that the summary needs rebuilding."""
+    global _dirty
+    with _dirty_lock:
+        _dirty = True
+
+def _rebuild_worker():
+    """Background worker — rebuilds at most once every 3 seconds when dirty."""
+    global _dirty
+    while True:
+        time.sleep(3)
+        with _dirty_lock:
+            if not _dirty:
+                continue
+            _dirty = False
+        try:
+            build()
+        except Exception as e:
+            print(f"Summary rebuild error: {e}")
+
+def start_worker():
+    """Start the background rebuild worker (called once at app startup)."""
+    global _worker_started
+    if _worker_started:
+        return
+    _worker_started = True
+    t = threading.Thread(target=_rebuild_worker, daemon=True)
+    t.start()

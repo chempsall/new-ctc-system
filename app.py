@@ -425,7 +425,7 @@ def api_create_rtc():
     conn.commit()
     conn.close()
 
-    threading.Thread(target=summary_module.build, daemon=True).start()
+    summary_module.mark_dirty()
     return jsonify({"rtc_id": rtc_id}), 201
 
 
@@ -495,7 +495,7 @@ def api_duplicate_rtc(rtc_id):
     conn.commit()
     conn.close()
 
-    threading.Thread(target=summary_module.build, daemon=True).start()
+    summary_module.mark_dirty()
     return jsonify({"rtc_id": new_rtc_id, "staff_copied": len(staff_members)}), 201
 
 
@@ -643,7 +643,7 @@ def api_update_rtc(rtc_id):
     conn.commit()
     conn.close()
 
-    threading.Thread(target=summary_module.build, daemon=True).start()
+    summary_module.mark_dirty()
     return jsonify({"status": "ok", "allocations_updated": alloc_count})
 
 
@@ -825,7 +825,7 @@ def api_link_horizon(rtc_id):
 
     conn.commit()
     conn.close()
-    threading.Thread(target=summary_module.build, daemon=True).start()
+    summary_module.mark_dirty()
     return jsonify({"status": "ok", "project_id": real_project["project_id"]})
 
 
@@ -855,7 +855,7 @@ def admin_delete_rtc(rtc_id):
             c.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
     conn.commit()
     conn.close()
-    threading.Thread(target=summary_module.build, daemon=True).start()
+    summary_module.mark_dirty()
     return jsonify({"status": "ok", "allocations_removed": alloc_count})
 
 
@@ -1089,6 +1089,7 @@ def _get_or_create_project(cursor, data: dict, now: str) -> int:
 def create_app():
     database.initialise_database()
     summary_module.build()
+    summary_module.start_worker()
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(
