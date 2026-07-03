@@ -419,8 +419,8 @@ a:hover { text-decoration: underline; }
 .staff-table th:nth-child(1) { width: 35% } /* Name */
 .staff-table th:nth-child(2) { width: 18% } /* Job Function */
 .staff-table th:nth-child(3) { width: 22% } /* Allocated */
-.staff-table th:nth-child(4) { width: 17%; text-align: center; } /* Capacity */
-.staff-table th:nth-child(5) { width: 8%; text-align: center; } /* Status */
+.staff-table th:nth-child(4) { width: 17%; text-align: center !important; } /* Capacity */
+.staff-table th:nth-child(5) { width: 8%; text-align: center !important; } /* Status */
 
 .staff-table th {
   padding: 8px 12px;

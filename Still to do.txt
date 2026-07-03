@@ -1,0 +1,4 @@
+CTCs should be editable (and copyable) from the Projects slider - the same way as they are from the RTC page.
+
+Projects page needs an additional filter for Project Manager
+

@@ -514,7 +514,7 @@ function renderRtcTable() {
       <td><span class="team-badge">${dept}</span></td>
       <td style="font-size:11px">${pd}</td>
       <td style="font-size:11px">${pm}</td>
-      <td>${statusBadge(r.status)}</td>
+      <td style="text-align:center">${statusBadge(r.status)}</td>
       <td style="text-align:center" class="mono">${days}</td>
       <td class="text-tertiary" style="font-size:11px">
         ${escHtml(r.last_updated_by || "—")}<br>
