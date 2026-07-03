@@ -363,12 +363,12 @@ function renderStaffTable() {
           <span class="alloc-days" style="color:var(--text-tertiary)">${fmt.days(allocated)}d</span>
         </div>
       </td>
-      <td class="right" style="vertical-align:middle;padding-top:3px">
+      <td style="text-align:center;vertical-align:top;padding-top:3px">
         <span class="mono" style="font-size:11px;color:var(--text-tertiary)">
           / ${fmt.days(capacity)}d
         </span>
       </td>
-      <td><span class="kpi kpi--${kpi}">${{over:'Over',under:'Under',ok:'OK',unavailable:'N/A',none:''}[kpi]||kpi}</span></td>
+      <td style="text-align:center"><span class="kpi kpi--${kpi}">${{over:'Over',under:'Under',ok:'OK',unavailable:'N/A',none:''}[kpi]||kpi}</span></td>
     </tr>`;
   }).join("");
 
@@ -404,11 +404,11 @@ function renderProjectTable() {
         <div class="proj-number">${escHtml(proj.task_order || "")}</div>
       </td>
       <td>
-        <div class="proj-name">${escHtml(proj.name)}${conflict}</div>
+        <div class="proj-name">${escHtml(proj.name)}</div>
         <div class="proj-task">${escHtml(proj.task_name || "")}</div>
       </td>
       <td><span class="team-badge">${escHtml(proj.department || "—")}</span></td>
-      <td>
+      <td style="text-align:center">
         <span class="horizon horizon--${linked ? "linked" : "norecord"}">
           <span class="horizon--dot"></span>
           ${linked ? "Linked" : "No record"}
@@ -515,7 +515,7 @@ function renderRtcTable() {
       <td style="font-size:11px">${pd}</td>
       <td style="font-size:11px">${pm}</td>
       <td>${statusBadge(r.status)}</td>
-      <td class="right mono">${days}</td>
+      <td style="text-align:center" class="mono">${days}</td>
       <td class="text-tertiary" style="font-size:11px">
         ${escHtml(r.last_updated_by || "—")}<br>
         <span style="color:var(--text-tertiary)">${fmtDate(r.last_updated_at)}</span>
