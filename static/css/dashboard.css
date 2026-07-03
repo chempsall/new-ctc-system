@@ -825,6 +825,9 @@ a:hover { text-decoration: underline; }
 .btn:hover { background: var(--wsp-red); }
 .btn:disabled { background: var(--grey-300); cursor: not-allowed; }
 
+.btn--primary { background: var(--wsp-red); }
+.btn--primary:hover { background: var(--wsp-red-dark); }
+
 .btn--sm { padding: 4px 10px; font-size: 11px; }
 
 .btn--secondary {
