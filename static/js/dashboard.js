@@ -828,10 +828,10 @@ function switchView(view) {
   }
 
   // Month tabs only relevant for staff and projects views
-  const monthTabs = document.getElementById("month-tabs");
-  if (monthTabs) {
-    monthTabs.style.display = view === "rtcs" ? "none" : "";
-  }
+ const monthTabs = document.getElementById("month-tabs");
+  if (monthTabs) monthTabs.style.display = view === "rtcs" ? "none" : "";
+  const rtcBar = document.getElementById("rtc-actions-bar");
+  if (rtcBar) rtcBar.style.display = view === "rtcs" ? "" : "none";
 
   // Reload data fresh on every tab switch so changes made on one tab
   // are reflected immediately on the others without needing a page refresh

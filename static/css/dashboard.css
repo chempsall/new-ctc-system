@@ -272,6 +272,11 @@ a:hover { text-decoration: underline; }
   display: inline-flex; align-items: center; gap: 8px;
 }
 
+.rtc-actions-bar {
+  display: flex; gap: 4px;
+  margin-bottom: 16px;
+}
+
 .month-tabs {
   display: flex; gap: 4px;
   margin-bottom: 16px;
@@ -279,6 +284,10 @@ a:hover { text-decoration: underline; }
 
 .month-tab {
   padding: 5px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   border-radius: var(--radius-sm);
   font-size: 12px; font-weight: 400;
   color: var(--text-secondary);
@@ -286,6 +295,11 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border);
   background: var(--surface);
   transition: all 0.15s;
+  width: 80px;
+  height: 30px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .month-tab:hover { border-color: var(--border-strong); color: var(--text-primary); }
 .month-tab.active {
@@ -293,6 +307,17 @@ a:hover { text-decoration: underline; }
   border-color: var(--wsp-red);
   color: #fff;
   font-weight: 500;
+}
+
+.month-tab--primary {
+  background: var(--wsp-red);
+  border-color: var(--wsp-red);
+  color: #fff;
+  font-weight: 500;
+}
+.month-tab--primary:hover {
+  background: var(--wsp-red-dark);
+  border-color: var(--wsp-red-dark);
 }
 
 /* --------------------------------------------------------------------------
