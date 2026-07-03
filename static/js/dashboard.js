@@ -189,7 +189,7 @@ function renderMetrics() {
   const conflicts = s.conflicts ? s.conflicts.length : 0;
   const noRecProj = projects.filter(pr => pr.horizon_status !== "linked").length;
 
-const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-"));
+const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && (ps.capacity?.[p] ?? 1) > 0);
   const fte = realStaff.reduce((sum, ps) => sum + (ps.fte?.[p] || 0), 0);
   document.getElementById("metric-staff").textContent    = realStaff.length;
   document.getElementById("metric-fte").textContent      = fte.toFixed(1);
@@ -234,6 +234,12 @@ function filteredStaff() {
       const q = f.search.toLowerCase();
       if (!person.name.toLowerCase().includes(q) &&
           !person.job_title.toLowerCase().includes(q)) return false;
+    }
+    // Exclude people with no capacity in the current period
+    // (i.e. they haven't started yet or have already left)
+    if (!person.id?.startsWith("GENERIC-")) {
+      const cap = person.capacity?.[p];
+      if (cap !== null && cap !== undefined && cap <= 0) return false;
     }
     return true;
 }).sort((a, b) => {
@@ -362,7 +368,7 @@ function renderStaffTable() {
           / ${fmt.days(capacity)}d
         </span>
       </td>
-      <td><span class="kpi kpi--${kpi}">${kpi}</span></td>
+      <td><span class="kpi kpi--${kpi}">${{over:'Over',under:'Under',ok:'OK',unavailable:'N/A',none:''}[kpi]||kpi}</span></td>
     </tr>`;
   }).join("");
 

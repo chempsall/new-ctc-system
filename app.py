@@ -694,6 +694,16 @@ def api_update_rtc(rtc_id):
         if not valid_period:
             continue
 
+        # Guard: only update allocations for staff who are members of this RTC.
+        # Prevents a removed person being silently reinstated via a PATCH.
+        is_member = c.execute("""
+            SELECT 1 FROM allocations
+            WHERE rtc_id = ? AND horizon_person_number = ?
+            LIMIT 1
+        """, (rtc_id, pid)).fetchone()
+        if not is_member:
+            continue
+
         c.execute("""
             INSERT INTO allocations
                 (horizon_person_number, rtc_id, period_start, days, last_updated)

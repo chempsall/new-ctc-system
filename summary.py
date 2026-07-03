@@ -112,11 +112,20 @@ def build(department: str = None) -> dict:
 
     # -- Staff ---------------------------------------------------------------
     staff_query = "SELECT * FROM staff WHERE end_date IS NULL OR end_date > ?"
+    first_period = period_starts[0] if period_starts else date.today().isoformat()
+    staff_query = "SELECT * FROM staff WHERE end_date IS NULL OR end_date > ?"
     if department:
         staff_query += " AND department = ?"
-        staff_rows = conn.execute(staff_query, (date.today().isoformat(), department)).fetchall()
+        staff_rows = conn.execute(staff_query, (first_period, department)).fetchall()
     else:
-        staff_rows = conn.execute(staff_query, (date.today().isoformat(),)).fetchall()
+        staff_rows = conn.execute(staff_query, (first_period,)).fetchall()
+    
+    staff_query = "SELECT * FROM staff WHERE (end_date IS NULL OR end_date > ?) AND (start_date IS NULL OR start_date <= ?)"
+    if department:
+        staff_query += " AND department = ?"
+        staff_rows = conn.execute(staff_query, (first_period, period_starts[-1], department)).fetchall()
+    else:
+        staff_rows = conn.execute(staff_query, (first_period, period_starts[-1])).fetchall()
 
     # Availability fractions per person per period
     avail_rows = conn.execute("""
@@ -184,7 +193,11 @@ def build(department: str = None) -> dict:
                 cap = None
             else:
                 frac = avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
-                cap  = round(wdays * frac, 2)
+                proportion = _period_fte(
+                    s["start_date"], s["end_date"],
+                    ps, p["period_end"], 1.0
+                )
+                cap = round(wdays * frac * proportion, 2)
 
             alloc   = round(person_alloc.get(pid, {}).get(ps, 0), 2)
             h_days  = round(person_horizon.get(pid, {}).get(ps, 0), 2)
