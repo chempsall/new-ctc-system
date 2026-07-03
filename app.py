@@ -625,6 +625,22 @@ def api_update_rtc(rtc_id):
         days   = alloc.get("days", 0)
         if not pid or not period:
             continue
+
+        # Validate days — must be a non-negative number
+        try:
+            days = float(days)
+        except (TypeError, ValueError):
+            continue
+        if days < 0:
+            days = 0
+
+        # Validate period_start exists in reporting_periods
+        valid_period = c.execute(
+            "SELECT 1 FROM reporting_periods WHERE period_start = ?", (period,)
+        ).fetchone()
+        if not valid_period:
+            continue
+
         c.execute("""
             INSERT INTO allocations
                 (horizon_person_number, rtc_id, period_start, days, last_updated)
