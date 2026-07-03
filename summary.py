@@ -18,6 +18,47 @@ from database import get_connection
 
 HORIZON_MONTHS = 6   # How many future months to include in the summary
 
+# ---------------------------------------------------------------------------
+# Resourcing thresholds
+# These determine the KPI status shown on the dashboard.
+# Expressed as fractions of available capacity.
+# ---------------------------------------------------------------------------
+KPI_OVER_THRESHOLD  = 1.025   # above this = over-allocated (red)
+KPI_UNDER_THRESHOLD = 0.975   # below this = under-resourced (blue)
+# between the two = fully allocated (green)
+# unavailable = no capacity at all
+
+def _period_fte(start_date, end_date, period_start, period_end, availability):
+    """
+    Calculate FTE for a person in a given period, accounting for
+    partial months due to joining or leaving.
+    availability: fraction e.g. 0.8
+    Returns a float between 0 and availability.
+    """
+    from datetime import date as _date
+
+    def _parse(d):
+        if isinstance(d, _date): return d
+        if not d: return None
+        return _date.fromisoformat(d)
+
+    ps = _parse(period_start)
+    pe = _parse(period_end)
+    ss = _parse(start_date)
+    se = _parse(end_date)
+
+    # Clamp person's active range to the period
+    effective_start = max(ps, ss) if ss else ps
+    effective_end   = min(pe, se) if se else pe
+
+    if effective_start > effective_end:
+        return 0.0
+
+    period_days    = (pe - ps).days + 1
+    present_days   = (effective_end - effective_start).days + 1
+    proportion     = present_days / period_days
+
+    return round(availability * proportion, 3)
 
 def _get_active_periods(conn, from_date=None):
     """
@@ -37,7 +78,23 @@ def _get_active_periods(conn, from_date=None):
 
     return [dict(r) for r in rows]
 
-
+def _period_fte(start_date, end_date, period_start, period_end, availability):
+    from datetime import date as _date
+    def _parse(d):
+        if isinstance(d, _date): return d
+        if not d: return None
+        return _date.fromisoformat(d)
+    ps = _parse(period_start)
+    pe = _parse(period_end)
+    ss = _parse(start_date)
+    se = _parse(end_date)
+    effective_start = max(ps, ss) if ss else ps
+    effective_end   = min(pe, se) if se else pe
+    if effective_start > effective_end:
+        return 0.0
+    period_days  = (pe - ps).days + 1
+    present_days = (effective_end - effective_start).days + 1
+    return round(availability * (present_days / period_days), 3)
 
 def build(department: str = None) -> dict:
     """
@@ -115,6 +172,7 @@ def build(department: str = None) -> dict:
         allocated    = {}
         horizon_days = {}
         no_rec_days  = {}
+        fte          = {}
         kpi          = {}
 
         for p in periods:
@@ -122,8 +180,11 @@ def build(department: str = None) -> dict:
             label = p["label"]
             wdays = p["working_days"]
 
-            frac = avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
-            cap  = round(wdays * frac, 2)
+            if pid.startswith("GENERIC-"):
+                cap = None
+            else:
+                frac = avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
+                cap  = round(wdays * frac, 2)
 
             alloc   = round(person_alloc.get(pid, {}).get(ps, 0), 2)
             h_days  = round(person_horizon.get(pid, {}).get(ps, 0), 2)
@@ -134,16 +195,40 @@ def build(department: str = None) -> dict:
             horizon_days[label] = h_days
             no_rec_days[label]  = nr_days
 
-            # KPI: compare allocated vs capacity
-            if cap == 0:
-                kpi[label] = "unavailable"
-            elif alloc > cap * 1.05:      # >105% = over
-                kpi[label] = "over"
-            elif alloc >= cap * 0.85:     # 85-105% = check
-                kpi[label] = "check"
-            else:
-                kpi[label] = "ok"
+            fte[label] = 0.0 if pid.startswith("GENERIC-") else _period_fte(
+                s["start_date"], s["end_date"],
+                ps, p["period_end"],
+                avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
+            )
 
+            fte_val = 0.0 if pid.startswith("GENERIC-") else _period_fte(
+                s["start_date"], s["end_date"],
+                ps, p["period_end"],
+                avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
+            )
+            capacity[label]     = cap
+            allocated[label]    = alloc
+            horizon_days[label] = h_days
+
+            fte_val = 0.0 if pid.startswith("GENERIC-") else _period_fte(
+                s["start_date"], s["end_date"],
+                ps, p["period_end"],
+                avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
+            )
+
+            no_rec_days[label]  = nr_days
+
+            # KPI: compare allocated vs capacity
+            if pid.startswith("GENERIC-"):
+                kpi[label] = "none"
+            elif cap == 0:
+                kpi[label] = "unavailable"
+            elif alloc > cap * KPI_OVER_THRESHOLD:
+                kpi[label] = "over"
+            elif alloc >= cap * KPI_UNDER_THRESHOLD:
+                kpi[label] = "ok"
+            else:
+                kpi[label] = "under"
         # Projects this person is on
         proj_entries = []
         for project_id, period_days in person_proj_days.get(pid, {}).items():
@@ -167,7 +252,8 @@ def build(department: str = None) -> dict:
             "allocated":    allocated,
             "horizon_days": horizon_days,
             "no_record_days": no_rec_days,
-            "kpi":          kpi,
+            "fte":            fte,
+            "kpi":            kpi,
             "projects":     proj_entries
         })
 

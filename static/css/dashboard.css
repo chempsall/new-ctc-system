@@ -300,8 +300,8 @@ a:hover { text-decoration: underline; }
    -------------------------------------------------------------------------- */
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
   margin-bottom: 20px;
 }
 
@@ -313,7 +313,7 @@ a:hover { text-decoration: underline; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 14px 16px;
+  padding: 10px 8px;
   box-shadow: var(--shadow-sm);
 }
 
@@ -452,10 +452,9 @@ a:hover { text-decoration: underline; }
   transition: width 0.3s ease;
 }
 
-.alloc-bar__fill--ok    { background: var(--green); }
-.alloc-bar__fill--check { background: var(--amber); }
+.alloc-bar__fill--ok    { background: var(--grey-200); }
+.alloc-bar__fill--under { background: var(--green); }
 .alloc-bar__fill--over  { background: var(--status-red); }
-.alloc-bar__fill--none  { background: var(--grey-200); }
 
 .alloc-days {
   font-family: var(--font-mono);
@@ -476,8 +475,8 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0.05em;
   white-space: nowrap;
 }
-.kpi--ok    { background: var(--green-light);  color: var(--green-dark); }
-.kpi--check { background: var(--amber-light);  color: var(--amber-dark); }
+.kpi--ok    { background: var(--grey-100);  color: var(--grey-600); }
+.kpi--under { background: var(--green-light);  color: var(--green-dark); }
 .kpi--over  { background: var(--status-red-light); color: var(--status-red-dark); }
 .kpi--none  { background: var(--grey-100);    color: var(--grey-400);   }
 
@@ -967,7 +966,7 @@ a:hover { text-decoration: underline; }
 }
 .month-picker__arrow:hover { background: var(--grey-100); color: var(--text-primary); }
 .month-picker__grid {
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(6, 1fr);
   gap: 2px; padding: 6px;
 }
 .month-picker__btn {

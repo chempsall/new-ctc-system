@@ -28,7 +28,7 @@
     </div>
 
     <div class="topnav__tabs">
-      <button class="topnav__tab active" data-view="rtcs">
+      <button class="topnav__tab" data-view="rtcs">
         RTCs
       </button>
       <button class="topnav__tab" data-view="staff">
@@ -73,13 +73,23 @@
         <div class="metric-card__sub">in current filter</div>
       </div>
       <div class="metric-card">
+        <div class="metric-card__label">FTE</div>
+        <div class="metric-card__value" id="metric-fte">—</div>
+        <div class="metric-card__sub">full time equivalent</div>
+      </div>
+      <div class="metric-card">
         <div class="metric-card__label">Projects</div>
         <div class="metric-card__value" id="metric-projects">—</div>
         <div class="metric-card__sub">in current filter</div>
       </div>
       <div class="metric-card" id="metric-over-card">
-        <div class="metric-card__label">Over-allocated</div>
+        <div class="metric-card__label">Over-resourced</div>
         <div class="metric-card__value" id="metric-over">—</div>
+        <div class="metric-card__sub">people this period</div>
+      </div>
+      <div class="metric-card" id="metric-under-card">
+        <div class="metric-card__label">Under-resourced</div>
+        <div class="metric-card__value" id="metric-under">—</div>
         <div class="metric-card__sub">people this period</div>
       </div>
       <div class="metric-card" id="metric-norec-card">

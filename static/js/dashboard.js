@@ -13,7 +13,9 @@
 const state = {
   summary:        null,    // Full summary payload from /api/summary
   activePeriod:   null,    // Currently selected month label e.g. "Apr-2026"
-  activeView:     "rtcs", // "rtcs" | "staff" | "projects"
+  activeView: (["rtcs","staff","projects"].includes(window.location.hash.replace("#","")))
+              ? window.location.hash.replace("#","")
+              : "rtcs",
   filters: {
     job_function: "all",
     job_title:    "all",
@@ -98,7 +100,6 @@ function init() {
   buildMonthTabs();
   buildFilterOptions();
   renderMetrics();
-  renderView();
   wireEvents();
   updateStatusBar();
   switchView(state.activeView);
@@ -181,21 +182,28 @@ function renderMetrics() {
   const staff    = filteredStaff();
   const projects = filteredProjects();
 
-  const overCount = staff.filter(ps => ps.kpi[p] === "over").length;
+  const overCount  = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && ps.kpi[p] === "over").length;
+  const underCount = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && ps.kpi[p] === "under").length;
   const noRecDays = staff.reduce((sum, ps) =>
     sum + (ps.no_record_days[p] || 0), 0);
   const conflicts = s.conflicts ? s.conflicts.length : 0;
   const noRecProj = projects.filter(pr => pr.horizon_status !== "linked").length;
 
-  document.getElementById("metric-staff").textContent  = staff.length;
+const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-"));
+  const fte = realStaff.reduce((sum, ps) => sum + (ps.fte?.[p] || 0), 0);
+  document.getElementById("metric-staff").textContent    = realStaff.length;
+  document.getElementById("metric-fte").textContent      = fte.toFixed(1);
   document.getElementById("metric-projects").textContent = projects.length;
-  document.getElementById("metric-over").textContent   = overCount;
-  document.getElementById("metric-norec").textContent  = noRecProj;
+  document.getElementById("metric-over").textContent     = overCount;
+  document.getElementById("metric-norec").textContent    = noRecProj;
 
   document.getElementById("metric-over-card").className =
     "metric-card" + (overCount > 0 ? " metric-card--alert" : "");
   document.getElementById("metric-norec-card").className =
     "metric-card" + (noRecProj > 0 ? " metric-card--warn" : "");
+  document.getElementById("metric-under").textContent = underCount;
+  document.getElementById("metric-under-card").className =
+    "metric-card" + (underCount > 0 ? " metric-card--info" : "");
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +256,7 @@ function filteredStaff() {
       return gradeSort(a.job_title || "") - gradeSort(b.job_title || "");
     }
     // Real staff — over first, then check, then ok
-    const order = { over: 0, check: 1, ok: 2, unavailable: 3 };
+    const order = { over: 0, ok: 1, under: 2, unavailable: 3 };
     const ka = order[a.kpi[p]] ?? 9;
     const kb = order[b.kpi[p]] ?? 9;
     if (ka !== kb) return ka - kb;
@@ -785,6 +793,7 @@ function selectPeriod(label) {
 // ---------------------------------------------------------------------------
 function switchView(view) {
   state.activeView = view;
+  window.location.hash = view;
   state.selectedStaff   = null;
   state.selectedProject = null;
   state.selectedRtc     = null;
@@ -823,9 +832,8 @@ function switchView(view) {
   if (view === "rtcs") {
     loadRtcs();
   } else {
-    // Reload the summary cache for staff/projects views
     loadSummary().then(() => renderView());
-    return; // renderView() called inside loadSummary chain above
+    return;
   }
 
   renderView();
