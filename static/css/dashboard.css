@@ -419,8 +419,8 @@ a:hover { text-decoration: underline; }
 .staff-table th:nth-child(1) { width: 35% } /* Name */
 .staff-table th:nth-child(2) { width: 18% } /* Job Function */
 .staff-table th:nth-child(3) { width: 22% } /* Allocated */
-.staff-table th:nth-child(4) { width: 17% } /* Capacity */
-.staff-table th:nth-child(5) { width: 8% } /* Status */
+.staff-table th:nth-child(4) { width: 17%; text-align: center; } /* Capacity */
+.staff-table th:nth-child(5) { width: 8%; text-align: center; } /* Status */
 
 .staff-table th {
   padding: 8px 12px;
@@ -441,7 +441,7 @@ a:hover { text-decoration: underline; }
   padding: 9px 12px;
   font-size: 12px;
   border-bottom: 1px solid var(--border);
-  vertical-align: middle;
+  vertical-align: top;
   overflow: hidden;
 }
 
@@ -516,10 +516,10 @@ a:hover { text-decoration: underline; }
 .project-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .project-table th:nth-child(1) { width: 12% } /* Number */
 .project-table th:nth-child(2) { width: 34% } /* Project / Task */
-.project-table th:nth-child(3) { width: 20% } /* Cost Centre */
+.project-table th:nth-child(3) { width: 20% } /* Department */
 .project-table th:nth-child(4) { width: 14% } /* Horizon */
 .project-table th:nth-child(5) { width: 12% } /* PM */
-.project-table th:nth-child(6) { width: 8%  } /* Days */
+.project-table th:nth-child(6) { width: 8%; text-align: center; } /* Days */
 
 .project-table th {
   padding: 8px 12px;
@@ -535,7 +535,7 @@ a:hover { text-decoration: underline; }
   padding: 9px 12px;
   font-size: 12px;
   border-bottom: 1px solid var(--border);
-  vertical-align: middle;
+  vertical-align: top;
   overflow: hidden;
 }
 
@@ -798,12 +798,12 @@ a:hover { text-decoration: underline; }
    -------------------------------------------------------------------------- */
 .rtc-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .rtc-table th:nth-child(1) { width: 24% } /* Customer / Project / Task */
-.rtc-table th:nth-child(2) { width: 16% } /* Cost Centre */
+.rtc-table th:nth-child(2) { width: 20% } /* Department */
 .rtc-table th:nth-child(3) { width: 14% } /* PD */
 .rtc-table th:nth-child(4) { width: 14% } /* PM */
-.rtc-table th:nth-child(5) { width: 10% } /* Status */
+.rtc-table th:nth-child(5) { width: 8% } /* Status */
 .rtc-table th:nth-child(6) { width: 8%  } /* This month */
-.rtc-table th:nth-child(7) { width: 14% } /* Last updated */
+.rtc-table th:nth-child(7) { width: 12% } /* Last updated */
 
 .rtc-table th {
   padding: 9px 12px;

@@ -397,13 +397,11 @@ function renderProjectTable() {
     const days       = proj.total_days[p] || 0;
     const linked     = proj.horizon_status === "linked";
     const isSelected = String(proj.project_id) === String(state.selectedProject);
-    const conflict   = proj.conflict_flag
-      ? `<span title="Filename conflict" style="color:var(--amber-dark);margin-left:4px">⚠</span>`
-      : "";
 
     return `<tr data-id="${proj.project_id}" class="${isSelected ? "selected" : ""}">
       <td>
         <div class="proj-number">${escHtml(proj.number || "—")}</div>
+        <div class="proj-number">${escHtml(proj.task_order || "")}</div>
       </td>
       <td>
         <div class="proj-name">${escHtml(proj.name)}${conflict}</div>
@@ -419,7 +417,7 @@ function renderProjectTable() {
       <td style="font-size:11px;color:var(--text-secondary)">
         ${escHtml(proj.pm || "—")}
       </td>
-      <td class="right">
+      <td style="text-align:center">
         <span class="mono" style="font-size:11px">
           ${fmt.days(days)}d
         </span>
