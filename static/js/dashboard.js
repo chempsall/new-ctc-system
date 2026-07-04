@@ -33,6 +33,11 @@ const state = {
     pd:       "",
     status:   "",
   },
+  sort: {
+    staff:    { col: null, dir: "asc" },
+    projects: { col: null, dir: "asc" },
+    rtcs:     { col: null, dir: "asc" },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -226,10 +231,46 @@ function renderConflictBanner() {
 // ---------------------------------------------------------------------------
 // Filtered data
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Sort helpers
+// ---------------------------------------------------------------------------
+function applySort(arr, view, getters) {
+  const { col, dir } = state.sort[view];
+  if (!col || !getters[col]) return arr;
+  const mult = dir === "asc" ? 1 : -1;
+  return [...arr].sort((a, b) => {
+    const va = getters[col](a);
+    const vb = getters[col](b);
+    if (va === null || va === undefined) return 1;
+    if (vb === null || vb === undefined) return -1;
+    if (typeof va === "number" && typeof vb === "number") return (va - vb) * mult;
+    return String(va).localeCompare(String(vb)) * mult;
+  });
+}
+
+function toggleSort(view, col) {
+  const s = state.sort[view];
+  if (s.col === col) {
+    s.dir = s.dir === "asc" ? "desc" : "asc";
+  } else {
+    s.col = col;
+    s.dir = "asc";
+  }
+  renderView();
+  if (view === "rtcs") renderRtcTable();
+}
+
+function sortIndicator(view, col) {
+  const s = state.sort[view];
+  if (s.col !== col) return '<span class="sort-icon">⇅</span>';
+  return `<span class="sort-icon sort-icon--active">${s.dir === "asc" ? "▲" : "▼"}</span>`;
+}
+
 function filteredStaff() {
+
   const f = state.filters;
   const p = state.activePeriod;
-  return state.summary.staff.filter(person => {
+  const baseStaff = state.summary.staff.filter(person => {
     if (f.department !== "all" && person.department !== f.department) return false;
     if (f.job_title !== "all" && person.job_title !== f.job_title) return false;
     if (f.job_function !== "all" && person.job_function !== f.job_function) return false;
@@ -271,12 +312,20 @@ function filteredStaff() {
     if (ka !== kb) return ka - kb;
     return a.name.localeCompare(b.name);
   });
+  // Apply user sort on top of default sort
+  return applySort(baseStaff, "staff", {
+    name:      s => s.name,
+    function:  s => s.job_function,
+    allocated: s => s.allocated[p] || 0,
+    capacity:  s => s.capacity[p] || 0,
+    status:    s => s.kpi[p],
+  });
 }
 
 function filteredProjects() {
   const f = state.filters;
   const p = state.activePeriod;
-  return state.summary.projects.filter(proj => {
+  const base = state.summary.projects.filter(proj => {
     if (f.department !== "all" && proj.department !== f.department) return false;
     if (f.horizon !== "all") {
       if (f.horizon === "linked"   && proj.horizon_status !== "linked")   return false;
@@ -299,6 +348,12 @@ function filteredProjects() {
     const da = a.total_days[p] || 0;
     const db = b.total_days[p] || 0;
     return db - da;
+  });
+  return applySort(base, "projects", {
+    department: proj => proj.department,
+    horizon:    proj => proj.horizon_status,
+    pm:         proj => proj.pm,
+    days:       proj => proj.total_days[p] || 0,
   });
 }
 
@@ -380,6 +435,7 @@ function renderStaffTable() {
   tbody.querySelectorAll("tr[data-id]").forEach(row => {
     row.addEventListener("click", () => selectStaff(row.dataset.id));
   });
+  updateSortIndicators("staff", ["name","function","allocated","capacity","status"]);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,6 +488,7 @@ function renderProjectTable() {
   tbody.querySelectorAll("tr[data-id]").forEach(row => {
     row.addEventListener("click", () => selectProject(parseInt(row.dataset.id)));
   });
+  updateSortIndicators("projects", ["department","horizon","pm","days"]);
 }
 
 // ---------------------------------------------------------------------------
@@ -464,8 +521,18 @@ async function loadRtcs() {
 
 function filteredRtcs() {
   const statusFilter = state.rtcFilters.status;
-  if (!statusFilter) return state.rtcs;
-  return state.rtcs.filter(r => r.status === statusFilter);
+  const p = state.activePeriod;
+  const base = statusFilter
+    ? state.rtcs.filter(r => r.status === statusFilter)
+    : state.rtcs;
+  return applySort(base, "rtcs", {
+    department:   r => r.department,
+    pd:           r => r.project_director,
+    pm:           r => r.project_manager,
+    status:       r => r.status,
+    days:         r => r.future_days || 0,
+    last_updated: r => r.last_updated_at,
+  });
 }
 
 function renderRtcTable() {
@@ -530,6 +597,7 @@ function renderRtcTable() {
   tbody.querySelectorAll("tr[data-id]").forEach(row => {
     row.addEventListener("click", () => selectRtc(parseInt(row.dataset.id)));
   });
+  updateSortIndicators("rtcs", ["department","pd","pm","status","days","last_updated"]);
 }
 
 function selectRtc(id) {
@@ -1308,6 +1376,21 @@ async function submitRtcModal() {
     submitBtn.disabled = false;
     submitBtn.textContent = _rtcModalMode === "duplicate" ? "Duplicate RTC" : "Create RTC";
   }
+}
+
+function updateSortIndicators(view, cols) {
+  const { col, dir } = state.sort[view];
+  cols.forEach(c => {
+    const el = document.getElementById(`sort-${view}-${c}`);
+    if (!el) return;
+    if (c === col) {
+      el.textContent = dir === "asc" ? " ▲" : " ▼";
+      el.style.color = "var(--wsp-red)";
+    } else {
+      el.textContent = "";
+      el.style.color = "";
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

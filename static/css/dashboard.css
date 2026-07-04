@@ -1025,3 +1025,18 @@ a:hover { text-decoration: underline; }
 .form-checkbox-label input[type="checkbox"] {
   accent-color: var(--wsp-red); cursor: pointer;
 }
+
+/* --------------------------------------------------------------------------
+   Sortable column headers
+   -------------------------------------------------------------------------- */
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+th.sortable:hover {
+  color: var(--text-primary);
+  background: var(--grey-100);
+}
+.sort-icon { font-size: 9px; color: var(--text-tertiary); }
+.sort-icon--active { color: var(--wsp-red); }
