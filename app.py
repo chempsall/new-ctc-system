@@ -121,6 +121,13 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/rtc/<int:rtc_id>")
+def rtc_editor(rtc_id):
+    """Serves the RTC editing screen."""
+    return render_template("rtc.html", rtc_id=rtc_id)
+
+
+
 @app.route("/api/summary")
 def api_summary():
     """Pre-built summary JSON — the only endpoint the dashboard calls on load."""
@@ -807,6 +814,68 @@ def api_remove_rtc_staff(rtc_id, person_id):
     conn.commit()
     conn.close()
     return jsonify({"status": "ok", "rows_deleted": deleted})
+
+
+@app.route("/api/rtcs/<int:rtc_id>/staff/<person_id>/replace", methods=["POST"])
+def api_replace_rtc_staff(rtc_id, person_id):
+    """
+    Replaces a staff member (typically a generic placeholder) with a real person.
+    Copies the allocation values from the old person to the new one,
+    then deletes the old person's rows.
+    Body: { "new_horizon_person_number": "..." }
+    """
+    data = request.get_json(silent=True, force=True)
+    if not data or "new_horizon_person_number" not in data:
+        return jsonify({"error": "new_horizon_person_number required"}), 400
+
+    new_pid = str(data["new_horizon_person_number"]).strip()
+    user    = get_current_user()
+    now     = datetime.now(timezone.utc).isoformat()
+    conn    = database.get_connection()
+    c       = conn.cursor()
+
+    # Confirm new person exists in staff
+    if not c.execute(
+        "SELECT 1 FROM staff WHERE horizon_person_number = ?", (new_pid,)
+    ).fetchone():
+        conn.close()
+        return jsonify({"error": f"Staff member {new_pid} not found"}), 404
+
+    # Get the existing allocations for the old person on this RTC
+    old_allocs = c.execute("""
+        SELECT period_start, days FROM allocations
+        WHERE rtc_id = ? AND horizon_person_number = ?
+    """, (rtc_id, person_id)).fetchall()
+
+    if not old_allocs:
+        conn.close()
+        return jsonify({"error": "Person not found on this RTC"}), 404
+
+    # Copy allocations to new person
+    for row in old_allocs:
+        c.execute("""
+            INSERT INTO allocations
+                (horizon_person_number, rtc_id, period_start, days, last_updated)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(horizon_person_number, rtc_id, period_start)
+            DO UPDATE SET days = excluded.days, last_updated = excluded.last_updated
+        """, (new_pid, rtc_id, row["period_start"], row["days"], now))
+
+    # Delete old person's rows
+    c.execute(
+        "DELETE FROM allocations WHERE rtc_id = ? AND horizon_person_number = ?",
+        (rtc_id, person_id)
+    )
+
+    c.execute("""
+        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
+        WHERE rtc_id = ?
+    """, (user, now, rtc_id))
+
+    conn.commit()
+    conn.close()
+    summary_module.mark_dirty()
+    return jsonify({"status": "ok", "replaced": person_id, "with": new_pid})
 
 
 @app.route("/api/rtcs/<int:rtc_id>/check-horizon")

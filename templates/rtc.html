@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RTC Editor — Resource Forecast</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <style>
+    /* ── Page layout ───────────────────────────────────────────────── */
+    body { font-family: var(--font-body); background: var(--bg); margin: 0; }
+
+    .rtc-topbar {
+      height: var(--nav-h);
+      background: var(--black);
+      border-bottom: 2px solid var(--wsp-red);
+      display: flex; align-items: center;
+      padding: 0 20px; gap: 14px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .rtc-topbar img   { height: 22px; }
+    .rtc-topbar .divider { width:1px; height:20px; background:var(--grey-700); }
+    .rtc-topbar .title { font-size:13px; font-weight:500; color:var(--grey-200); }
+    .rtc-topbar a.back {
+      font-size:11px; color:var(--grey-400);
+      text-decoration:none; padding:4px 10px;
+      border:1px solid var(--grey-700); border-radius:var(--radius-sm);
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .rtc-topbar a.back:hover { background:var(--wsp-red); border-color:var(--wsp-red); color:#fff; }
+    .rtc-topbar .save-status {
+      margin-left: auto;
+      font-size: 11px; color: var(--grey-400);
+    }
+    .rtc-topbar .save-status.saving { color: var(--amber-dark); }
+    .rtc-topbar .save-status.saved  { color: var(--green-dark); }
+    .rtc-topbar .save-status.error  { color: var(--status-red); }
+
+    .rtc-main { max-width: 1600px; margin: 0 auto; padding: 20px 24px 40px; }
+
+    /* ── Header card ───────────────────────────────────────────────── */
+    .rtc-header-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: 16px 20px;
+      margin-bottom: 16px;
+    }
+    .rtc-header-top {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 12px;
+    }
+    .rtc-header-title {
+      font-size: 16px; font-weight: 600;
+      color: var(--text-primary);
+      flex: 1;
+    }
+    .rtc-badge {
+      font-size: 11px; font-weight: 500;
+      padding: 3px 10px;
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
+    }
+    .rtc-badge--linked {
+      background: var(--green-light); color: var(--green-dark);
+      border: 1px solid var(--green);
+    }
+    .rtc-badge--placeholder {
+      background: var(--amber-light); color: var(--amber-dark);
+      border: 1px solid var(--amber);
+    }
+    .rtc-header-fields {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px 20px;
+    }
+    .rtc-field { display: flex; flex-direction: column; gap: 2px; }
+    .rtc-field__label {
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text-tertiary);
+    }
+    .rtc-field__value {
+      font-size: 12px; color: var(--text-primary);
+    }
+    .rtc-field__input {
+      font-family: var(--font-body); font-size: 12px;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text-primary);
+      width: 100%; box-sizing: border-box;
+      transition: border-color 0.15s;
+    }
+    .rtc-field__input:focus {
+      outline: none;
+      border-color: var(--wsp-red);
+      box-shadow: 0 0 0 2px var(--wsp-red-light);
+    }
+
+    /* Horizon lookup result in header */
+    .rtc-horizon-msg {
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px; line-height: 1.5;
+    }
+    .rtc-horizon-msg--found {
+      background: var(--blue-light); color: var(--blue-dark);
+      border: 1px solid var(--blue);
+    }
+    .rtc-horizon-msg--notfound {
+      background: var(--amber-light); color: var(--amber-dark);
+      border: 1px solid var(--amber);
+    }
+
+    /* ── Grid card ─────────────────────────────────────────────────── */
+    .rtc-grid-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .rtc-grid-toolbar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .rtc-staff-search-wrap { position: relative; }
+    .rtc-staff-search {
+      font-family: var(--font-body); font-size: 12px;
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text-primary);
+      width: 240px;
+      transition: border-color 0.15s;
+    }
+    .rtc-staff-search:focus {
+      outline: none;
+      border-color: var(--wsp-red);
+      box-shadow: 0 0 0 2px var(--wsp-red-light);
+    }
+    .rtc-staff-dropdown {
+      position: absolute; top: 100%; left: 0; z-index: 50;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      width: 320px;
+      max-height: 260px;
+      overflow-y: auto;
+      display: none;
+    }
+    .rtc-staff-dropdown.open { display: block; }
+    .rtc-staff-option {
+      padding: 7px 12px;
+      font-size: 12px; cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 1px;
+    }
+    .rtc-staff-option:last-child { border-bottom: none; }
+    .rtc-staff-option:hover { background: var(--surface-2); }
+    .rtc-staff-option__name { color: var(--text-primary); font-weight: 500; }
+    .rtc-staff-option__meta { color: var(--text-tertiary); font-size: 11px; }
+    .rtc-staff-option--generic .rtc-staff-option__name { font-style: italic; }
+    .rtc-staff-option--divider {
+      padding: 4px 12px;
+      font-size: 10px; color: var(--text-tertiary);
+      background: var(--grey-50);
+      cursor: default; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    /* ── The grid itself ───────────────────────────────────────────── */
+    .rtc-grid-wrap {
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+    .rtc-grid {
+      border-collapse: collapse;
+      table-layout: fixed;
+      width: max-content;
+      min-width: 100%;
+    }
+
+    /* Sticky frozen columns */
+    .rtc-grid th.frozen,
+    .rtc-grid td.frozen {
+      position: sticky;
+      background: var(--surface);
+      z-index: 2;
+    }
+    .rtc-grid th.frozen-1, .rtc-grid td.frozen-1 { left: 0;    width: 160px; min-width: 160px; }
+    .rtc-grid th.frozen-2, .rtc-grid td.frozen-2 { left: 160px; width: 120px; min-width: 120px; }
+    .rtc-grid th.frozen-3, .rtc-grid td.frozen-3 { left: 280px; width: 110px; min-width: 110px; }
+
+    /* Shadow on last frozen column */
+    .rtc-grid th.frozen-3,
+    .rtc-grid td.frozen-3 {
+      border-right: 2px solid var(--border);
+    }
+
+    /* Month column headers */
+    .rtc-grid th {
+      padding: 8px 4px;
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text-tertiary);
+      text-align: center;
+      background: var(--surface-2);
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+      user-select: none;
+    }
+    .rtc-grid th.frozen { text-align: left; padding-left: 12px; }
+    .rtc-grid th.month-current {
+      color: var(--wsp-red);
+      border-bottom-color: var(--wsp-red);
+    }
+
+    /* Month cells */
+    .rtc-grid td {
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      padding: 0;
+      height: 36px;
+      vertical-align: middle;
+    }
+    .rtc-grid td.frozen { padding: 0 8px 0 12px; }
+
+    /* Staff name cell content */
+    .rtc-staff-name { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+    .rtc-staff-name--generic { font-style: italic; color: var(--text-secondary); }
+    .rtc-staff-job  { font-size: 10px; color: var(--text-tertiary); }
+
+    /* Allocation cell */
+    .rtc-cell {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; width: 100%;
+      font-size: 12px; font-family: var(--font-mono);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .rtc-cell:hover { background: var(--surface-2); }
+    .rtc-cell--past {
+      background: var(--grey-50);
+      color: var(--text-tertiary);
+      cursor: not-allowed;
+    }
+    .rtc-cell--past:hover { background: var(--grey-50); }
+    .rtc-cell--editing {
+      padding: 0;
+      background: var(--surface);
+    }
+    .rtc-cell-input {
+      width: 100%; height: 100%;
+      border: 2px solid var(--wsp-red);
+      border-radius: 0;
+      text-align: center;
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--text-primary);
+      background: var(--surface);
+      padding: 0;
+      outline: none;
+    }
+    .rtc-cell--zero { color: var(--text-tertiary); }
+
+    /* Row actions */
+    .rtc-row-actions {
+      display: flex; align-items: center; gap: 4px;
+    }
+    .rtc-remove-btn {
+      font-size: 11px; line-height: 1;
+      color: var(--text-tertiary);
+      background: none; border: none;
+      cursor: pointer; padding: 2px 4px;
+      border-radius: var(--radius-sm);
+      transition: color 0.15s, background 0.15s;
+    }
+    .rtc-remove-btn:hover { color: var(--status-red); background: var(--status-red-light); }
+    .rtc-replace-btn {
+      font-size: 10px; font-weight: 500;
+      color: var(--text-tertiary);
+      background: none;
+      border: 1px solid var(--border);
+      cursor: pointer; padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .rtc-replace-btn:hover { border-color: var(--wsp-red); color: var(--wsp-red); }
+
+    .rtc-grid tr:hover td.frozen { background: var(--surface-2); }
+    .rtc-grid tr:last-child td { border-bottom: none; }
+
+    /* Empty state */
+    .rtc-empty {
+      padding: 40px; text-align: center;
+      font-size: 13px; color: var(--text-tertiary);
+    }
+
+    /* ── Popup modal ───────────────────────────────────────────────── */
+    .rtc-popup-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.4);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .rtc-popup {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      padding: 24px;
+      max-width: 420px; width: 100%;
+    }
+    .rtc-popup__title {
+      font-size: 14px; font-weight: 600;
+      color: var(--text-primary); margin-bottom: 8px;
+    }
+    .rtc-popup__body {
+      font-size: 12px; line-height: 1.6;
+      color: var(--text-secondary); margin-bottom: 16px;
+    }
+    .rtc-popup__footer { display: flex; gap: 8px; justify-content: flex-end; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div class="rtc-topbar">
+    <img src="/static/images/wsp-logo.png" alt="WSP">
+    <span class="divider"></span>
+    <span class="title">Resource Forecast — RTC Editor</span>
+    <a href="/" class="back">← Back to dashboard</a>
+    <span class="save-status" id="save-status"></span>
+  </div>
+
+  <div class="rtc-main">
+
+    <!-- Header card -->
+    <div class="rtc-header-card" id="rtc-header">
+      <div class="rtc-header-top">
+        <span class="rtc-header-title" id="header-title">Loading…</span>
+        <span class="rtc-badge hidden" id="horizon-badge"></span>
+      </div>
+      <div class="rtc-header-fields" id="header-fields"></div>
+      <div class="rtc-horizon-msg hidden" id="horizon-msg"></div>
+    </div>
+
+    <!-- Grid card -->
+    <div class="rtc-grid-card">
+      <div class="rtc-grid-toolbar">
+        <div class="rtc-staff-search-wrap">
+          <input type="text" class="rtc-staff-search" id="staff-search"
+                 placeholder="Add person — type to search…" autocomplete="off">
+          <div class="rtc-staff-dropdown" id="staff-dropdown"></div>
+        </div>
+      </div>
+      <div class="rtc-grid-wrap">
+        <table class="rtc-grid" id="rtc-grid">
+          <thead id="grid-head"></thead>
+          <tbody id="grid-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Horizon popup -->
+  <div class="rtc-popup-overlay hidden" id="horizon-popup">
+    <div class="rtc-popup">
+      <div class="rtc-popup__title" id="horizon-popup-title"></div>
+      <div class="rtc-popup__body"  id="horizon-popup-body"></div>
+      <div class="rtc-popup__footer">
+        <button class="btn btn--secondary" id="horizon-popup-cancel" style="display:none">Cancel</button>
+        <button class="btn" id="horizon-popup-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Replace staff popup -->
+  <div class="rtc-popup-overlay hidden" id="replace-popup">
+    <div class="rtc-popup">
+      <div class="rtc-popup__title">Replace placeholder</div>
+      <div class="rtc-popup__body">Search for the person to replace this placeholder with:</div>
+      <div class="rtc-staff-search-wrap" style="margin-bottom:16px">
+        <input type="text" class="rtc-staff-search" id="replace-search"
+               placeholder="Type to search…" autocomplete="off" style="width:100%;box-sizing:border-box">
+        <div class="rtc-staff-dropdown" id="replace-dropdown" style="width:100%"></div>
+      </div>
+      <div class="rtc-popup__footer">
+        <button class="btn btn--secondary" id="replace-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const RTC_ID = {{ rtc_id }};
+  </script>
+  <script src="/static/js/rtc.js"></script>
+</body>
+</html>

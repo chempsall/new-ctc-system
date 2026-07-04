@@ -2,3 +2,35 @@ CTCs should be editable (and copyable) from the Projects slider - the same way a
 
 Projects page needs an additional filter for Project Manager
 
+Is the PAR file updated every night?
+
+Can we have a HR extract for staff_list and what would it look like?
+
+
+
+
+_GENERIC has found its way back into the departments filter.
+
+RTCs includes "This Month" Column whereas Projects includes "Days" column. These should be swapped and the "Days" column should be a total of all days currently entered.
+
+"Projects" should include a filter for PM
+
+What does the filter on the RTCs page do? What is it filtering? (It won't find the PD or PM for instance)
+
+What does the filter on the People page do? What is it filtering? (It won't find a project name for instance)
+
+It should be possible to sort RTCs ascending or descending on each column
+
+It should be possible to sort People ascending or descending on each column
+
+It should be possible to sort Projects Ascending or descending by each column
+
+
+
+The "x" to remove a person would be better on the far left of a CTC instead of the far right.
+
+Scrolling downwards on a project with a lot of people results in the column headers disappearing. They should be frozen.
+
+
+
+
