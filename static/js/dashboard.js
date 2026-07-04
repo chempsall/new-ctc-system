@@ -122,7 +122,7 @@ function buildFilterOptions() {
   const s = state.summary;
 
   // Teams — from unique values in staff
-  const depts = [...new Set(s.staff.map(p => p.department).filter(Boolean))].sort();
+  const depts = (s.departments || []).map(d => d.department);
   populateSelect("filter-department", depts, "All departments");
 
   // Job Titles — from unique values in staff
@@ -500,8 +500,8 @@ function renderRtcTable() {
     const dept     = escHtml(r.department || "—");
     const pd       = escHtml(r.project_director || "—");
     const pm       = escHtml(r.project_manager || "—");
-    const days     = r.current_month_days
-                     ? fmt.days(r.current_month_days) + "d"
+    const days     = r.future_days
+                     ? fmt.days(r.future_days) + "d"
                      : "—";
 
     return `<tr data-id="${r.rtc_id}" class="${isSelected ? "selected" : ""}">
