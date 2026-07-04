@@ -21,6 +21,7 @@ const state = {
     job_title:    "all",
     department:   "all",
     horizon:      "all",   // "all" | "linked" | "norecord"
+    project_pm:   "all",
     search:       "",
   },
   selectedStaff:    null,  // horizon_person_number of selected row
@@ -153,6 +154,8 @@ function buildFilterOptions() {
   const pms = [...new Set((s.projects||[]).map(p => p.pm).filter(Boolean))].sort();
   populateSelect("filter-rtc-pm", pms, "All project managers");
 
+  populateSelect("filter-project-pm", pms, "All project managers");
+
   const pds = [...new Set((s.projects||[]).map(p => p.director).filter(Boolean))].sort();
   populateSelect("filter-rtc-pd", pds, "All project directors");
 }
@@ -279,6 +282,7 @@ function filteredProjects() {
       if (f.horizon === "linked"   && proj.horizon_status !== "linked")   return false;
       if (f.horizon === "norecord" && proj.horizon_status === "linked")   return false;
     }
+    if (f.project_pm !== "all" && proj.pm !== f.project_pm) return false;
     if (f.search) {
       const q = f.search.toLowerCase();
       if (!proj.name.toLowerCase().includes(q) &&
@@ -894,6 +898,7 @@ function resetFilters() {
   state.filters.job_title    = "all";
   state.filters.department   = "all";
   state.filters.horizon      = "all";
+  state.filters.project_pm   = "all";
   state.filters.search       = "";
   state.rtcFilters.pm        = "";
   state.rtcFilters.pd        = "";
@@ -912,6 +917,10 @@ function resetFilters() {
   if (titleSel)   titleSel.value   = "all";
   if (funcSel)    funcSel.value    = "all";
   if (horizonSel) horizonSel.value = "all";
+  
+  const projectPmSel = document.getElementById("filter-project-pm");
+  if (projectPmSel) projectPmSel.value = "all";
+
   if (searchEl)   searchEl.value   = "";
   if (pmSel)      pmSel.value      = "all";
   if (pdSel)      pdSel.value      = "all";
@@ -1329,6 +1338,11 @@ function wireEvents() {
       renderView();
     });
   }
+
+document.getElementById("filter-project-pm")?.addEventListener("change", e => {
+    state.filters.project_pm = e.target.value;
+    renderView();
+  });
 
   const searchEl = document.getElementById("filter-search");
   if (searchEl) {
