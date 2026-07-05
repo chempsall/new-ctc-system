@@ -195,13 +195,14 @@
       background: var(--surface);
       z-index: 2;
     }
-    .rtc-grid th.frozen-1, .rtc-grid td.frozen-1 { left: 0;    width: 160px; min-width: 160px; }
-    .rtc-grid th.frozen-2, .rtc-grid td.frozen-2 { left: 160px; width: 120px; min-width: 120px; }
-    .rtc-grid th.frozen-3, .rtc-grid td.frozen-3 { left: 280px; width: 110px; min-width: 110px; }
+    .rtc-grid th.frozen-1, .rtc-grid td.frozen-1 { left: 0px;   width: 50px;  min-width: 50px;  }
+    .rtc-grid th.frozen-2, .rtc-grid td.frozen-2 { left: 50px;  width: 160px; min-width: 160px; }
+    .rtc-grid th.frozen-3, .rtc-grid td.frozen-3 { left: 210px; width: 120px; min-width: 120px; }
+    .rtc-grid th.frozen-4, .rtc-grid td.frozen-4 { left: 330px; width: 110px; min-width: 110px; }
 
     /* Shadow on last frozen column */
-    .rtc-grid th.frozen-3,
-    .rtc-grid td.frozen-3 {
+    .rtc-grid th.frozen-4,
+    .rtc-grid td.frozen-4 {
       border-right: 2px solid var(--border);
     }
 
@@ -231,6 +232,7 @@
       height: 36px;
       vertical-align: middle;
     }
+    .rtc-grid { border-right: 1px solid var(--border); }
     .rtc-grid td.frozen { padding: 0 8px 0 12px; }
 
     /* Staff name cell content */
@@ -273,7 +275,7 @@
 
     /* Row actions */
     .rtc-row-actions {
-      display: flex; align-items: center; gap: 4px;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
     }
     .rtc-remove-btn {
       font-size: 11px; line-height: 1;

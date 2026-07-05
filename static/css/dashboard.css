@@ -943,7 +943,7 @@ a:hover { text-decoration: underline; }
 }
 
 /* Form elements */
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; align-items: start; }
 .form-group { display: flex; flex-direction: column; gap: 5px; }
 .form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
 .form-required { color: var(--wsp-red); }

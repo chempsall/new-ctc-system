@@ -326,16 +326,16 @@ function renderGrid() {
 function renderGridHead() {
   const head = document.getElementById('grid-head');
   const cells = [
-    '<th class="frozen frozen-1">Name</th>',
-    '<th class="frozen frozen-2">Job Title</th>',
-    '<th class="frozen frozen-3">Job Function</th>',
+    '<th class="frozen frozen-1" style="width:50px;text-align:center">Action</th>',
+    '<th class="frozen frozen-2">Name</th>',
+    '<th class="frozen frozen-3">Job Title</th>',
+    '<th class="frozen frozen-4">Job Function</th>',
     ...state.periods.map(p => {
       const isCurrent = p.period_start === TODAY_MONTH;
       return `<th class="month-col${isCurrent ? ' month-current' : ''}" data-period="${p.period_start}">
         ${esc(p.label)}
       </th>`;
     }),
-    '<th style="width:60px"></th>', // Actions column
   ];
   head.innerHTML = `<tr>${cells.join('')}</tr>`;
 }
@@ -360,9 +360,10 @@ function renderGridBody() {
       : `<button class="rtc-remove-btn" onclick="removeStaff('${esc(person.horizon_person_number)}')">✕</button>`;
 
     const cells = [
-      `<td class="frozen frozen-1"><span class="${nameCls}">${esc(person.name)}</span></td>`,
-      `<td class="frozen frozen-2"><span class="rtc-staff-job">${esc(person.job_title || '—')}</span></td>`,
-      `<td class="frozen frozen-3"><span class="rtc-staff-job">${esc(person.job_function || '—')}</span></td>`,
+      `<td class="frozen frozen-1"><div class="rtc-row-actions">${actionsBtns}</div></td>`,
+      `<td class="frozen frozen-2"><span class="${nameCls}">${esc(person.name)}</span></td>`,
+      `<td class="frozen frozen-3"><span class="rtc-staff-job">${esc(person.job_title || '—')}</span></td>`,
+      `<td class="frozen frozen-4"><span class="rtc-staff-job">${esc(person.job_function || '—')}</span></td>`,
       ...state.periods.map(p => {
         const isPast = p.period_start < TODAY_MONTH;
         const days   = person.allocations[p.period_start] ?? 0;
@@ -379,7 +380,6 @@ function renderGridBody() {
           </div>
         </td>`;
       }),
-      `<td><div class="rtc-row-actions">${actionsBtns}</div></td>`,
     ];
 
     return `<tr data-pid="${esc(person.horizon_person_number)}">${cells.join('')}</tr>`;

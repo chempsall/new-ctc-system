@@ -9,11 +9,14 @@ Can we have a HR extract for staff_list and what would it look like?
 
 
 
-_GENERIC has found its way back into the departments filter.
 
-RTCs includes "This Month" Column whereas Projects includes "Days" column. These should be swapped and the "Days" column should be a total of all days currently entered.
 
-"Projects" should include a filter for PM
+Move the date selection tool up when creating a new RTC
+
+A CTC doesn't scroll to the first month
+
+Only add 12 months with a button to add 12 more
+
 
 What does the filter on the RTCs page do? What is it filtering? (It won't find the PD or PM for instance)
 
@@ -25,11 +28,15 @@ It should be possible to sort People ascending or descending on each column
 
 It should be possible to sort Projects Ascending or descending by each column
 
+Purge leavers on admin page
 
+Exclude generic from people page unless they have allocation?
 
 The "x" to remove a person would be better on the far left of a CTC instead of the far right.
 
 Scrolling downwards on a project with a lot of people results in the column headers disappearing. They should be frozen.
+
+Test "nagging" messages
 
 
 
