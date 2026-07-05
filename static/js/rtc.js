@@ -17,7 +17,9 @@ const state = {
 // Today's first-of-month — used to determine past/current/future months
 const TODAY_MONTH = (() => {
   const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}-01`;
 })();
 
 // ── Initialise ───────────────────────────────────────────────────────────────
@@ -27,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadAllStaff();
   renderHeader();
   renderGrid();
-  scrollToCurrentMonth();
+  setTimeout(scrollToCurrentMonth, 100);
   checkHorizon();
   wireEvents();
 });
@@ -393,11 +395,10 @@ function fmt(days) {
 // ── Scroll to current month ───────────────────────────────────────────────────
 
 function scrollToCurrentMonth() {
-  const th = document.querySelector(`.rtc-grid th.month-current`);
+  const th = document.querySelector('.rtc-grid th.month-current');
   if (th) {
     const wrap = document.querySelector('.rtc-grid-wrap');
-    // Account for the three frozen columns (390px total)
-    wrap.scrollLeft = Math.max(0, th.offsetLeft - 390);
+    wrap.scrollLeft = Math.max(0, th.offsetLeft - 440);
   }
 }
 
