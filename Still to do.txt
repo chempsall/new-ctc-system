@@ -12,24 +12,18 @@ Can we have a HR extract for staff_list and what would it look like?
 
 
 
-Only add 12 months with a button to add 12 more
-
-Maximum working effort by days in month
-
 Annual leave, public holidays, study leave, etc.
 
 Edge case - more than one PD (is the same possible for PM?)
+
+Edge case - zero hours contract?
 
 
 What does the filter on the RTCs page do? What is it filtering? (It won't find the PD or PM for instance)
 
 What does the filter on the People page do? What is it filtering? (It won't find a project name for instance)
 
-It should be possible to sort RTCs ascending or descending on each column
 
-It should be possible to sort People ascending or descending on each column
-
-It should be possible to sort Projects Ascending or descending by each column
 
 Purge leavers on admin page
 How to delete a project? On admin page?

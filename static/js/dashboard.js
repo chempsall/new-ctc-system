@@ -281,7 +281,10 @@ function filteredStaff() {
     }
     // Exclude people with no capacity in the current period
     // (i.e. they haven't started yet or have already left)
-    if (!person.id?.startsWith("GENERIC-")) {
+    if (person.id?.startsWith("GENERIC-")) {
+      const alloc = person.allocated?.[p] || 0;
+      if (alloc <= 0) return false;
+    } else {
       const cap = person.capacity?.[p];
       if (cap !== null && cap !== undefined && cap <= 0) return false;
     }
