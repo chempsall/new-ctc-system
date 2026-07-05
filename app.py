@@ -548,14 +548,26 @@ def api_get_rtc(rtc_id):
         ORDER BY s.name, a.period_start
     """, (rtc_id,)).fetchall()
 
-    # Fetch reporting periods from start_date forward (36 months)
-    periods = c.execute("""
-        SELECT period_start, label, working_days
-        FROM reporting_periods
-        WHERE period_start >= ?
-        ORDER BY period_start
-        LIMIT 36
-    """, (rtc["start_date"],)).fetchall()
+    # Fetch reporting periods actually in use for this RTC
+    # Based on the max period_start in allocations, minimum 12 months
+    max_period = c.execute("""
+        SELECT MAX(period_start) FROM allocations WHERE rtc_id = ?
+    """, (rtc_id,)).fetchone()[0]
+
+    if max_period:
+        periods = c.execute("""
+            SELECT period_start, label, working_days
+            FROM reporting_periods
+            WHERE period_start >= ? AND period_start <= ?
+            ORDER BY period_start
+        """, (rtc["start_date"], max_period)).fetchall()
+    else:
+        periods = c.execute("""
+            SELECT period_start, label, working_days
+            FROM reporting_periods
+            WHERE period_start >= ?
+            ORDER BY period_start LIMIT 12
+        """, (rtc["start_date"],)).fetchall()
 
     period_starts = [p["period_start"] for p in periods]
 
@@ -763,12 +775,24 @@ def api_add_rtc_staff(rtc_id):
         conn.close()
         return jsonify({"error": f"Staff member {pid} not found"}), 404
 
-    # Get the periods for this RTC
-    periods = c.execute("""
-        SELECT period_start FROM reporting_periods
-        WHERE period_start >= ?
-        ORDER BY period_start LIMIT 36
-    """, (rtc["start_date"],)).fetchall()
+    # Get the periods already in use for this RTC
+    # (match existing staff's allocation range, minimum 12)
+    existing_end = c.execute("""
+        SELECT MAX(period_start) FROM allocations WHERE rtc_id = ?
+    """, (rtc_id,)).fetchone()[0]
+
+    if existing_end:
+        periods = c.execute("""
+            SELECT period_start FROM reporting_periods
+            WHERE period_start >= ? AND period_start <= ?
+            ORDER BY period_start
+        """, (rtc["start_date"], existing_end)).fetchall()
+    else:
+        periods = c.execute("""
+            SELECT period_start FROM reporting_periods
+            WHERE period_start >= ?
+            ORDER BY period_start LIMIT 12
+        """, (rtc["start_date"],)).fetchall()
 
     added = 0
     for p in periods:
@@ -876,6 +900,67 @@ def api_replace_rtc_staff(rtc_id, person_id):
     conn.close()
     summary_module.mark_dirty()
     return jsonify({"status": "ok", "replaced": person_id, "with": new_pid})
+
+
+@app.route("/api/rtcs/<int:rtc_id>/extend", methods=["POST"])
+def api_extend_rtc(rtc_id):
+    """
+    Extends an RTC by 12 more months.
+    Adds zero-allocation rows for all current staff for the next 12 periods
+    beyond the current last period.
+    """
+    user = get_current_user()
+    now  = datetime.now(timezone.utc).isoformat()
+    conn = database.get_connection()
+    c    = conn.cursor()
+
+    # Get current staff on this RTC
+    staff_rows = c.execute("""
+        SELECT DISTINCT horizon_person_number FROM allocations
+        WHERE rtc_id = ?
+    """, (rtc_id,)).fetchall()
+    if not staff_rows:
+        conn.close()
+        return jsonify({"error": "No staff on this RTC"}), 400
+
+    # Find the current last period
+    last_period = c.execute("""
+        SELECT MAX(period_start) FROM allocations WHERE rtc_id = ?
+    """, (rtc_id,)).fetchone()[0]
+    if not last_period:
+        conn.close()
+        return jsonify({"error": "No existing periods found"}), 400
+
+    # Get the next 12 periods after the current last one
+    new_periods = c.execute("""
+        SELECT period_start FROM reporting_periods
+        WHERE period_start > ?
+        ORDER BY period_start LIMIT 12
+    """, (last_period,)).fetchall()
+    if not new_periods:
+        conn.close()
+        return jsonify({"error": "No further reporting periods available"}), 400
+
+    # Insert zero-allocation rows for all staff for all new periods
+    added = 0
+    for person in staff_rows:
+        pid = person["horizon_person_number"]
+        for p in new_periods:
+            c.execute("""
+                INSERT OR IGNORE INTO allocations
+                    (horizon_person_number, rtc_id, period_start, days, last_updated)
+                VALUES (?, ?, ?, 0, ?)
+            """, (pid, rtc_id, p["period_start"], now))
+            added += c.rowcount
+
+    c.execute("""
+        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
+        WHERE rtc_id = ?
+    """, (user, now, rtc_id))
+
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "periods_added": len(new_periods), "rows_added": added})
 
 
 @app.route("/api/rtcs/<int:rtc_id>/check-horizon")

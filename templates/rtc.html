@@ -179,7 +179,8 @@
     /* ── The grid itself ───────────────────────────────────────────── */
     .rtc-grid-wrap {
       overflow-x: auto;
-      overflow-y: visible;
+      overflow-y: auto;
+      max-height: 60vh;
     }
     .rtc-grid {
       border-collapse: collapse;
@@ -193,12 +194,12 @@
     .rtc-grid td.frozen {
       position: sticky;
       background: var(--surface);
-      z-index: 2;
+      z-index: 10;
     }
     .rtc-grid th.frozen-1, .rtc-grid td.frozen-1 { left: 0px;   width: 50px;  min-width: 50px;  }
     .rtc-grid th.frozen-2, .rtc-grid td.frozen-2 { left: 50px;  width: 160px; min-width: 160px; }
-    .rtc-grid th.frozen-3, .rtc-grid td.frozen-3 { left: 210px; width: 120px; min-width: 120px; }
-    .rtc-grid th.frozen-4, .rtc-grid td.frozen-4 { left: 330px; width: 110px; min-width: 110px; }
+    .rtc-grid th.frozen-3, .rtc-grid td.frozen-3 { left: 210px; width: 160px; min-width: 160px; }
+    .rtc-grid th.frozen-4, .rtc-grid td.frozen-4 { left: 370px; width: 175px; min-width: 175px; }
 
     /* Shadow on last frozen column */
     .rtc-grid th.frozen-4,
@@ -215,10 +216,14 @@
       text-align: center;
       background: var(--surface-2);
       border-bottom: 2px solid var(--border);
+      box-shadow: 0 2px 0 0 var(--border);
       white-space: nowrap;
       user-select: none;
+      position: sticky;
+      top: 0;
+      z-index: 3;
     }
-    .rtc-grid th.frozen { text-align: left; padding-left: 12px; }
+    .rtc-grid th.frozen { text-align: left; padding-left: 12px; z-index: 20; background: var(--surface-2); }
     .rtc-grid th.month-current {
       color: var(--wsp-red);
       border-bottom-color: var(--wsp-red);
@@ -364,6 +369,9 @@
                  placeholder="Add person — type to search…" autocomplete="off">
           <div class="rtc-staff-dropdown" id="staff-dropdown"></div>
         </div>
+        <button class="btn btn--sm btn--secondary" id="btn-extend" onclick="extendRtc()" style="margin-left:auto">
+          + 12 months
+        </button>
       </div>
       <div class="rtc-grid-wrap">
         <table class="rtc-grid" id="rtc-grid">

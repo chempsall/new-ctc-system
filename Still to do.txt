@@ -11,11 +11,14 @@ Can we have a HR extract for staff_list and what would it look like?
 
 
 
-Move the date selection tool up when creating a new RTC
-
-A CTC doesn't scroll to the first month
 
 Only add 12 months with a button to add 12 more
+
+Maximum working effort by days in month
+
+Annual leave, public holidays, study leave, etc.
+
+Edge case - more than one PD (is the same possible for PM?)
 
 
 What does the filter on the RTCs page do? What is it filtering? (It won't find the PD or PM for instance)
@@ -29,15 +32,15 @@ It should be possible to sort People ascending or descending on each column
 It should be possible to sort Projects Ascending or descending by each column
 
 Purge leavers on admin page
+How to delete a project? On admin page?
 
 Exclude generic from people page unless they have allocation?
 
-The "x" to remove a person would be better on the far left of a CTC instead of the far right.
 
 Scrolling downwards on a project with a lot of people results in the column headers disappearing. They should be frozen.
 
 Test "nagging" messages
 
-
+Do CTC's move to "need review" if they haven't been opened or haven't been changed? What about a RTC with no future work in it? That hasn't been reviewed because it doesn't need review.
 
 

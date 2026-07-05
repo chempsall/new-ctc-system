@@ -17,9 +17,7 @@ const state = {
 // Today's first-of-month — used to determine past/current/future months
 const TODAY_MONTH = (() => {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}-01`;
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
 })();
 
 // ── Initialise ───────────────────────────────────────────────────────────────
@@ -29,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadAllStaff();
   renderHeader();
   renderGrid();
-  setTimeout(scrollToCurrentMonth, 100);
+  scrollToCurrentMonth();
   checkHorizon();
   wireEvents();
 });
@@ -98,7 +96,6 @@ function renderHeader() {
       ${field('Project Director', rtc.project_director || '—')}
       ${field('Project Manager', rtc.project_manager || '—')}
       ${field('Department', rtc.department || '—')}
-      ${field('Start month', fmtMonth(rtc.start_date))}
     `;
   } else {
     // Editable inputs for placeholder fields
@@ -146,7 +143,6 @@ function renderHeader() {
                placeholder="Enter PM name">
       </div>
       ${field('Department', rtc.department || '—')}
-      ${field('Start month', fmtMonth(rtc.start_date))}
     `;
 
     // Wire up lookup trigger on blur of project number + task order
@@ -334,8 +330,9 @@ function renderGridHead() {
     '<th class="frozen frozen-4">Job Function</th>',
     ...state.periods.map(p => {
       const isCurrent = p.period_start === TODAY_MONTH;
+      const shortLabel = p.label.replace(/(\w{3})-(\d{4})/, (_, m, y) => `${m}-${y.slice(2)}`);
       return `<th class="month-col${isCurrent ? ' month-current' : ''}" data-period="${p.period_start}">
-        ${esc(p.label)}
+        ${esc(shortLabel)}
       </th>`;
     }),
   ];
@@ -395,10 +392,11 @@ function fmt(days) {
 // ── Scroll to current month ───────────────────────────────────────────────────
 
 function scrollToCurrentMonth() {
-  const th = document.querySelector('.rtc-grid th.month-current');
+  const th = document.querySelector(`.rtc-grid th.month-current`);
   if (th) {
     const wrap = document.querySelector('.rtc-grid-wrap');
-    wrap.scrollLeft = Math.max(0, th.offsetLeft - 440);
+    // Account for the three frozen columns (390px total)
+    wrap.scrollLeft = Math.max(0, th.offsetLeft - 390);
   }
 }
 
@@ -641,6 +639,29 @@ function renderDropdown(dropdownEl, query, excludePids, onSelect) {
   }
 
   dropdownEl.classList.add('open');
+}
+
+// ── Extend RTC ──────────────────────────────────────────────────────────────
+
+async function extendRtc() {
+  const btn = document.getElementById("btn-extend");
+  btn.disabled = true;
+  btn.textContent = "Adding…";
+  try {
+    const r = await fetch(`/api/rtcs/${RTC_ID}/extend`, { method: "POST" });
+    const d = await r.json();
+    if (r.ok) {
+      await loadRtc();
+      renderGrid();
+      setSaveStatus("saved");
+    } else {
+      alert(d.error || "Could not extend RTC");
+    }
+  } catch(e) {
+    alert("Could not reach the server");
+  }
+  btn.disabled = false;
+  btn.textContent = "+ 12 months";
 }
 
 // ── Wire events ───────────────────────────────────────────────────────────────
