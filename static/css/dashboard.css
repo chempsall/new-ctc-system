@@ -835,9 +835,11 @@ a:hover { text-decoration: underline; }
   font-size: 10px; font-weight: 500;
   white-space: nowrap;
 }
-.rtc-badge--active   { background: var(--green-light);  color: var(--green-dark); }
-.rtc-badge--review   { background: var(--amber-light);  color: var(--amber-dark); }
-.rtc-badge--archived { background: var(--grey-100);     color: var(--grey-500);   }
+.rtc-badge--current    { background: var(--green-light);      color: var(--green-dark);      }
+.rtc-badge--review     { background: var(--amber-light);      color: var(--amber-dark);      }
+.rtc-badge--overdue    { background: var(--status-red-light); color: var(--status-red-dark); }
+.rtc-badge--archiving  { background: var(--grey-100);         color: var(--grey-500);        }
+.rtc-badge--archived   { background: var(--grey-100);         color: var(--grey-500);        }
 
 /* RTC action buttons */
 .rtc-actions {

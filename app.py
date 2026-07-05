@@ -380,12 +380,21 @@ def api_rtcs():
 
         # Compute status
         last_opened = row["last_opened"]
+        future_days = row["future_days"]
         if row["is_archived"]:
             status = "archived"
-        elif not last_opened or last_opened[:10] < thirty_days_ago:
-            status = "needs_review"
+        elif future_days == 0:
+            status = "awaiting_archiving"
         else:
-            status = "active"
+            # Has future allocations — check review recency
+            grace_cutoff = (now.date() - timedelta(days=7)).isoformat()
+            month_start  = now.date().replace(day=1).isoformat()
+            if last_opened and (last_opened[:10] >= month_start or last_opened[:10] >= grace_cutoff):
+                status = "current"
+            elif last_opened and last_opened[:10] >= thirty_days_ago:
+                status = "due_review"
+            else:
+                status = "overdue_review"
 
         row["status"] = status
         result.append(row)
@@ -1166,20 +1175,27 @@ def admin_run_cleanup():
     conn = database.get_connection()
     c    = conn.cursor()
 
-    # Find eligible RTCs: no future days AND last_opened before cutoff
+    # Archive RTCs with no future allocations AND no allocations last calendar month
+    last_month_start = (now.date().replace(day=1) - timedelta(days=1)).replace(day=1).isoformat()
+    last_month_end   = now.date().replace(day=1).isoformat()
     eligible = c.execute("""
         SELECT r.rtc_id, p.project_number, p.project_name,
                r.last_opened, r.department
         FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
         WHERE r.is_archived = 0
-        AND (r.last_opened IS NULL OR r.last_opened < ?)
         AND COALESCE((
             SELECT SUM(a.days)
             FROM allocations a
-            WHERE a.rtc_id = r.rtc_id AND a.period_start > ?
+            WHERE a.rtc_id = r.rtc_id AND a.period_start >= ?
         ), 0) = 0
-    """, (cutoff, today)).fetchall()
+        AND COALESCE((
+            SELECT SUM(a.days)
+            FROM allocations a
+            WHERE a.rtc_id = r.rtc_id
+            AND a.period_start >= ? AND a.period_start < ?
+        ), 0) = 0
+    """, (today, last_month_start, last_month_end)).fetchall()
 
     archived = []
     for row in eligible:

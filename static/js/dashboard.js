@@ -544,7 +544,10 @@ function filteredRtcs() {
     department:   r => r.department,
     pd:           r => r.project_director,
     pm:           r => r.project_manager,
-    status:       r => r.status,
+    status:       r => ({
+      current: 0, due_review: 1, overdue_review: 2,
+      awaiting_archiving: 3, archived: 4
+    })[r.status] ?? 9,
     days:         r => r.future_days || 0,
     last_updated: r => r.last_updated_at,
   });
@@ -570,9 +573,11 @@ function renderRtcTable() {
 
   const statusBadge = status => {
     const map = {
-      active:        ["rtc-badge rtc-badge--active",  "Active"],
-      needs_review:  ["rtc-badge rtc-badge--review",  "Needs review"],
-      archived:      ["rtc-badge rtc-badge--archived", "Archived"],
+      current:            ["rtc-badge rtc-badge--current",   "Current"],
+      due_review:         ["rtc-badge rtc-badge--review",    "Due for review"],
+      overdue_review:     ["rtc-badge rtc-badge--overdue",   "Overdue review"],
+      awaiting_archiving: ["rtc-badge rtc-badge--archiving", "Awaiting archiving"],
+      archived:           ["rtc-badge rtc-badge--archived",  "Archived"],
     };
     const [cls, label] = map[status] || ["rtc-badge", status];
     return `<span class="${cls}">${label}</span>`;
