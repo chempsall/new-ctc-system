@@ -515,11 +515,11 @@ a:hover { text-decoration: underline; }
    -------------------------------------------------------------------------- */
 .project-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .project-table th:nth-child(1) { width: 12% } /* Number */
-.project-table th:nth-child(2) { width: 34% } /* Project / Task */
+.project-table th:nth-child(2) { width: 32% } /* Project / Task */
 .project-table th:nth-child(3) { width: 20% } /* Department */
 .project-table th:nth-child(4) { width: 14%; text-align: center; } /* Horizon */
 .project-table th:nth-child(5) { width: 12% } /* PM */
-.project-table th:nth-child(6) { width: 8%; text-align: center; } /* Days */
+.project-table th:nth-child(6) { width: 10%; text-align: center; } /* Days */
 
 .project-table th {
   padding: 8px 12px;
@@ -1033,6 +1033,9 @@ th.sortable {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+}
+th:not(.sortable) {
+  cursor: default;
 }
 th.sortable:hover {
   color: var(--text-primary);
