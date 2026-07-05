@@ -131,6 +131,12 @@ function buildFilterOptions() {
   const depts = (s.departments || []).map(d => d.department);
   populateSelect("filter-department", depts, "All departments");
 
+  const deptWidth = document.getElementById("filter-department")?.offsetWidth;
+  if (deptWidth) {
+    const searchEl = document.getElementById("filter-search");
+    if (searchEl) searchEl.style.width = deptWidth + "px";
+  }
+
   // Job Titles — from unique values in staff
   const gradeOrder = t => {
     const m = t.match(/^([LPT])(\d+)/);

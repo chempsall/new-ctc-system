@@ -369,9 +369,13 @@ def api_rtcs():
         if pd_arg and pd_arg.lower() not in (row["project_director"] or "").lower(): continue
         if search:
             q = search.lower()
-            if q not in (row["project_number"] or "").lower() and \
-               q not in (row["project_name"] or "").lower() and \
-               q not in (row["task_name"] or "").lower():
+            if q not in (row["project_number"]   or "").lower() and \
+               q not in (row["project_name"]     or "").lower() and \
+               q not in (row["task_name"]        or "").lower() and \
+               q not in (row["project_customer"] or "").lower() and \
+               q not in (row["project_director"] or "").lower() and \
+               q not in (row["project_manager"]  or "").lower() and \
+               q not in (row["department"]       or "").lower():
                 continue
 
         # Compute status
