@@ -610,12 +610,12 @@ function filterStaff(query, excludePids = []) {
   const generics = all.filter(s => s.horizon_person_number.startsWith('GENERIC-') && !onRtc.has(s.horizon_person_number));
 
   const matchReal = q
-    ? real.filter(s => s.name.toLowerCase().includes(q) || (s.job_title||'').toLowerCase().includes(q))
+    ? real.filter(s => s.name.toLowerCase().includes(q))
     : real;
   matchReal.sort((a,b) => a.name.localeCompare(b.name));
 
   const matchGenerics = q
-    ? generics.filter(s => s.name.toLowerCase().includes(q) || (s.job_title||'').toLowerCase().includes(q))
+    ? generics.filter(s => s.name.toLowerCase().includes(q))
     : generics;
   matchGenerics.sort((a,b) => {
     if (a.horizon_person_number === 'GENERIC-UK-DOCUMENT-CONTROL') return 1;
