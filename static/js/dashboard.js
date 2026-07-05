@@ -679,7 +679,6 @@ function showRtcDetail(rtc) {
     ${rtc.project_customer ? `<div><strong>Customer</strong> ${escHtml(rtc.project_customer)}</div>` : ""}
     <div><strong>PD</strong> ${escHtml(rtc.project_director || "\u2014")}</div>
     <div><strong>PM</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
-    <div><strong>Start</strong> ${escHtml(startFmt)}</div>
     <div><strong>Created by</strong> ${escHtml(rtc.created_by || "\u2014")}</div>
 
 
