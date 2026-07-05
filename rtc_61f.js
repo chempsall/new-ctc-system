@@ -17,9 +17,7 @@ const state = {
 // Today's first-of-month — used to determine past/current/future months
 const TODAY_MONTH = (() => {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}-01`;
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
 })();
 
 // ── Initialise ───────────────────────────────────────────────────────────────
@@ -29,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadAllStaff();
   renderHeader();
   renderGrid();
-  setTimeout(scrollToCurrentMonth, 100);
+  scrollToCurrentMonth();
   checkHorizon();
   wireEvents();
 });
@@ -43,21 +41,7 @@ async function loadRtc() {
     const d = await r.json();
     state.rtc     = d.rtc;
     state.periods = d.periods;
-    state.staff   = d.staff.sort((a, b) => {
-      const aGeneric = a.horizon_person_number.startsWith('GENERIC-');
-      const bGeneric = b.horizon_person_number.startsWith('GENERIC-');
-      if (aGeneric && !bGeneric) return 1;
-      if (!aGeneric && bGeneric) return -1;
-      const gradeSort = t => {
-        const m = (t || '').match(/^([PT])(\d+)/);
-        if (!m) return 999;
-        return (m[1] === 'P' ? 0 : 1) * 100 + (99 - parseInt(m[2]));
-      };
-      const ga = gradeSort(a.job_title);
-      const gb = gradeSort(b.job_title);
-      if (ga !== gb) return ga - gb;
-      return (a.name || '').localeCompare(b.name || '');
-    });
+    state.staff   = d.staff;
   } catch(e) {
     document.getElementById('header-title').textContent = 'Failed to load RTC';
     console.error(e);
@@ -408,10 +392,11 @@ function fmt(days) {
 // ── Scroll to current month ───────────────────────────────────────────────────
 
 function scrollToCurrentMonth() {
-  const th = document.querySelector('.rtc-grid th.month-current');
+  const th = document.querySelector(`.rtc-grid th.month-current`);
   if (th) {
     const wrap = document.querySelector('.rtc-grid-wrap');
-    wrap.scrollLeft = Math.max(0, th.offsetLeft - 440);
+    // Account for the three frozen columns (390px total)
+    wrap.scrollLeft = Math.max(0, th.offsetLeft - 390);
   }
 }
 
@@ -457,31 +442,14 @@ function commitEdit(div) {
   if (!div) return;
   _editingCell = null;
 
-  const input = div.querySelector('.rtc-cell-input');
+  const input  = div.querySelector('.rtc-cell-input');
   if (!input) return;
 
   const pid    = div.dataset.pid;
   const period = div.dataset.period;
   let   days   = parseFloat(input.value);
   if (isNaN(days) || days < 0) days = 0;
-  days = Math.round(days * 100) / 100;
-
-  // Cap at working days for the period
-  const periodObj = state.periods.find(p => p.period_start === period);
-  const maxDays = periodObj ? periodObj.working_days : 25;
-  if (days > maxDays) {
-    const person = state.staff.find(s => s.horizon_person_number === pid);
-    const prevDays = person?.allocations[period] ?? 0;
-    div.classList.remove('rtc-cell--editing');
-    div.innerHTML = prevDays > 0 ? fmt(prevDays) : '';
-    div.classList.toggle('rtc-cell--zero', prevDays === 0);
-    showPopup(
-      'Too many days',
-      `You cannot allocate more than ${maxDays} days in this period. The entry has been reverted.`,
-      [{ label: 'OK', action: closePopup }]
-    );
-    return;
-  }
+  days = Math.round(days * 100) / 100; // max 2dp
 
   // Update local state
   const person = state.staff.find(s => s.horizon_person_number === pid);
@@ -678,7 +646,7 @@ function renderDropdown(dropdownEl, query, excludePids, onSelect) {
 async function extendRtc() {
   const btn = document.getElementById("btn-extend");
   btn.disabled = true;
-  btn.textContent = "Adding\u2026";
+  btn.textContent = "Adding…";
   try {
     const r = await fetch(`/api/rtcs/${RTC_ID}/extend`, { method: "POST" });
     const d = await r.json();

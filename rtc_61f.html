@@ -194,7 +194,7 @@
     .rtc-grid td.frozen {
       position: sticky;
       background: var(--surface);
-      z-index: 2;
+      z-index: 10;
     }
     .rtc-grid th.frozen-1, .rtc-grid td.frozen-1 { left: 0px;   width: 50px;  min-width: 50px;  }
     .rtc-grid th.frozen-2, .rtc-grid td.frozen-2 { left: 50px;  width: 160px; min-width: 160px; }
@@ -216,10 +216,14 @@
       text-align: center;
       background: var(--surface-2);
       border-bottom: 2px solid var(--border);
+      box-shadow: 0 2px 0 0 var(--border);
       white-space: nowrap;
       user-select: none;
+      position: sticky;
+      top: 0;
+      z-index: 3;
     }
-    .rtc-grid th.frozen { text-align: left; padding-left: 12px; }
+    .rtc-grid th.frozen { text-align: left; padding-left: 12px; z-index: 20; background: var(--surface-2); }
     .rtc-grid th.month-current {
       color: var(--wsp-red);
       border-bottom-color: var(--wsp-red);
@@ -232,7 +236,6 @@
       padding: 0;
       height: 36px;
       vertical-align: middle;
-      max-width: 0;
     }
     .rtc-grid { border-right: 1px solid var(--border); }
     .rtc-grid td.frozen { padding: 0 8px 0 12px; }
@@ -261,12 +264,9 @@
     .rtc-cell--editing {
       padding: 0;
       background: var(--surface);
-      overflow: hidden;
-      max-width: 100%;
     }
     .rtc-cell-input {
       width: 100%; height: 100%;
-      min-width: 0;
       border: 2px solid var(--wsp-red);
       border-radius: 0;
       text-align: center;
@@ -275,10 +275,7 @@
       background: var(--surface);
       padding: 0;
       outline: none;
-      box-sizing: border-box;
     }
-    .rtc-cell-input::-webkit-inner-spin-button,
-    .rtc-cell-input::-webkit-outer-spin-button { -webkit-appearance: none; }
     .rtc-cell--zero { color: var(--text-tertiary); }
 
     /* Row actions */
