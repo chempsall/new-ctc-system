@@ -28,7 +28,6 @@ What does the filter on the People page do? What is it filtering? (It won't find
 Purge leavers on admin page
 How to delete a project? On admin page?
 
-Exclude generic from people page unless they have allocation?
 
 
 Scrolling downwards on a project with a lot of people results in the column headers disappearing. They should be frozen.

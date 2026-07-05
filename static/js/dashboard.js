@@ -400,10 +400,11 @@ function renderStaffTable() {
   }
 
   tbody.innerHTML = staff.map(person => {
-    const allocated = person.allocated[p] || 0;
-    const capacity  = person.capacity[p]  || 0;
-    const kpi       = person.kpi[p]       || "ok";
-    const pct       = capacity > 0
+    const allocated  = person.allocated[p] || 0;
+    const capacity   = person.capacity[p]  || 0;
+    const kpi        = person.kpi[p]       || "ok";
+    const isGeneric  = person.id?.startsWith("GENERIC-");
+    const pct        = capacity > 0
       ? Math.min(100, (allocated / capacity) * 100).toFixed(1)
       : 0;
     const isSelected = String(person.id) === String(state.selectedStaff);
@@ -417,17 +418,22 @@ function renderStaffTable() {
         <span class="team-badge">${escHtml(person.job_function || "—")}</span>
       </td>
       <td>
-        <div class="alloc-bar-wrap">
-          <div class="alloc-bar">
-            <div class="alloc-bar__fill alloc-bar__fill--${kpi}"
-                 style="width:${pct}%"></div>
-          </div>
-          <span class="alloc-days" style="color:var(--text-tertiary)">${fmt.days(allocated)}d</span>
-        </div>
+        ${isGeneric
+          ? `<div class="alloc-bar-wrap">
+               <span style="font-size:11px;color:var(--text-secondary);font-style:italic">${fmt.days(allocated)}d allocated</span>
+             </div>`
+          : `<div class="alloc-bar-wrap">
+               <div class="alloc-bar">
+                 <div class="alloc-bar__fill alloc-bar__fill--${kpi}"
+                      style="width:${pct}%"></div>
+               </div>
+               <span class="alloc-days" style="color:var(--text-tertiary)">${fmt.days(allocated)}d</span>
+             </div>`
+        }
       </td>
       <td style="text-align:center;vertical-align:top;padding-top:3px">
         <span class="mono" style="font-size:11px;color:var(--text-tertiary)">
-          / ${fmt.days(capacity)}d
+          ${isGeneric ? '' : `/ ${fmt.days(capacity)}d`}
         </span>
       </td>
       <td style="text-align:center"><span class="kpi kpi--${kpi}">${{over:'Over',under:'Under',ok:'OK',unavailable:'N/A',none:''}[kpi]||kpi}</span></td>
