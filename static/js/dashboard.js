@@ -22,6 +22,7 @@ const state = {
     department:   "all",
     horizon:      "all",   // "all" | "linked" | "norecord"
     project_pm:   "all",
+    project_pd:   "all",
     search:       "",
   },
   selectedStaff:    null,  // horizon_person_number of selected row
@@ -169,6 +170,7 @@ function buildFilterOptions() {
 
   const pds = [...new Set((s.projects||[]).map(p => p.director).filter(Boolean))].sort();
   populateSelect("filter-rtc-pd", pds, "All project directors");
+  populateSelect("filter-project-pd", pds, "All project directors");
 }
 
 function populateSelect(id, values, allLabel) {
@@ -341,6 +343,7 @@ function filteredProjects() {
       if (f.horizon === "norecord" && proj.horizon_status === "linked")   return false;
     }
     if (f.project_pm !== "all" && proj.pm !== f.project_pm) return false;
+    if (f.project_pd !== "all" && proj.director !== f.project_pd) return false;
     if (f.search) {
       const q = f.search.toLowerCase();
       if (!proj.name.toLowerCase().includes(q) &&
@@ -986,6 +989,7 @@ function resetFilters() {
   state.filters.department   = "all";
   state.filters.horizon      = "all";
   state.filters.project_pm   = "all";
+  state.filters.project_pd   = "all";
   state.filters.search       = "";
   state.rtcFilters.pm        = "";
   state.rtcFilters.pd        = "";
@@ -1007,6 +1011,9 @@ function resetFilters() {
   
   const projectPmSel = document.getElementById("filter-project-pm");
   if (projectPmSel) projectPmSel.value = "all";
+
+  const projectPdSel = document.getElementById("filter-project-pd");
+  if (projectPdSel) projectPdSel.value = "all";
 
   if (searchEl)   searchEl.value   = "";
   if (pmSel)      pmSel.value      = "all";
@@ -1443,6 +1450,11 @@ function wireEvents() {
 
 document.getElementById("filter-project-pm")?.addEventListener("change", e => {
     state.filters.project_pm = e.target.value;
+    renderView();
+  });
+
+  document.getElementById("filter-project-pd")?.addEventListener("change", e => {
+    state.filters.project_pd = e.target.value;
     renderView();
   });
 
