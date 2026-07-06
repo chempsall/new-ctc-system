@@ -462,30 +462,42 @@ function startEdit(div) {
   const input = document.getElementById('cell-input');
   input.focus();
   input.select();
+
   input.addEventListener('blur', () => { if (!_navigating) commitEdit(div); });
+
   input.addEventListener('keydown', e => {
     if (e.key === 'Escape') { cancelEdit(div, current); return; }
 
     let nextDiv = null;
-    if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'ArrowRight') {
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      nextDiv = findAdjacentCell(div, 0, e.shiftKey ? -1 : 1);
+
+    } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       nextDiv = findAdjacentCell(div, 0, 1);
+
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
       nextDiv = findAdjacentCell(div, 0, -1);
-    } else if (e.key === 'ArrowDown') {
+
+    } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
       e.preventDefault();
       nextDiv = findAdjacentCell(div, 1, 0);
+
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       nextDiv = findAdjacentCell(div, -1, 0);
     }
+
     if (nextDiv) {
       _navigating = true;
       const ok = commitEdit(div);
       _navigating = false;
       if (ok !== false) startEdit(nextDiv);
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      // No cell to move to — commit and exit edit mode
       input.blur();
     }
   });
