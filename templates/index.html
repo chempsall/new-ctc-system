@@ -28,14 +28,14 @@
     </div>
 
     <div class="topnav__tabs">
-      <button class="topnav__tab" data-view="rtcs">
+      <button class="topnav__tab active" data-view="rtcs">
         RTCs
-      </button>
-      <button class="topnav__tab" data-view="staff">
-        People
       </button>
       <button class="topnav__tab" data-view="projects">
         Projects
+      </button>
+      <button class="topnav__tab" data-view="staff">
+        People
       </button>
     </div>
 
@@ -109,50 +109,48 @@
         <span class="filter-bar__label">Filter</span>
 
         <select id="filter-department">
-          <option value="all">All departments</option>
+          <option value="all">Department</option>
         </select>
 
-        <span id="staff-only-filters">
-          <select id="filter-job-title">
-            <option value="all">All job titles</option>
-          </select>
-          <select id="filter-job-function">
-            <option value="all">All job functions</option>
-          </select>
-        </span>
+        <!-- Slot 2: Project Director / Job Title -->
+        <select id="filter-rtc-pd" style="display:none">
+          <option value="">Project Director</option>
+        </select>
+        <select id="filter-project-pd" style="display:none">
+          <option value="all">Project Director</option>
+        </select>
+        <select id="filter-job-title" style="display:none">
+          <option value="all">Job Title</option>
+        </select>
 
-        <span id="horizon-filter-wrap" style="display:none">
-          <select id="filter-horizon">
-            <option value="all">All Horizon statuses</option>
-            <option value="linked">Linked only</option>
-            <option value="norecord">No record only</option>
-          </select>
-          <select id="filter-project-pm">
-            <option value="all">All project managers</option>
-          </select>
-          <select id="filter-project-pd">
-            <option value="all">All project directors</option>
-          </select>
-        </span>
+        <!-- Slot 3: Project Manager / Job Function -->
+        <select id="filter-rtc-pm" style="display:none">
+          <option value="">Project Manager</option>
+        </select>
+        <select id="filter-project-pm" style="display:none">
+          <option value="all">Project Manager</option>
+        </select>
+        <select id="filter-job-function" style="display:none">
+          <option value="all">Job Function</option>
+        </select>
 
-        <span id="rtc-only-filters" style="display:none">
-          <select id="filter-rtc-pd">
-            <option value="">All project directors</option>
-          </select>
-          <select id="filter-rtc-pm">
-            <option value="">All project managers</option>
-          </select>
-
-          <select id="filter-rtc-status">
-            <option value="">All statuses</option>
-            <option value="current">Current</option>
-            <option value="due_review">Due for review</option>
-            <option value="overdue_review">Overdue review</option>
-            <option value="awaiting_archiving">Awaiting archiving</option>
-            <option value="archived">Archived</option>
-          </select>
-        </span>
-
+        <!-- Slot 4: Review Status / Horizon Status / hidden -->
+        <select id="filter-rtc-status" style="display:none">
+          <option value="">Review Status</option>
+          <option value="current">Current</option>
+          <option value="due_review">Due for review</option>
+          <option value="overdue_review">Overdue review</option>
+          <option value="awaiting_archiving">Awaiting archiving</option>
+          <option value="archived">Archived</option>
+        </select>
+        <select id="filter-horizon" style="display:none">
+          <option value="all">Horizon Status</option>
+          <option value="linked">Linked only</option>
+          <option value="norecord">No record only</option>
+        </select>
+        
+        <select id="filter-slot4-spacer" style="flex:1;min-width:0;display:none;visibility:hidden"></select>
+        <button type="button" id="filter-reset" class="filter-reset-btn">
         <button type="button" id="filter-reset" class="filter-reset-btn">
           Reset filters
         </button>

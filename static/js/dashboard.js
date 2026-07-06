@@ -130,7 +130,7 @@ function buildFilterOptions() {
 
   // Teams — from unique values in staff
   const depts = (s.departments || []).map(d => d.department);
-  populateSelect("filter-department", depts, "All departments");
+  populateSelect("filter-department", depts, "Department");
 
   const deptWidth = document.getElementById("filter-department")?.offsetWidth;
   if (deptWidth) {
@@ -157,20 +157,20 @@ function buildFilterOptions() {
   )].sort((a, b) => gradeOrder(a).localeCompare(gradeOrder(b)));
 
 
-  populateSelect("filter-job-title", titles, "All job titles");
+  populateSelect("filter-job-title", titles, "Job Title");
 
   // Disciplines
   const funcs = [...new Set(s.staff.map(p => p.job_function).filter(Boolean))].sort();
-  populateSelect("filter-job-function", funcs, "All job functions");
+  populateSelect("filter-job-function", funcs, "Job Function");
 
   const pms = [...new Set((s.projects||[]).map(p => p.pm).filter(Boolean))].sort();
-  populateSelect("filter-rtc-pm", pms, "All project managers");
+  populateSelect("filter-rtc-pm", pms, "Project Manager");
 
-  populateSelect("filter-project-pm", pms, "All project managers");
+  populateSelect("filter-project-pm", pms, "Project Manager");
 
   const pds = [...new Set((s.projects||[]).map(p => p.director).filter(Boolean))].sort();
-  populateSelect("filter-rtc-pd", pds, "All project directors");
-  populateSelect("filter-project-pd", pds, "All project directors");
+  populateSelect("filter-rtc-pd", pds, "Project Director");
+  populateSelect("filter-project-pd", pds, "Project Director");
 }
 
 function populateSelect(id, values, allLabel) {
@@ -901,22 +901,29 @@ function switchView(view) {
     btn.classList.toggle("active", btn.dataset.view === view);
   });
 
-  // Show/hide horizon filter (only relevant for projects)
-  const horizonFilter = document.getElementById("horizon-filter-wrap");
-  if (horizonFilter) {
-    horizonFilter.style.display = view === "projects" ? "" : "none";
-  }
-
-  // Show/hide job title + job function filters (only relevant for staff)
-  const staffOnlyFilters = document.getElementById("staff-only-filters");
-  if (staffOnlyFilters) {
-    staffOnlyFilters.style.display = view === "staff" ? "" : "none";
-  }
-
-  // Show/hide RTC-specific filters
-  const rtcOnlyFilters = document.getElementById("rtc-only-filters");
-  if (rtcOnlyFilters) {
-    rtcOnlyFilters.style.display = view === "rtcs" ? "" : "none";
+  // Show/hide filter slots per view
+  const filterSlots = {
+    rtcs:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status"],
+    staff:    ["filter-job-title", "filter-job-function"],
+    projects: ["filter-project-pd", "filter-project-pm", "filter-horizon"],
+  };
+  const allSlots = [
+    "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
+    "filter-job-title", "filter-job-function",
+    "filter-horizon", "filter-project-pd", "filter-project-pm",
+  ];
+  allSlots.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
+  });
+  (filterSlots[view] || []).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "";
+  });
+  const spacer = document.getElementById("filter-slot4-spacer");
+  if (spacer) {
+    spacer.style.display = view === "staff" ? "" : "none";
+    spacer.style.visibility = "hidden";
   }
 
   // Month tabs only relevant for staff and projects views

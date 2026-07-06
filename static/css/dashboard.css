@@ -241,6 +241,13 @@ a:hover { text-decoration: underline; }
   transition: border-color 0.15s;
   min-width: 0;
 }
+#filter-department,
+#filter-rtc-pd, #filter-project-pd, #filter-job-title,
+#filter-rtc-pm, #filter-project-pm, #filter-job-function,
+#filter-rtc-status, #filter-horizon {
+  flex: 1;
+  min-width: 0;
+}
 .filter-bar select:hover,
 .filter-bar input[type="text"]:hover { border-color: var(--border-strong); }
 .filter-bar select:focus,
