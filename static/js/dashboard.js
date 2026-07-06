@@ -922,8 +922,12 @@ function switchView(view) {
   });
   const spacer = document.getElementById("filter-slot4-spacer");
   if (spacer) {
-    spacer.style.display = view === "staff" ? "" : "none";
-    spacer.style.visibility = "hidden";
+    if (view === "staff") {
+      spacer.style.display = "";
+      spacer.style.visibility = "hidden";
+    } else {
+      spacer.style.display = "none";
+    }
   }
 
   // Month tabs only relevant for staff and projects views
