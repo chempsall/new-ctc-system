@@ -480,8 +480,7 @@ function renderProjectTable() {
 
     return `<tr data-id="${proj.project_id}" class="${isSelected ? "selected" : ""}">
       <td>
-        <div class="proj-number">${escHtml(proj.number || "—")}</div>
-        <div class="proj-number">${escHtml(proj.task_order || "")}</div>
+        ${!(proj.number || "").includes("_") ? `<div class="proj-number">${escHtml(proj.number || "—")} ${escHtml(proj.task_order || "")}</div>` : ""}
       </td>
       <td>
         <div class="proj-name">${escHtml(proj.name)}</div>
@@ -605,7 +604,7 @@ function renderRtcTable() {
         ${customer ? `<div class="proj-customer">${customer}</div>` : ""}
         <div class="proj-name">${projName}</div>
         ${taskName ? `<div class="proj-task">${taskName}</div>` : ""}
-        <div class="proj-number">${escHtml(r.project_number || "")} ${escHtml(r.task_order_number || "")}</div>
+        ${!r.project_number?.includes("_") ? `<div class="proj-number">${escHtml(r.project_number || "")} ${escHtml(r.task_order_number || "")}</div>` : ""}
       </td>
       <td><span class="team-badge">${dept}</span></td>
       <td style="font-size:11px">${pd}</td>
@@ -699,8 +698,8 @@ function showRtcDetail(rtc) {
 
 
 
-    <div><strong>Project number</strong> ${escHtml(rtc.project_number || "\u2014")}</div>
-    <div><strong>Task number</strong> ${escHtml(rtc.task_order_number || "\u2014")}</div>
+    <div><strong>Project number</strong> ${rtc.project_number?.includes("_") ? "Placeholder" : escHtml(rtc.project_number || "\u2014")}</div>
+    <div><strong>Task number</strong> ${rtc.task_order_number?.includes("_") ? "Placeholder" : escHtml(rtc.task_order_number || "\u2014")}</div>
     <div><strong>Project name</strong> ${escHtml(rtc.project_name || "\u2014")}</div>
     <div><strong>Task name</strong> ${escHtml(rtc.task_name || "\u2014")}</div>
     ${rtc.project_customer ? `<div><strong>Customer</strong> ${escHtml(rtc.project_customer)}</div>` : ""}

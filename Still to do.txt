@@ -9,6 +9,8 @@ Can we have a HR extract for staff_list and what would it look like?
 
 
 
+Are you hallucinating code again? You say "And where the max days block returns early" which starts with a setTimeout - that code doesn't exist.
+
 
 
 
@@ -19,14 +21,11 @@ Edge case - more than one PD (is the same possible for PM?)
 Edge case - zero hours contract?
 
 
-What does the filter on the RTCs page do? What is it filtering? (It won't find the PD or PM for instance)
-
-What does the filter on the People page do? What is it filtering? (It won't find a project name for instance)
-
-
-
 Purge leavers on admin page
+
 How to delete a project? On admin page?
+
+Add "edit" on project page (don't add duplicate)
 
 
 
@@ -34,6 +33,6 @@ Scrolling downwards on a project with a lot of people results in the column head
 
 Test "nagging" messages
 
-Do CTC's move to "need review" if they haven't been opened or haven't been changed? What about a RTC with no future work in it? That hasn't been reviewed because it doesn't need review.
 
 
+Test archive, need review, etc - How?

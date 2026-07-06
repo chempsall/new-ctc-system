@@ -251,16 +251,6 @@ def api_project():
         result["match_type"] = "full"
         return jsonify(result)
 
-
-    rows_debug = conn.execute("""
-        SELECT project_number, task_order_number, project_status, last_imported
-        FROM projects
-        WHERE project_number = ?
-        ORDER BY last_imported DESC
-    """, (project_number,)).fetchall()
-    print(f"DEBUG all rows: {[dict(r) for r in rows_debug]}")
-
-
     # Try project-number-only match — known project, unknown task order
     row = conn.execute("""
         SELECT project_number, project_name,
@@ -268,7 +258,7 @@ def api_project():
                project_manager, project_status, project_type
         FROM projects
         WHERE project_number = ?
-        AND project_status NOT IN ('Placeholder')
+        AND project_status NOT IN ('Placeholder', 'Pending')
         ORDER BY last_imported DESC
         LIMIT 1
     """, (project_number,)).fetchone()
@@ -277,7 +267,6 @@ def api_project():
 
     if row:
         result = dict(row)
-        print(f"DEBUG project_only: {result}")
         result["match_type"]       = "project_only"
         result["task_order_number"] = task_order_number
         result["task_name"]        = None   # unknown — must be entered manually
@@ -1000,23 +989,10 @@ def api_check_horizon(rtc_id):
         return jsonify({"is_placeholder": False, "match": None})
 
     # Look for a real PAR record with a similar project name
-    stored_name = (rtc["project_name"] or "").strip()
     match = None
-    if stored_name and stored_name != "Placeholder \u2014 awaiting Horizon record":
-        row = conn.execute("""
-            SELECT project_id, project_number, task_order_number,
-                   project_name, task_name, project_manager, project_director
-            FROM projects
-            WHERE project_status = 'Active'
-            AND LOWER(project_name) LIKE LOWER(?)
-            LIMIT 1
-        """, (f"%{stored_name[:30]}%",)).fetchone()
-        if row:
-            match = dict(row)
-
+    
     conn.close()
     return jsonify({"is_placeholder": True, "match": match})
-
 
 @app.route("/api/rtcs/<int:rtc_id>/link-horizon", methods=["POST"])
 def api_link_horizon(rtc_id):
@@ -1281,7 +1257,12 @@ def _get_or_create_project(cursor, data: dict, now: str) -> int:
         if row:
             return row["project_id"]
 
-        # Not in DB yet — create a shared pending row the PAR import will enrich
+        # Not in DB yet — always make task order unique to prevent collisions
+        # between two RTCs using the same project number and unrecognised task order.
+        # The PAR import will create the real row when it appears.
+        suffix     = now.replace(":", "").replace("-", "").replace(".", "")[:20]
+        task_order = f"{task_order}_{suffix}"
+
         cursor.execute("""
             INSERT INTO projects (
                 project_number, task_order_number,

@@ -125,7 +125,7 @@ function renderHeader() {
       <div class="rtc-field">
         <span class="rtc-field__label">Task order</span>
         <input class="rtc-field__input" id="field-task-order"
-               value="${esc(rtc.task_order_number || '')}"
+                value="${esc((rtc.task_order_number || '').replace(/_\d{14,}$/, ''))}"
                placeholder="e.g. 9081">
       </div>
       <div class="rtc-field">
@@ -418,6 +418,31 @@ function scrollToCurrentMonth() {
 // ── Cell editing ──────────────────────────────────────────────────────────────
 
 let _editingCell = null;
+let _navigating  = false;
+
+function findAdjacentCell(div, rowDelta, colDelta) {
+  const currentRow = div.closest('tr');
+  const currentTd  = div.closest('td');
+  if (!currentRow || !currentTd) return null;
+
+  const allRows = [...document.querySelectorAll('#grid-body tr')];
+  const allTds  = [...currentRow.querySelectorAll('td.month-col')];
+  const colIdx  = allTds.indexOf(currentTd);
+  const rowIdx  = allRows.indexOf(currentRow);
+
+  if (colDelta !== 0) {
+    const nextTd = allTds[colIdx + colDelta];
+    return nextTd?.querySelector('.rtc-cell:not(.rtc-cell--past)') || null;
+  }
+  if (rowDelta !== 0) {
+    const nextRow = allRows[rowIdx + rowDelta];
+    if (!nextRow) return null;
+    const nextTds = [...nextRow.querySelectorAll('td.month-col')];
+    const nextTd  = nextTds[colIdx];
+    return nextTd?.querySelector('.rtc-cell:not(.rtc-cell--past)') || null;
+  }
+  return null;
+}
 
 function startEdit(div) {
   if (div.classList.contains('rtc-cell--past')) return;
@@ -437,10 +462,32 @@ function startEdit(div) {
   const input = document.getElementById('cell-input');
   input.focus();
   input.select();
-  input.addEventListener('blur',    () => commitEdit(div));
+  input.addEventListener('blur', () => { if (!_navigating) commitEdit(div); });
   input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') input.blur();
-    if (e.key === 'Escape') { cancelEdit(div, current); }
+    if (e.key === 'Escape') { cancelEdit(div, current); return; }
+
+    let nextDiv = null;
+    if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      nextDiv = findAdjacentCell(div, 0, 1);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      nextDiv = findAdjacentCell(div, 0, -1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      nextDiv = findAdjacentCell(div, 1, 0);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      nextDiv = findAdjacentCell(div, -1, 0);
+    }
+    if (nextDiv) {
+      _navigating = true;
+      commitEdit(div);
+      _navigating = false;
+      startEdit(nextDiv);
+    } else if (e.key === 'Enter') {
+      input.blur();
+    }
   });
 }
 
