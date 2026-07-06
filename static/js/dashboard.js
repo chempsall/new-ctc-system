@@ -344,6 +344,8 @@ function filteredProjects() {
     }
     if (f.project_pm !== "all" && proj.pm !== f.project_pm) return false;
     if (f.project_pd !== "all" && proj.director !== f.project_pd) return false;
+    // Exclude projects with no allocation in the current period
+    if ((proj.total_days[p] || 0) === 0) return false;
     if (f.search) {
       const q = f.search.toLowerCase();
       if (!proj.name.toLowerCase().includes(q) &&
@@ -642,7 +644,24 @@ function selectRtc(id) {
 function showRtcDetail(rtc) {
   const panel = document.getElementById("detail-panel");
 
-  document.getElementById("dp-avatar").textContent = "RTC";
+  const avatarMap = {
+    current:            "✓",
+    due_review:         "!",
+    overdue_review:     "!",
+    awaiting_archiving: "⌛",
+    archived:           "✗",
+  };
+  document.getElementById("dp-avatar").textContent = avatarMap[rtc.status] || "!";
+
+  const avatarColourMap = {
+    current:            "var(--green-dark)",
+    due_review:         "var(--amber-dark)",
+    overdue_review:     "var(--status-red)",
+    awaiting_archiving: "var(--text-tertiary)",
+    archived:           "var(--text-tertiary)",
+  };
+  document.getElementById("dp-avatar").style.color = avatarColourMap[rtc.status] || "";
+
   document.getElementById("dp-name").textContent =
     rtc.project_name || "No project name";
   document.getElementById("dp-role").textContent =
@@ -804,44 +823,58 @@ function selectProject(id) {
 }
 
 function showProjectDetail(proj) {
-  const panel   = document.getElementById("detail-panel");
-  const p       = state.activePeriod;
-  const linked  = proj.horizon_status === "linked";
-  document.getElementById("dp-avatar").textContent = proj.number
-    ? proj.number.slice(-4)
-    : "PROJ";
+  const panel  = document.getElementById("detail-panel");
+  const p      = state.activePeriod;
+  const linked = proj.horizon_status === "linked";
+
+  // Avatar — show horizon status icon instead of project number characters
+  document.getElementById("dp-avatar").textContent = linked ? "✓" : "!";
+
   document.getElementById("dp-name").textContent = proj.name;
   document.getElementById("dp-role").textContent =
-    `${proj.task_name || ""}`;
+    [proj.task_name, proj.department].filter(Boolean).join(" · ");
 
-  const totalDays = Object.values(proj.total_days).reduce((a, b) => a + b, 0);
-  document.getElementById("dp-stat-alloc").textContent  = fmt.days(proj.total_days[p]) + "d";
-  document.getElementById("dp-stat-cap").textContent    = fmt.days(totalDays) + "d total";
-  document.getElementById("dp-stat-remain").textContent = "—";
+  // This period days
+  const thisPeriodDays = proj.total_days[p] || 0;
 
-  document.getElementById("dp-kpi").className   = `horizon horizon--${linked ? "linked" : "norecord"}`;
-  document.getElementById("dp-kpi").innerHTML   =
+  // Future days — sum of periods from current period onwards only
+  const currentPeriodStart = state.summary.periods[0];
+  const currentIdx = state.summary.periods.indexOf(state.activePeriod);
+  const futureLabels = new Set(state.summary.periods.slice(currentIdx + 1));
+  const futureDays = Object.entries(proj.total_days)
+    .filter(([label]) => futureLabels.has(label))
+    .reduce((sum, [, days]) => sum + days, 0);
+
+  document.getElementById("dp-stat-alloc").textContent = fmt.days(thisPeriodDays) + "d";
+  document.getElementById("dp-stat-cap").textContent   = fmt.days(futureDays) + "d";
+  document.getElementById("dp-stat-remain").textContent = proj.pm || "—";
+  document.getElementById("dp-stat-remain").style.color = "";
+
+  document.getElementById("dp-kpi").className = `horizon horizon--${linked ? "linked" : "norecord"}`;
+  document.getElementById("dp-kpi").innerHTML =
     `<span class="horizon--dot"></span>${linked ? "Linked" : "No record"}`;
 
   // No-record warning
   const warnEl = document.getElementById("dp-norec-warn");
   if (!linked) {
     warnEl.classList.remove("hidden");
-    document.getElementById("dp-norec-days").textContent = "not fee-earning";
+    document.getElementById("dp-norec-days").textContent =
+      "This project has no Horizon record. Time allocated to it will not generate revenue.";
   } else {
     warnEl.classList.add("hidden");
   }
 
-  const projContainer = document.getElementById("dp-projects");
-  projContainer.innerHTML = "";
+  // Stat labels
+  const labels = document.querySelectorAll(".detail-stat__label");
+  if (labels[0]) labels[0].textContent = "This period";
+  if (labels[1]) labels[1].textContent = "Future days";
+  if (labels[2]) labels[2].textContent = "Project Manager";
 
-  // Show staff allocated to this project
-  const staffLookup = Object.fromEntries(
-    state.summary.staff.map(s => [s.id, s])
-  );
+  // Staff allocated this period
+  const projContainer = document.getElementById("dp-projects");
   const allocated = state.summary.staff
     .filter(s => s.projects.some(pr => pr.project_id === proj.project_id &&
-                                        (pr.days[p] || 0) > 0))
+                                       (pr.days[p] || 0) > 0))
     .map(s => ({
       name: s.name,
       job_title: s.job_title,
@@ -850,7 +883,7 @@ function showProjectDetail(proj) {
     .sort((a, b) => b.days - a.days);
 
   if (allocated.length > 0) {
-    projContainer.innerHTML += `
+    projContainer.innerHTML = `
       <div style="margin-top:12px;font-size:10px;font-weight:600;
                   text-transform:uppercase;letter-spacing:0.08em;
                   color:var(--text-tertiary);margin-bottom:6px">
@@ -862,6 +895,8 @@ function showProjectDetail(proj) {
           <span class="detail-proj-name">${escHtml(s.name)}</span>
           <span class="detail-proj-days">${fmt.days(s.days)}d</span>
         </div>`).join("")}`;
+  } else {
+    projContainer.innerHTML = "";
   }
 
   panel.classList.add("open");
