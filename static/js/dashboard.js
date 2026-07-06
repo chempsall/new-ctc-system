@@ -1249,10 +1249,16 @@ function renderMonthPicker() {
   document.getElementById("rtc-year-label").textContent = _rtcPickerYear;
   const grid = document.getElementById("rtc-month-grid");
   if (!grid) return;
+  const now         = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
   grid.innerHTML = MONTH_ABBR.map((name, i) => {
-    const month = i + 1;
-    const sel   = month === _rtcPickerMonth ? "selected" : "";
-    return `<button type="button" class="month-picker__btn ${sel}" data-month="${month}">${name}</button>`;
+    const month   = i + 1;
+    const isPast  = _rtcPickerYear < currentYear ||
+                    (_rtcPickerYear === currentYear && month < currentMonth);
+    const sel     = month === _rtcPickerMonth ? "selected" : "";
+    const disabled = isPast ? "disabled" : "";
+    return `<button type="button" class="month-picker__btn ${sel}" data-month="${month}" ${disabled}>${name}</button>`;
   }).join("");
   grid.querySelectorAll(".month-picker__btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1576,7 +1582,9 @@ document.getElementById("filter-project-pm")?.addEventListener("change", e => {
 
   // Month picker year arrows
   document.getElementById("rtc-year-prev")?.addEventListener("click", () => {
-    _rtcPickerYear--; renderMonthPicker();
+    if (_rtcPickerYear > new Date().getFullYear()) {
+      _rtcPickerYear--; renderMonthPicker();
+    }
   });
   document.getElementById("rtc-year-next")?.addEventListener("click", () => {
     _rtcPickerYear++; renderMonthPicker();
