@@ -119,13 +119,13 @@ function renderHeader() {
       <div class="rtc-field">
         <span class="rtc-field__label">Project number</span>
         <input class="rtc-field__input" id="field-proj-number"
-               value="${esc(rtc.project_number || '')}"
+               value="${esc((rtc.project_number || '').replace(/_\d{8}T\d+$/, ''))}"
                placeholder="e.g. UK0041867">
       </div>
       <div class="rtc-field">
         <span class="rtc-field__label">Task order</span>
         <input class="rtc-field__input" id="field-task-order"
-                value="${esc((rtc.task_order_number || '').replace(/_\d{14,}$/, ''))}"
+                value="${esc((rtc.task_order_number || '').replace(/_\d{8}T\d+$/, ''))}"
                placeholder="e.g. 9081">
       </div>
       <div class="rtc-field">
@@ -228,11 +228,15 @@ async function horizonLookup(projNum, taskOrder) {
 
     if (d.match_type === 'full' || d.match_type === 'project_only') {
       msgEl.className = 'rtc-horizon-msg rtc-horizon-msg--found';
-      msgEl.innerHTML = `<strong>Horizon record found:</strong> ${esc(d.project_name || '')}
-        ${d.match_type === 'project_only' ? ' — task order not yet in PAR' : ''}
-        <button class="btn btn--sm" style="margin-left:12px" onclick="confirmHorizonLink(${JSON.stringify(d).replace(/</g,'\\u003c')})">
-          Confirm link
-        </button>`;
+      if (d.match_type === 'project_only') {
+        msgEl.innerHTML = `<strong>Project found in Horizon</strong> — this task order is not yet in PAR. Project-level details have been auto-filled and will update automatically when the task order appears in the next PAR import.`;
+      } else {
+        window._horizonMatch = d;
+        msgEl.innerHTML = `<strong>Horizon record found:</strong> ${esc(d.project_name || '')}
+          <button class="btn btn--sm" style="margin-left:12px" onclick="confirmHorizonLink(window._horizonMatch)">
+            Confirm link
+          </button>`;
+      }
       msgEl.classList.remove('hidden');
     } else {
       msgEl.className = 'rtc-horizon-msg rtc-horizon-msg--notfound';
@@ -299,9 +303,9 @@ async function checkHorizon() {
     } else {
       // No match — remind user to update placeholder
       showPopup(
-        'Placeholder project details',
-        'This RTC uses placeholder project details. Once the real Horizon record becomes available, enter the project number and task order in the header above to link it.',
-        [{ label: 'OK', action: closePopup }]
+        '⚠ Action required: Link to Horizon',
+        'This RTC is not linked to a Horizon record. Time allocated to it will not generate revenue.<br><br>Once the project number and task order are available, enter them in the fields above and the system will link this RTC automatically.',
+        [{ label: 'I understand — I will update this when the details are available', action: closePopup }]
       );
     }
   } catch(e) { console.error('Horizon check failed', e); }

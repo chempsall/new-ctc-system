@@ -984,7 +984,7 @@ def api_check_horizon(rtc_id):
         conn.close()
         return jsonify({"error": "Not found"}), 404
 
-    if rtc["project_status"] != "Placeholder":
+    if rtc["project_status"] not in ("Placeholder", "Pending"):
         conn.close()
         return jsonify({"is_placeholder": False, "match": None})
 
