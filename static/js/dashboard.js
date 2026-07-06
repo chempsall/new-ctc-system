@@ -907,6 +907,9 @@ function switchView(view) {
     staff:    ["filter-job-title", "filter-job-function"],
     projects: ["filter-project-pd", "filter-project-pm", "filter-horizon"],
   };
+  const hiddenSlots = {
+    staff: ["filter-rtc-status"],
+  };
   const allSlots = [
     "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
     "filter-job-title", "filter-job-function",
@@ -918,17 +921,12 @@ function switchView(view) {
   });
   (filterSlots[view] || []).forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = "";
+    if (el) { el.style.display = ""; el.style.visibility = "visible"; }
   });
-  const spacer = document.getElementById("filter-slot4-spacer");
-  if (spacer) {
-    if (view === "staff") {
-      spacer.style.display = "";
-      spacer.style.visibility = "hidden";
-    } else {
-      spacer.style.display = "none";
-    }
-  }
+  (hiddenSlots[view] || []).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.style.display = ""; el.style.visibility = "hidden"; }
+  });
 
   // Month tabs only relevant for staff and projects views
  const monthTabs = document.getElementById("month-tabs");

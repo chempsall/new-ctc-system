@@ -244,7 +244,8 @@ a:hover { text-decoration: underline; }
 #filter-department,
 #filter-rtc-pd, #filter-project-pd, #filter-job-title,
 #filter-rtc-pm, #filter-project-pm, #filter-job-function,
-#filter-rtc-status, #filter-horizon {
+#filter-rtc-status, #filter-horizon,
+#filter-slot4-spacer {
   flex: 1;
   min-width: 0;
 }
