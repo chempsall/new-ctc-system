@@ -482,9 +482,9 @@ function startEdit(div) {
     }
     if (nextDiv) {
       _navigating = true;
-      commitEdit(div);
+      const ok = commitEdit(div);
       _navigating = false;
-      startEdit(nextDiv);
+      if (ok !== false) startEdit(nextDiv);
     } else if (e.key === 'Enter') {
       input.blur();
     }
@@ -527,7 +527,7 @@ function commitEdit(div) {
       `You cannot allocate more than ${maxDays} days in this period. The entry has been reverted.`,
       [{ label: 'OK', action: closePopup }]
     );
-    return;
+    return false;
   }
 
   // Update local state
@@ -542,6 +542,7 @@ function commitEdit(div) {
   // Debounced save
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(() => saveAllocation(pid, period, days), 500);
+  return true;
 }
 
 async function saveAllocation(pid, period, days) {
