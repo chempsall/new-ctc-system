@@ -232,6 +232,37 @@ def build(department: str = None) -> dict:
             "projects":     proj_entries
         })
 
+    # Merge suffixed generic copies (e.g. GENERIC-UK-SENIOR-ENGINEER_2)
+    # into their base generic record, summing allocations
+    import re as _re
+    base_generics = {}
+    merged_list = []
+    for person in staff_list:
+        pid = person["id"]
+        m = _re.match(r'^(GENERIC-.+?)_\d+$', pid)
+        if m:
+            base_pid = m.group(1)
+            if base_pid in base_generics:
+                base = base_generics[base_pid]
+                for period in person["allocated"]:
+                    base["allocated"][period]     = base["allocated"].get(period, 0) + person["allocated"].get(period, 0)
+                    base["fte"][period]            = base["fte"].get(period, 0) + person["fte"].get(period, 0)
+                    base["horizon_days"][period]   = base["horizon_days"].get(period, 0) + person["horizon_days"].get(period, 0)
+                    base["no_record_days"][period] = base["no_record_days"].get(period, 0) + person["no_record_days"].get(period, 0)
+                for p in person["projects"]:
+                    existing = next((x for x in base["projects"] if x["project_id"] == p["project_id"]), None)
+                    if existing:
+                        for period, days in p["days"].items():
+                            existing["days"][period] = existing["days"].get(period, 0) + days
+                    else:
+                        base["projects"].append(p)
+        else:
+            merged_list.append(person)
+            if pid.startswith("GENERIC-"):
+                base_generics[pid] = person
+
+    staff_list = merged_list
+
     # -- Projects ------------------------------------------------------------
     # Query projects that have at least one RTC (i.e. are being worked on).
     # Filter by department if specified.
