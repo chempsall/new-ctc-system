@@ -388,7 +388,7 @@ def api_rtcs():
         result.append(row)
 
     # Sort: current_month_days descending, then project_name ascending
-    result.sort(key=lambda r: (-r["current_month_days"], r["project_name"] or ""))
+    result.sort(key=lambda r: (-r["future_days"], r["project_name"] or ""))
     return jsonify(result)
 
 

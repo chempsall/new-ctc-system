@@ -1,7 +1,5 @@
 CTCs should be editable from the Projects slider - the same way as they are from the RTC page.
 
-Projects page needs an additional filter for Project Manager
-
 Is the PAR file updated every night?
 
 Can we have a HR extract for staff_list and what would it look like?
@@ -13,12 +11,12 @@ Edge case - more than one PD (is the same possible for PM?)
 
 
 
-
-Filter free text has stopped working on the RTCs page
-
 With a correct Project Number and task number but before the Horizon records are available it shows "Not linked" (as expected). However, when the Horizon record is available it doesn't automatically link (debatable how desirable this is) AND required me to delete the task order number and re-insert it before it would link.
 
-Generic people are appearing more than once on the People page
+
+Ading a project that lives in another department still lists 010117 as home.
+
+
 
 
 
@@ -47,3 +45,5 @@ Staff leavers on RTCs — when a staff member leaves, future allocations should 
 
 Post-alpha:
 Name changes — when a staff member's name changes, project_manager and project_director text fields on existing project rows are not automatically updated. Consider storing Horizon person numbers for PM/PD instead of plain text names.
+
+
