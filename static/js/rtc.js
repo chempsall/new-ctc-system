@@ -705,7 +705,7 @@ function filterStaff(query, excludePids = []) {
   const onRtc = new Set(excludePids);
 
   const real    = all.filter(s => !s.horizon_person_number.startsWith('GENERIC-') && !onRtc.has(s.horizon_person_number));
-  const generics = all.filter(s => s.horizon_person_number.startsWith('GENERIC-') && !onRtc.has(s.horizon_person_number));
+  const generics = all.filter(s => s.horizon_person_number.startsWith('GENERIC-'));
 
   const matchReal = q
     ? real.filter(s => s.name.toLowerCase().includes(q))

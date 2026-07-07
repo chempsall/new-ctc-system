@@ -11,7 +11,7 @@ Edge case - more than one PD (is the same possible for PM?)
 
 
 
-The problem with the timestamp suffix is still recurring. I've got a project where the project number is known but the task number is not. On the RTCs page it is shown in the Customer / Project / Task column with the project number (correctly) and ???_2026... and on the Projects page it is shown like this in the Projects column.
+
 
 Th easiest solution for this is to not display anything when both the project number and task number are placeholders and only display the project number when that is the only thing that is known. 
 
@@ -22,6 +22,7 @@ I just found a weird bug. I typed "Hart" into the add person box and it didn't f
 Don't allow the same person to be added twice in an RTC
 
 
+I'm still not satisfied with the "Days" display on the RTCs page. It shows remaining days excluding the current month (potentially misleading)
 
 
 

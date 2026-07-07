@@ -339,13 +339,13 @@ def api_rtcs():
                 SELECT SUM(a.days)
                 FROM allocations a
                 WHERE a.rtc_id = r.rtc_id
-                AND a.period_start > ?
+                AND a.period_start >= ?
             ), 0) AS future_days
         FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
         WHERE 1=1
         AND (? = '1' OR r.is_archived = 0)
-    """, (current_period, today, archived)).fetchall()
+    """, (current_period, current_period, archived)).fetchall()
 
     conn.close()
 
@@ -792,6 +792,27 @@ def api_add_rtc_staff(rtc_id):
     ).fetchone():
         conn.close()
         return jsonify({"error": f"Staff member {pid} not found"}), 404
+
+    # For generics, allow multiple instances by creating a unique suffixed ID
+    if pid.startswith('GENERIC-'):
+        existing_count = c.execute("""
+            SELECT COUNT(DISTINCT horizon_person_number) FROM allocations
+            WHERE rtc_id = ? AND horizon_person_number LIKE ?
+        """, (rtc_id, pid + '%')).fetchone()[0]
+        if existing_count > 0:
+            pid = f"{pid}_{existing_count + 1}"
+            original_pid = str(data["horizon_person_number"]).strip()
+            orig = c.execute(
+                "SELECT * FROM staff WHERE horizon_person_number = ?", (original_pid,)
+            ).fetchone()
+            if orig:
+                c.execute("""
+                    INSERT OR IGNORE INTO staff
+                        (horizon_person_number, name, job_title, job_family,
+                         job_function, department, availability, last_imported)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'seeded')
+                """, (pid, orig["name"], orig["job_title"], orig["job_family"],
+                      orig["job_function"], orig["department"], orig["availability"]))
 
     # Get the periods already in use for this RTC
     # (match existing staff's allocation range, minimum 12)
