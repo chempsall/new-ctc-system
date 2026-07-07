@@ -675,70 +675,20 @@ def api_get_rtc(rtc_id):
 
     period_starts = [p["period_start"] for p in periods]
 
-    # Fetch per-period availability overrides for people on this RTC
-    person_ids = list({r["horizon_person_number"] for r in alloc_rows})
-    avail_map = {}
-    if person_ids and period_starts:
-        avail_rows = c.execute("""
-            SELECT horizon_person_number, period_start, availability_fraction
-            FROM staff_availability
-            WHERE horizon_person_number IN ({})
-            AND period_start IN ({})
-        """.format(
-            ",".join("?" * len(person_ids)),
-            ",".join("?" * len(period_starts))
-        ), person_ids + period_starts).fetchall()
-        for r in avail_rows:
-            avail_map.setdefault(r["horizon_person_number"], {})[r["period_start"]] = \
-                r["availability_fraction"]
-
-    # Fetch allocations on OTHER RTCs for the same people in the same periods
-    other_rtc_map = {}
-    if person_ids and period_starts:
-        other_rows = c.execute("""
-            SELECT horizon_person_number, period_start, SUM(days) as days
-            FROM allocations
-            WHERE horizon_person_number IN ({})
-            AND period_start IN ({})
-            AND rtc_id != ?
-            GROUP BY horizon_person_number, period_start
-        """.format(
-            ",".join("?" * len(person_ids)),
-            ",".join("?" * len(period_starts))
-        ), person_ids + period_starts + [rtc_id]).fetchall()
-        for r in other_rows:
-            other_rtc_map.setdefault(r["horizon_person_number"], {})[r["period_start"]] = \
-                r["days"]
 
     conn.close()
 
-    # Build working days lookup
-    working_days = {p["period_start"]: p["working_days"] for p in periods}
-
-    # Build person-keyed structure with allocations, capacity, and other-RTC days
+    # Build person-keyed structure with allocations
     people = {}
     for row in alloc_rows:
         pid = row["horizon_person_number"]
         if pid not in people:
-            # Generic roles are unconstrained — no capacity limit applies
-            # since they represent a grade requirement, not a specific person
-            if pid.startswith("GENERIC-"):
-                capacity = {ps: None for ps in period_starts}
-            else:
-                base_avail = row["availability"] if row["availability"] is not None else 1.0
-                capacity = {}
-                for ps in period_starts:
-                    avail = avail_map.get(pid, {}).get(ps, base_avail)
-                    capacity[ps] = round(working_days[ps] * avail, 2)
-
             people[pid] = {
                 "horizon_person_number": pid,
                 "name":         row["name"],
                 "job_title":    row["job_title"],
                 "job_function": row["job_function"],
                 "allocations":  {},
-                "capacity":     capacity,
-                "other_rtc_days": other_rtc_map.get(pid, {}),
             }
         people[pid]["allocations"][row["period_start"]] = row["days"]
 

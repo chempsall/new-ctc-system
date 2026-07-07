@@ -697,7 +697,6 @@ function showRtcDetail(rtc) {
     </div>`;
 
   // Check for linkable Horizon record
-  checkHorizonLink(rtc.rtc_id);
 
   // Relabel the stat headings for the RTC context
   const labels = document.querySelectorAll(".detail-stat__label");
@@ -1045,44 +1044,6 @@ function resetFilters() {
   } else {
     renderView();
   }
-}
-
-// ---------------------------------------------------------------------------
-// Horizon link check
-// ---------------------------------------------------------------------------
-
-async function checkHorizonLink(rtcId) {
-  try {
-    const r = await fetch(`/api/rtcs/${rtcId}/check-horizon`);
-    const d = await r.json();
-    if (!d.is_placeholder || !d.match) return;
-
-    const details = document.getElementById("link-modal-details");
-    if (details) {
-      details.innerHTML = `
-        <div class="form-lookup-row"><span class="form-lookup-label">Project</span><span class="form-lookup-value">${escHtml(d.match.project_name)}</span></div>
-        <div class="form-lookup-row"><span class="form-lookup-label">Task</span><span class="form-lookup-value">${escHtml(d.match.task_name || "\u2014")}</span></div>
-        <div class="form-lookup-row"><span class="form-lookup-label">PM</span><span class="form-lookup-value">${escHtml(d.match.project_manager || "\u2014")}</span></div>
-        <div class="form-lookup-row"><span class="form-lookup-label">Number</span><span class="form-lookup-value">${escHtml(d.match.project_number)} / ${escHtml(d.match.task_order_number)}</span></div>`;
-    }
-
-    document.getElementById("link-modal-confirm").onclick = async () => {
-      document.getElementById("link-modal-overlay").classList.add("hidden");
-      await fetch(`/api/rtcs/${rtcId}/link-horizon`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project_number:    d.match.project_number,
-          task_order_number: d.match.task_order_number,
-        })
-      });
-      await loadRtcs();
-    };
-    document.getElementById("link-modal-skip").onclick = () => {
-      document.getElementById("link-modal-overlay").classList.add("hidden");
-    };
-    document.getElementById("link-modal-overlay").classList.remove("hidden");
-  } catch(e) { /* silent fail — non-critical */ }
 }
 
 // ---------------------------------------------------------------------------

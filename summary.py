@@ -79,7 +79,7 @@ def _get_active_periods(conn, from_date=None):
 
     return [dict(r) for r in rows]
 
-def build(department: str = None) -> dict:
+def build() -> dict:
     """
     Build the full summary JSON.
     If department is specified, builds for that department only.
@@ -101,11 +101,7 @@ def build(department: str = None) -> dict:
         WHERE (end_date IS NULL OR end_date > ?)
         AND   (start_date IS NULL OR start_date <= ?)
     """
-    if department:
-        staff_query += " AND department = ?"
-        staff_rows = conn.execute(staff_query, (first_period, last_period, department)).fetchall()
-    else:
-        staff_rows = conn.execute(staff_query, (first_period, last_period)).fetchall()
+    staff_rows = conn.execute(staff_query, (first_period, last_period)).fetchall()
 
     # Availability fractions per person per period
     avail_rows = conn.execute("""
