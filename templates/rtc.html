@@ -31,9 +31,9 @@
       margin-left: auto;
       font-size: 11px; color: var(--grey-400);
     }
-    .rtc-topbar .save-status.saving { color: var(--amber-dark); }
-    .rtc-topbar .save-status.saved  { color: var(--green-dark); }
-    .rtc-topbar .save-status.error  { color: var(--status-red); }
+    .rtc-topbar .save-status.saving { color: var(--wsp-red); }
+    .rtc-topbar .save-status.saved  { color: var(--wsp-red); }
+    .rtc-topbar .save-status.error  { color: var(--wsp-red); }
 
     .rtc-main { max-width: 1600px; margin: 0 auto; padding: 20px 24px 40px; }
 
@@ -349,7 +349,7 @@
     <span class="divider"></span>
     <span class="title">Resource Forecast — RTC Editor</span>
     <span class="save-status" id="save-status"></span>
-    <a href="/" class="back" style="margin-left:auto;background:var(--wsp-red);border-color:var(--wsp-red);color:#fff">← Back to dashboard</a>
+    <a href="#" class="back" id="btn-back" style="margin-left:auto;background:var(--wsp-red);border-color:var(--wsp-red);color:#fff">← Back to dashboard</a>
   </div>
 
   <div class="rtc-main">

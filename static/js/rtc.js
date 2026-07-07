@@ -12,6 +12,7 @@ const state = {
   allStaff:     [],     // Full staff list from /api/staff for search
   saving:       false,
   saveTimer:    null,
+  dirtyCells:   {},    // key: "pid|period" -> {pid, period, days}
 };
 
 // Today's first-of-month — used to determine past/current/future months
@@ -23,6 +24,19 @@ const TODAY_MONTH = (() => {
 })();
 
 // ── Initialise ───────────────────────────────────────────────────────────────
+
+// Flush dirty cells before page unload
+window.addEventListener('beforeunload', () => {
+  const cells = Object.values(state.dirtyCells);
+  if (!cells.length) return;
+  navigator.sendBeacon(`/api/rtcs/${RTC_ID}`, JSON.stringify({
+    allocations: cells.map(c => ({
+      horizon_person_number: c.pid,
+      period_start: c.period,
+      days: c.days
+    }))
+  }));
+});
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadRtc();
@@ -555,24 +569,44 @@ function commitEdit(div) {
   div.innerHTML = days > 0 ? fmt(days) : '';
   div.classList.toggle('rtc-cell--zero', days === 0);
 
-  // Debounced save
+  // Add to dirty cells buffer and debounce a flush
+  state.dirtyCells[`${pid}|${period}`] = { pid, period, days };
   clearTimeout(state.saveTimer);
-  state.saveTimer = setTimeout(() => saveAllocation(pid, period, days), 500);
+  state.saveTimer = setTimeout(flushDirtyCells, 500);
   return true;
 }
 
-async function saveAllocation(pid, period, days) {
+async function flushDirtyCells() {
+  const cells = Object.values(state.dirtyCells);
+  if (!cells.length) return;
+  state.dirtyCells = {};
   setSaveStatus('saving');
   try {
     const r = await fetch(`/api/rtcs/${RTC_ID}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        allocations: [{ horizon_person_number: pid, period_start: period, days }]
+        allocations: cells.map(c => ({
+          horizon_person_number: c.pid,
+          period_start: c.period,
+          days: c.days
+        }))
       }),
     });
     setSaveStatus(r.ok ? 'saved' : 'error');
-  } catch(e) { setSaveStatus('error'); }
+    if (!r.ok) {
+      // Re-queue failed cells
+      cells.forEach(c => state.dirtyCells[`${c.pid}|${c.period}`] = c);
+    }
+  } catch(e) {
+    setSaveStatus('error');
+    cells.forEach(c => state.dirtyCells[`${c.pid}|${c.period}`] = c);
+  }
+}
+
+async function saveAllocation(pid, period, days) {
+  state.dirtyCells[`${pid}|${period}`] = { pid, period, days };
+  await flushDirtyCells();
 }
 
 // ── Save status ───────────────────────────────────────────────────────────────
@@ -816,6 +850,15 @@ function wireEvents() {
   // Horizon popup close on overlay click
   document.getElementById('horizon-popup').addEventListener('click', e => {
     if (e.target.id === 'horizon-popup') closePopup();
+  });
+
+  document.getElementById('btn-back')?.addEventListener('click', async e => {
+    e.preventDefault();
+    clearTimeout(state.saveTimer);
+    if (Object.keys(state.dirtyCells).length > 0) {
+      await flushDirtyCells();
+    }
+    window.location.href = '/';
   });
 }
 

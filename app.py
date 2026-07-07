@@ -683,6 +683,22 @@ def api_update_rtc(rtc_id):
     if "project_number" in data and "task_order_number" in data:
         project_id = _get_or_create_project(c, data, now)
         updates["project_id"] = project_id
+    
+    # Update editable project fields on Placeholder/Pending rows only
+    PROJECT_EDITABLE = ["project_name", "task_name", "project_customer",
+                        "project_director", "project_manager"]
+    proj_updates = {k: data[k] for k in PROJECT_EDITABLE if k in data}
+    if proj_updates:
+        proj = c.execute("""
+            SELECT p.project_id, p.project_status
+            FROM rtcs r
+            JOIN projects p ON p.project_id = r.project_id
+            WHERE r.rtc_id = ?
+        """, (rtc_id,)).fetchone()
+        if proj and proj["project_status"] in ("Placeholder", "Pending"):
+            set_clause = ", ".join(f"{k} = ?" for k in proj_updates)
+            c.execute(f"UPDATE projects SET {set_clause} WHERE project_id = ?",
+                      list(proj_updates.values()) + [proj["project_id"]])
 
     if updates:
         updates["last_updated_by"] = user
