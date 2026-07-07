@@ -216,6 +216,13 @@ def _nightly_imports():
 
     summary_module.build()
     logger.info("Summary cache rebuilt")
+    # Ensure reporting periods stay 3 years ahead
+    _conn = database.get_connection()
+    from datetime import date as _date
+    from dateutil.relativedelta import relativedelta as _rd
+    database.ensure_periods_through(_conn, _date.today() + _rd(years=3))
+    _conn.close()
+    logger.info("Reporting periods extended through 3 years ahead")
     logger.info("Nightly import complete")
 
 
@@ -693,9 +700,10 @@ def api_get_rtc(rtc_id):
         people[pid]["allocations"][row["period_start"]] = row["days"]
 
     return jsonify({
-        "rtc":     dict(rtc),
-        "periods": [dict(p) for p in periods],
-        "staff":   list(people.values()),
+        "rtc":            dict(rtc),
+        "periods":        [dict(p) for p in periods],
+        "staff":          list(people.values()),
+        "server_period":  datetime.now(timezone.utc).date().replace(day=1).isoformat(),
     })
 
 
@@ -1022,15 +1030,19 @@ def api_extend_rtc(rtc_id):
         conn.close()
         return jsonify({"error": "No existing periods found"}), 400
 
+    # Ensure periods exist 12 months beyond the current last one
+    from datetime import date as _date
+    from dateutil.relativedelta import relativedelta as _rd
+    last_date = _date.fromisoformat(last_period)
+    target = last_date + _rd(months=12)
+    database.ensure_periods_through(conn, target)
+
     # Get the next 12 periods after the current last one
     new_periods = c.execute("""
         SELECT period_start FROM reporting_periods
         WHERE period_start > ?
         ORDER BY period_start LIMIT 12
     """, (last_period,)).fetchall()
-    if not new_periods:
-        conn.close()
-        return jsonify({"error": "No further reporting periods available"}), 400
 
     # Insert zero-allocation rows for all staff for all new periods
     added = 0
@@ -1474,6 +1486,9 @@ def create_app():
     summary_module.build()
     summary_module.start_worker()
 
+# IMPORTANT: The scheduler and summary worker thread are in-process globals.
+    # Run only ONE worker process (not multiple gunicorn workers) or the nightly
+    # import will execute N times concurrently against SQLite.
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         _nightly_imports,

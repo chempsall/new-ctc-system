@@ -40,6 +40,33 @@ def db():
     finally:
         conn.close()
 
+def ensure_periods_through(conn, target_date):
+    """
+    Extend reporting_periods so that target_date's month exists.
+    Safe to call multiple times — uses INSERT OR IGNORE.
+    """
+    from datetime import date as _date
+    from dateutil.relativedelta import relativedelta as _rd
+    c = conn.cursor()
+    last = c.execute(
+        "SELECT MAX(period_start) FROM reporting_periods"
+    ).fetchone()[0]
+    current = (_date.fromisoformat(last) + _rd(months=1)) if last \
+              else _date.today().replace(day=1)
+    if isinstance(target_date, str):
+        target_date = _date.fromisoformat(target_date)
+    target = target_date.replace(day=1)
+    while current <= target:
+        nxt = current + _rd(months=1)
+        c.execute("""INSERT OR IGNORE INTO reporting_periods
+                     (period_start, period_end, working_days, label)
+                     VALUES (?,?,?,?)""",
+                  (current.isoformat(),
+                   (nxt - timedelta(days=1)).isoformat(),
+                   25 if current.month in {1, 4, 7, 10} else 20,
+                   current.strftime("%b-%Y")))
+        current = nxt
+    conn.commit()
 
 def initialise_database():
     if DB_PATH is None:
@@ -216,6 +243,11 @@ def initialise_database():
     c.execute("""
         CREATE INDEX IF NOT EXISTS idx_allocations_period
         ON allocations(period_start)
+    """)
+
+    c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_allocations_person
+        ON allocations(horizon_person_number, period_start)
     """)
     
     _seed_reporting_periods(c)

@@ -15,9 +15,10 @@ database entirely, not just from this module.
 import json
 from datetime import datetime, timezone, date
 from database import get_connection
+import config
 
 
-HORIZON_MONTHS = 6   # How many future months to include in the summary
+HORIZON_MONTHS = config.FORECAST_HORIZON_MONTHS
 
 # ---------------------------------------------------------------------------
 # Resourcing thresholds
@@ -82,7 +83,6 @@ def _get_active_periods(conn, from_date=None):
 def build() -> dict:
     """
     Build the full summary JSON.
-    If department is specified, builds for that department only.
     Returns the summary dict and also writes it to summary_cache table.
     """
     conn = get_connection()
@@ -262,23 +262,13 @@ def build() -> dict:
 
     # -- Projects ------------------------------------------------------------
     # Query projects that have at least one RTC (i.e. are being worked on).
-    # Filter by department if specified.
-    if department:
-        proj_rows = conn.execute("""
-            SELECT DISTINCT p.*, r.department, r.rtc_id,
-                   r.start_date, r.last_updated_at
-            FROM projects p
-            JOIN rtcs r ON r.project_id = p.project_id
-            WHERE r.department = ? AND r.is_archived = 0
-        """, (department,)).fetchall()
-    else:
-        proj_rows = conn.execute("""
-            SELECT DISTINCT p.*, r.department, r.rtc_id,
-                   r.start_date, r.last_updated_at
-            FROM projects p
-            JOIN rtcs r ON r.project_id = p.project_id
-            WHERE r.is_archived = 0
-        """).fetchall()
+    proj_rows = conn.execute("""
+        SELECT DISTINCT p.*, r.department, r.rtc_id,
+               r.start_date, r.last_updated_at
+        FROM projects p
+        JOIN rtcs r ON r.project_id = p.project_id
+        WHERE r.is_archived = 0
+    """).fetchall()
 
     # Total allocated days per project per period (across all RTCs)
     proj_days_map = {}  # project_id -> period_start -> days

@@ -16,7 +16,7 @@ const state = {
 };
 
 // Today's first-of-month — used to determine past/current/future months
-const TODAY_MONTH = (() => {
+let TODAY_MONTH = (() => {
   const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -58,6 +58,7 @@ async function loadRtc() {
     const d = await r.json();
     state.rtc     = d.rtc;
     state.periods = d.periods;
+    if (d.server_period) TODAY_MONTH = d.server_period;
     state.staff   = d.staff.sort((a, b) => {
       const aGeneric = a.horizon_person_number.startsWith('GENERIC-');
       const bGeneric = b.horizon_person_number.startsWith('GENERIC-');
@@ -904,5 +905,6 @@ function esc(s) {
   if (s == null) return '';
   return String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
 }
