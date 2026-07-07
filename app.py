@@ -12,7 +12,7 @@ To start the development server:
 import json
 import logging
 import secrets
-from datetime import datetime, timezone, date, timedelta
+from datetime import datetime, timezone, timedelta
 from functools import wraps
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
@@ -85,6 +85,22 @@ from imports import par_import
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
+
+
+@app.errorhandler(404)
+def handle_404(e):
+    return jsonify({"error": "Not found"}), 404
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Return JSON for all unhandled exceptions."""
+    import traceback
+    logger.error(f"Unhandled exception: {e}\n{traceback.format_exc()}")
+    if config.FLASK_DEBUG:
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+    return jsonify({"error": "An unexpected error occurred"}), 500
+
 
 
 # ---------------------------------------------------------------------------
@@ -1225,6 +1241,7 @@ def admin_delete_rtc(rtc_id):
     conn.commit()
     conn.close()
     summary_module.mark_dirty()
+    logger.info(f"Admin: RTC {rtc_id} deleted ({alloc_count} allocation rows removed)")
     return jsonify({"status": "ok", "allocations_removed": alloc_count})
 
 
@@ -1236,26 +1253,27 @@ def admin_index():
 @app.route("/admin/import/staff", methods=["POST"])
 @require_admin
 def admin_import_staff():
-    from pathlib import Path
     path = (request.json or {}).get("file_path") or str(config.STAFF_LIST_PATH)
     if not path or not Path(path).exists():
         return jsonify({"error": f"File not found: {path}"}), 400
     result = staff_import.run(path)
     summary_module.build()
+    logger.info(f"Admin: staff import completed — {result.get('rows_processed',0)} rows processed, "
+                f"{result.get('rows_inserted',0)} inserted, {result.get('rows_updated',0)} updated")
     return jsonify(result)
 
 
 @app.route("/admin/import/par", methods=["POST"])
 @require_admin
 def admin_import_par():
-    from pathlib import Path
     path = (request.json or {}).get("file_path") or str(config.PAR_ACTUALS_PATH)
     if not path or not Path(path).exists():
         return jsonify({"error": f"File not found: {path}"}), 400
     result = par_import.run(path)
     summary_module.build()
+    logger.info(f"Admin: PAR import completed — {result.get('rows_processed',0)} rows processed, "
+                f"{result.get('rows_inserted',0)} inserted, {result.get('rows_updated',0)} updated")
     return jsonify(result)
-
 
 @app.route("/admin/import-log")
 @require_admin
@@ -1281,6 +1299,7 @@ def admin_relink_pending():
     """Manually triggers re-linking of pending RTCs to Horizon."""
     linked = _relink_pending_rtcs()
     summary_module.mark_dirty()
+    logger.info(f"Admin: re-link pending RTCs — {linked} linked")
     return jsonify({"status": "ok", "linked": linked})
 
 
@@ -1288,6 +1307,7 @@ def admin_relink_pending():
 @require_admin
 def admin_rebuild_summary():
     summary_module.build()
+    logger.info("Admin: summary cache rebuilt manually")
     return jsonify({"status": "ok",
                     "rebuilt_at": datetime.now(timezone.utc).isoformat()})
 
@@ -1346,6 +1366,9 @@ def admin_run_cleanup():
 
     if archived:
         summary_module.build()
+        logger.info(f"Admin: cleanup archived {len(archived)} RTC(s)")
+    else:
+        logger.info("Admin: cleanup — no RTCs eligible for archiving")
 
     return jsonify({
         "archived_count": len(archived),
@@ -1379,7 +1402,6 @@ def admin_log():
 @require_admin
 def admin_config():
     """Returns non-sensitive config summary for diagnostics."""
-    from pathlib import Path
     return jsonify({
         "environment":       config.ENV,
         "base_dir":          str(config.BASE_DIR),
@@ -1501,22 +1523,6 @@ def create_app():
     database.initialise_database()
     summary_module.build()
     summary_module.start_worker()
-
-    @app.errorhandler(404)
-    def handle_404(e):
-        return jsonify({"error": "Not found"}), 404
-
-    @app.errorhandler(Exception)
-    def handle_exception(e):
-        """Return JSON for all unhandled exceptions."""
-        import traceback
-        code = getattr(e, 'code', 500)
-        if code == 404:
-            return jsonify({"error": "Not found"}), 404
-        logger.error(f"Unhandled exception: {e}\n{traceback.format_exc()}")
-        if config.FLASK_DEBUG:
-            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
-        return jsonify({"error": "An unexpected error occurred"}), 500
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(

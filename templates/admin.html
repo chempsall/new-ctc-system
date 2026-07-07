@@ -290,8 +290,8 @@
             Log files are rotated daily and kept for 28 days.
           </div>
           <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn btn--sm" onclick="loadLog(false)">View all</button>
-            <button class="btn btn--sm btn--secondary" onclick="loadLog(true)">Errors only</button>
+            <button class="btn btn--sm" id="btn-log-all" onclick="loadLog(false)">View all</button>
+            <button class="btn btn--sm btn--secondary" id="btn-log-errors" onclick="loadLog(true)">Errors only</button>
             <button class="btn btn--sm btn--secondary" onclick="clearLog()">Clear</button>
           </div>
           <div id="log-output" style="margin-top:10px;display:none">
@@ -438,6 +438,8 @@
     // ── IMPORT LOG ────────────────────────────────────────────────────────
 
     async function loadLog(errorsOnly) {
+      document.getElementById('btn-log-all').className = errorsOnly ? 'btn btn--sm btn--secondary' : 'btn btn--sm';
+      document.getElementById('btn-log-errors').className = errorsOnly ? 'btn btn--sm' : 'btn btn--sm btn--secondary';
       const output  = document.getElementById("log-output");
       const lines   = document.getElementById("log-lines");
       const count   = document.getElementById("log-count");
