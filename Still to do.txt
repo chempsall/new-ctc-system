@@ -1,4 +1,4 @@
-CTCs should be editable (and copyable) from the Projects slider - the same way as they are from the RTC page.
+CTCs should be editable from the Projects slider - the same way as they are from the RTC page.
 
 Projects page needs an additional filter for Project Manager
 
@@ -11,18 +11,9 @@ Edge case - more than one PD (is the same possible for PM?)
 
 
 
+Does the duplicate function work?
 
-
-Th easiest solution for this is to not display anything when both the project number and task number are placeholders and only display the project number when that is the only thing that is known. 
-
-I just found a weird bug. I typed "Hart" into the add person box and it didn't find the person I thought it would. When I typed her first name she is there.
-
-
-
-Don't allow the same person to be added twice in an RTC
-
-
-I'm still not satisfied with the "Days" display on the RTCs page. It shows remaining days excluding the current month (potentially misleading)
+I'm still not satisfied with the "Days" display on the RTCs page. It shows remaining days excluding the current month (potentially misleading) - IS THIS TRUE? I don't think it is, I think it's total days.
 
 
 

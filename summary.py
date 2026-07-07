@@ -23,9 +23,9 @@ HORIZON_MONTHS = 6   # How many future months to include in the summary
 # These determine the KPI status shown on the dashboard.
 # Expressed as fractions of available capacity.
 # ---------------------------------------------------------------------------
-KPI_OVER_THRESHOLD  = 1.025   # above this = over-allocated (red)
-KPI_UNDER_THRESHOLD = 0.975   # below this = under-resourced (blue)
-# between the two = fully allocated (green)
+KPI_OVER_THRESHOLD  = 1.05   # above this = over-allocated (red)
+KPI_UNDER_THRESHOLD = 0.95   # below this = under-resourced (green)
+# between the two = fully allocated (amber)
 # unavailable = no capacity at all
 
 def _period_fte(start_date, end_date, period_start, period_end, availability):
@@ -78,24 +78,6 @@ def _get_active_periods(conn, from_date=None):
 
     return [dict(r) for r in rows]
 
-def _period_fte(start_date, end_date, period_start, period_end, availability):
-    from datetime import date as _date
-    def _parse(d):
-        if isinstance(d, _date): return d
-        if not d: return None
-        return _date.fromisoformat(d)
-    ps = _parse(period_start)
-    pe = _parse(period_end)
-    ss = _parse(start_date)
-    se = _parse(end_date)
-    effective_start = max(ps, ss) if ss else ps
-    effective_end   = min(pe, se) if se else pe
-    if effective_start > effective_end:
-        return 0.0
-    period_days  = (pe - ps).days + 1
-    present_days = (effective_end - effective_start).days + 1
-    return round(availability * (present_days / period_days), 3)
-
 def build(department: str = None) -> dict:
     """
     Build the full summary JSON.
@@ -111,21 +93,18 @@ def build(department: str = None) -> dict:
     working_days = {p["label"]: p["working_days"] for p in periods}
 
     # -- Staff ---------------------------------------------------------------
-    staff_query = "SELECT * FROM staff WHERE end_date IS NULL OR end_date > ?"
     first_period = period_starts[0] if period_starts else date.today().isoformat()
-    staff_query = "SELECT * FROM staff WHERE end_date IS NULL OR end_date > ?"
+    last_period  = period_starts[-1] if period_starts else date.today().isoformat()
+    staff_query  = """
+        SELECT * FROM staff
+        WHERE (end_date IS NULL OR end_date > ?)
+        AND   (start_date IS NULL OR start_date <= ?)
+    """
     if department:
         staff_query += " AND department = ?"
-        staff_rows = conn.execute(staff_query, (first_period, department)).fetchall()
+        staff_rows = conn.execute(staff_query, (first_period, last_period, department)).fetchall()
     else:
-        staff_rows = conn.execute(staff_query, (first_period,)).fetchall()
-    
-    staff_query = "SELECT * FROM staff WHERE (end_date IS NULL OR end_date > ?) AND (start_date IS NULL OR start_date <= ?)"
-    if department:
-        staff_query += " AND department = ?"
-        staff_rows = conn.execute(staff_query, (first_period, period_starts[-1], department)).fetchall()
-    else:
-        staff_rows = conn.execute(staff_query, (first_period, period_starts[-1])).fetchall()
+        staff_rows = conn.execute(staff_query, (first_period, last_period)).fetchall()
 
     # Availability fractions per person per period
     avail_rows = conn.execute("""
@@ -207,29 +186,12 @@ def build(department: str = None) -> dict:
             allocated[label]    = alloc
             horizon_days[label] = h_days
             no_rec_days[label]  = nr_days
-
-            fte[label] = 0.0 if pid.startswith("GENERIC-") else _period_fte(
+            fte[label]          = 0.0 if pid.startswith("GENERIC-") else _period_fte(
                 s["start_date"], s["end_date"],
                 ps, p["period_end"],
                 avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
             )
 
-            fte_val = 0.0 if pid.startswith("GENERIC-") else _period_fte(
-                s["start_date"], s["end_date"],
-                ps, p["period_end"],
-                avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
-            )
-            capacity[label]     = cap
-            allocated[label]    = alloc
-            horizon_days[label] = h_days
-
-            fte_val = 0.0 if pid.startswith("GENERIC-") else _period_fte(
-                s["start_date"], s["end_date"],
-                ps, p["period_end"],
-                avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
-            )
-
-            no_rec_days[label]  = nr_days
 
             # KPI: compare allocated vs capacity
             if pid.startswith("GENERIC-"):

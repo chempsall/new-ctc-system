@@ -176,37 +176,43 @@
     }
 
     /* ── The grid itself ───────────────────────────────────────────── */
-    .rtc-grid-wrap {
-      overflow-x: auto;
-      overflow-y: auto;
-      max-height: 60vh;
-    }
+    /* ── Grid geometry: single source of truth ─────────────────────── */
     .rtc-grid {
-      border-collapse: collapse;
+      --col-1: 60px;   /* Action */
+      --col-2: 160px;  /* Name */
+      --col-3: 160px;  /* Job Title */
+      --col-4: 175px;  /* Job Function */
+      --off-2: 60px;
+      --off-3: 220px;
+      --off-4: 380px;
+      border-collapse: separate;
+      border-spacing: 0;
       table-layout: fixed;
       width: max-content;
       min-width: 100%;
     }
+    .rtc-grid col.c-1     { width: var(--col-1); }
+    .rtc-grid col.c-2     { width: var(--col-2); }
+    .rtc-grid col.c-3     { width: var(--col-3); }
+    .rtc-grid col.c-4     { width: var(--col-4); }
+    .rtc-grid col.c-month { width: 72px; }
 
-    /* Sticky frozen columns */
-    .rtc-grid th.frozen,
-    .rtc-grid td.frozen {
+    /* ── Frozen columns pin horizontally ─────────────────────────────── */
+    .rtc-grid th.frozen, .rtc-grid td.frozen {
       position: sticky;
       background: var(--surface);
-      z-index: 2;
     }
-    .rtc-grid th.frozen-1, .rtc-grid td.frozen-1 { left: 0px;   width: 50px;  min-width: 50px;  }
-    .rtc-grid th.frozen-2, .rtc-grid td.frozen-2 { left: 50px;  width: 160px; min-width: 160px; }
-    .rtc-grid th.frozen-3, .rtc-grid td.frozen-3 { left: 210px; width: 160px; min-width: 160px; }
-    .rtc-grid th.frozen-4, .rtc-grid td.frozen-4 { left: 370px; width: 175px; min-width: 175px; }
+    .rtc-grid td.frozen { z-index: 2; }
+    .rtc-grid th.frozen-1, .rtc-grid td.frozen-1 { left: 0; }
+    .rtc-grid th.frozen-2, .rtc-grid td.frozen-2 { left: var(--off-2); }
+    .rtc-grid th.frozen-3, .rtc-grid td.frozen-3 { left: var(--off-3); }
+    .rtc-grid th.frozen-4, .rtc-grid td.frozen-4 { left: var(--off-4); }
 
-    /* Shadow on last frozen column */
-    .rtc-grid th.frozen-4,
-    .rtc-grid td.frozen-4 {
-      border-right: 2px solid var(--border);
-    }
+    /* ── All header cells pin vertically; corners pin both ways ─────── */
+    .rtc-grid thead th { position: sticky; top: 0; z-index: 3; }
+    .rtc-grid thead th.frozen { z-index: 4; }
 
-    /* Month column headers */
+    /* ── Headers ─────────────────────────────────────────────────────── */
     .rtc-grid th {
       padding: 8px 4px;
       font-size: 10px; font-weight: 600;
@@ -224,17 +230,22 @@
       border-bottom-color: var(--wsp-red);
     }
 
-    /* Month cells */
+    /* ── Body cells own their borders so they travel when stuck ──────── */
     .rtc-grid td {
       border-bottom: 1px solid var(--border);
       border-right: 1px solid var(--border);
       padding: 0;
       height: 36px;
       vertical-align: middle;
-      max-width: 0;
     }
-    .rtc-grid { border-right: 1px solid var(--border); }
     .rtc-grid td.frozen { padding: 0 8px 0 12px; }
+    .rtc-grid td.frozen-4, .rtc-grid th.frozen-4 { border-right: 2px solid var(--border); }
+
+    /* ── Grid wrap: page never scrolls past the grid ─────────────────── */
+    .rtc-grid-wrap {
+      overflow: auto;
+      max-height: calc(100vh - var(--nav-h) - 240px);
+    }
 
     /* Staff name cell content */
     .rtc-staff-name { font-size: 12px; font-weight: 500; color: var(--text-primary); }

@@ -490,7 +490,7 @@ a:hover { text-decoration: underline; }
   transition: width 0.3s ease;
 }
 
-.alloc-bar__fill--ok    { background: var(--grey-200); }
+.alloc-bar__fill--ok    { background: var(--amber); }
 .alloc-bar__fill--under { background: var(--green); }
 .alloc-bar__fill--over  { background: var(--status-red); }
 
@@ -513,7 +513,7 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0.05em;
   white-space: nowrap;
 }
-.kpi--ok    { background: var(--grey-100);  color: var(--grey-600); }
+.kpi--ok    { background: var(--amber-light);  color: var(--amber-dark); }
 .kpi--under { background: var(--green-light);  color: var(--green-dark); }
 .kpi--over  { background: var(--status-red-light); color: var(--status-red-dark); }
 .kpi--none  { background: var(--grey-100);    color: var(--grey-400);   }

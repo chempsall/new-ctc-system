@@ -353,12 +353,46 @@ function closePopup() {
 function renderGrid() {
   renderGridHead();
   renderGridBody();
+  sizeGridWrap();
+  syncFrozenOffsets();
 }
 
+function syncFrozenOffsets() {
+  const table = document.getElementById('rtc-grid');
+  if (!table) return;
+  const th1 = table.querySelector('th.frozen-1');
+  const th2 = table.querySelector('th.frozen-2');
+  const th3 = table.querySelector('th.frozen-3');
+  if (!th1 || !th2 || !th3) return;
+  const c1 = th1.getBoundingClientRect().width;
+  const c2 = th2.getBoundingClientRect().width;
+  const c3 = th3.getBoundingClientRect().width;
+  table.style.setProperty('--off-2', c1 + 'px');
+  table.style.setProperty('--off-3', (c1 + c2) + 'px');
+  table.style.setProperty('--off-4', (c1 + c2 + c3) + 'px');
+}
+
+function sizeGridWrap() {
+  const wrap = document.querySelector('.rtc-grid-wrap');
+  if (!wrap) return;
+  wrap.style.maxHeight =
+    (window.innerHeight - wrap.getBoundingClientRect().top - 24) + 'px';
+}
+window.addEventListener('resize', sizeGridWrap);
+
 function renderGridHead() {
+  const table = document.getElementById('rtc-grid');
+  let cg = table.querySelector('colgroup');
+  if (cg) cg.remove();
+  cg = document.createElement('colgroup');
+  cg.innerHTML =
+    '<col class="c-1"><col class="c-2"><col class="c-3"><col class="c-4">' +
+    state.periods.map(() => '<col class="c-month">').join('');
+  table.prepend(cg);
+
   const head = document.getElementById('grid-head');
   const cells = [
-    '<th class="frozen frozen-1" style="width:50px;text-align:center">Action</th>',
+    '<th class="frozen frozen-1" style="text-align:center">Action</th>',
     '<th class="frozen frozen-2">Name</th>',
     '<th class="frozen frozen-3">Job Title</th>',
     '<th class="frozen frozen-4">Job Function</th>',
@@ -429,7 +463,7 @@ function scrollToCurrentMonth() {
   const th = document.querySelector('.rtc-grid th.month-current');
   if (th) {
     const wrap = document.querySelector('.rtc-grid-wrap');
-    wrap.scrollLeft = Math.max(0, th.offsetLeft - 440);
+    wrap.scrollLeft = Math.max(0, th.offsetLeft - 380 - 72);
   }
 }
 
