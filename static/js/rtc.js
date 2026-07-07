@@ -203,13 +203,6 @@ function field(label, value) {
   </div>`;
 }
 
-function fmtMonth(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', {
-    month: 'long', year: 'numeric'
-  });
-}
-
 async function saveHeaderFields() {
   const body = {
     project_name:     document.getElementById('field-proj-name')?.value.trim() || '',
@@ -723,16 +716,6 @@ async function replaceStaff(newPid) {
 }
 
 // ── Staff search (type-ahead) ─────────────────────────────────────────────────
-
-const GENERIC_ORDER = [
-  'GENERIC-UK-DIRECTOR','GENERIC-UK-TECHNICAL-DIRECTOR',
-  'GENERIC-UK-ASSOCIATE-DIRECTOR','GENERIC-UK-PRINCIPAL-ENGINEER',
-  'GENERIC-UK-SENIOR-ENGINEER','GENERIC-UK-ENGINEER',
-  'GENERIC-UK-GRADUATE-ENGINEER','GENERIC-UK-UNDERGRADUATE-ENGINEER',
-  'GENERIC-UK-SENIOR-TECHNICIAN','GENERIC-UK-EXPERIENCED-TECHNICIAN',
-  'GENERIC-UK-INTERMEDIATE-TECHNICIAN','GENERIC-UK-ASSISTANT-TECHNICIAN',
-  'GENERIC-UK-TECHNICIAN-IN-TRAINING','GENERIC-UK-DOCUMENT-CONTROL',
-];
 
 function filterStaff(query, excludePids = []) {
   const q = query.toLowerCase().trim();

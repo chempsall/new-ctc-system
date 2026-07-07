@@ -51,21 +51,6 @@ const fmt = {
     if (isNaN(n)) return "—";
     return n % 1 === 0 ? n.toString() : n.toFixed(1);
   },
-  currency: n => {
-    if (n === null || n === undefined) return "—";
-    return new Intl.NumberFormat("en-GB", {
-      style: "currency", currency: "GBP", maximumFractionDigits: 0
-    }).format(n);
-  },
-  multiplier: n => {
-    if (n === null || n === undefined) return "—";
-    return parseFloat(n).toFixed(3) + "×";
-  },
-  percent: n => {
-    if (n === null || n === undefined) return "—";
-    const pct = (parseFloat(n) * 100).toFixed(1);
-    return pct + "%";
-  },
   initials: name => {
     if (!name) return "?";
     const parts = name.split(",").map(s => s.trim());
@@ -200,9 +185,6 @@ function renderMetrics() {
 
   const overCount  = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && ps.kpi[p] === "over").length;
   const underCount = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && ps.kpi[p] === "under").length;
-  const noRecDays = staff.reduce((sum, ps) =>
-    sum + (ps.no_record_days[p] || 0), 0);
-  const conflicts = s.conflicts ? s.conflicts.length : 0;
   const noRecProj = projects.filter(pr => pr.horizon_status !== "linked").length;
 
 const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && (ps.capacity?.[p] ?? 1) > 0);
@@ -220,20 +202,6 @@ const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && (ps.capac
   document.getElementById("metric-under").textContent = underCount;
   document.getElementById("metric-under-card").className =
     "metric-card" + (underCount > 0 ? " metric-card--info" : "");
-}
-
-// ---------------------------------------------------------------------------
-// Conflict banner
-// ---------------------------------------------------------------------------
-function renderConflictBanner() {
-  const banner = document.getElementById("conflict-banner");
-  const count  = state.summary.conflicts ? state.summary.conflicts.length : 0;
-  if (count === 0) {
-    banner.classList.add("hidden");
-    return;
-  }
-  banner.classList.remove("hidden");
-  document.getElementById("conflict-count").textContent = count;
 }
 
 // ---------------------------------------------------------------------------
@@ -567,7 +535,6 @@ function filteredRtcs() {
 function renderRtcTable() {
   const tbody  = document.getElementById("rtc-tbody");
   const rtcs   = filteredRtcs();
-  const dupBtn = document.getElementById("btn-duplicate-rtc");
 
   if (rtcs.length === 0) {
     tbody.innerHTML = `<tr><td colspan="7">
@@ -645,10 +612,6 @@ function selectRtc(id) {
   state.selectedRtc     = id;
   state.selectedStaff   = null;
   state.selectedProject = null;
-
-  // Enable duplicate button since an RTC is now selected
-  const dupBtn = document.getElementById("btn-duplicate-rtc");
-  if (dupBtn) dupBtn.disabled = false;
 
   renderRtcTable();
   showRtcDetail(rtc);
@@ -1545,10 +1508,6 @@ document.getElementById("filter-project-pm")?.addEventListener("change", e => {
   document.getElementById("filter-rtc-status")?.addEventListener("change", e => {
     state.rtcFilters.status = e.target.value;
     renderRtcTable();
-  });
-  document.getElementById("filter-rtc-archived")?.addEventListener("change", e => {
-    state.rtcFilters.archived = e.target.checked;
-    if (state.activeView === "rtcs") loadRtcs();
   });
 
   // RTC action buttons

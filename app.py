@@ -11,7 +11,6 @@ To start the development server:
 
 import json
 import secrets
-import threading
 from datetime import datetime, timezone, date, timedelta
 from functools import wraps
 from pathlib import Path
@@ -1190,7 +1189,6 @@ def admin_run_cleanup():
     """
     now         = datetime.now(timezone.utc)
     today       = now.date().isoformat()
-    cutoff      = (now.date() - timedelta(days=30)).isoformat()
 
     conn = database.get_connection()
     c    = conn.cursor()
