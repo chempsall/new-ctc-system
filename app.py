@@ -88,6 +88,56 @@ def require_admin(f):
 # SCHEDULED JOBS
 # ---------------------------------------------------------------------------
 
+def _relink_pending_rtcs(conn=None):
+    """
+    Checks all Pending/Placeholder RTCs against current PAR data.
+    If a real project+task match is found, links the RTC automatically.
+    Returns a count of RTCs linked.
+    """
+    close_after = conn is None
+    if conn is None:
+        conn = database.get_connection()
+    c = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+
+    pending = c.execute("""
+        SELECT r.rtc_id, p.project_number, p.task_order_number
+        FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE p.project_status IN ('Placeholder', 'Pending')
+        AND r.is_archived = 0
+    """).fetchall()
+
+    linked = 0
+    for row in pending:
+        rtc_id   = row["rtc_id"]
+        proj_num = (row["project_number"] or "").split("_")[0].strip()
+        task_num = (row["task_order_number"] or "").split("_")[0].strip()
+
+        if not proj_num or _is_placeholder(proj_num):
+            continue
+
+        match = c.execute("""
+            SELECT project_id FROM projects
+            WHERE project_number = ? AND task_order_number = ?
+            AND project_status = 'Active'
+        """, (proj_num, task_num)).fetchone()
+
+        if match:
+            c.execute("""
+                UPDATE rtcs SET project_id = ?, last_updated_at = ?,
+                               auto_linked = 1
+                WHERE rtc_id = ?
+            """, (match["project_id"], now, rtc_id))
+            linked += 1
+
+    if linked:
+        conn.commit()
+    if close_after:
+        conn.close()
+    return linked
+
+
 def _nightly_imports():
     """
     Runs at the configured time (default midnight).
@@ -105,6 +155,10 @@ def _nightly_imports():
     r = par_import.run()
     print(f"  PAR import: {r['rows_processed']} rows, "
           f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
+
+    relinked = _relink_pending_rtcs()
+    if relinked:
+        print(f"  Re-linked {relinked} pending RTC(s) to Horizon")
 
     summary_module.build()
     print(f"  Summary cache rebuilt")
@@ -1008,6 +1062,16 @@ def api_rtc_opened(rtc_id):
     conn.close()
     return jsonify({"status": "ok"})
 
+@app.route("/api/rtcs/<int:rtc_id>/clear-auto-link", methods=["POST"])
+def api_clear_auto_link(rtc_id):
+    """Clears the auto_linked flag after user has confirmed the link."""
+    conn = database.get_connection()
+    conn.execute("UPDATE rtcs SET auto_linked = 0 WHERE rtc_id = ?", (rtc_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
 @app.route("/api/rtcs/<int:rtc_id>/check-horizon")
 def api_check_horizon(rtc_id):
     """
@@ -1027,9 +1091,10 @@ def api_check_horizon(rtc_id):
         conn.close()
         return jsonify({"error": "Not found"}), 404
 
+    auto_linked = bool(rtc["auto_linked"]) if "auto_linked" in rtc.keys() else False
     if rtc["project_status"] not in ("Placeholder", "Pending"):
         conn.close()
-        return jsonify({"is_placeholder": False, "match": None})
+        return jsonify({"is_placeholder": False, "match": None, "auto_linked": auto_linked})
 
     # Look for a real PAR record with a similar project name
     match = None
@@ -1169,6 +1234,15 @@ def admin_import_log():
         row["errors"] = json.loads(row["errors"] or "[]")
         result.append(row)
     return jsonify(result)
+
+
+@app.route("/admin/relink-pending", methods=["POST"])
+@require_admin
+def admin_relink_pending():
+    """Manually triggers re-linking of pending RTCs to Horizon."""
+    linked = _relink_pending_rtcs()
+    summary_module.mark_dirty()
+    return jsonify({"status": "ok", "linked": linked})
 
 
 @app.route("/admin/rebuild-summary", methods=["POST"])

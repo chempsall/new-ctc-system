@@ -201,6 +201,19 @@
       </div>
 
       <div class="admin-action">
+        <div class="admin-action__name">Re-link pending RTCs</div>
+        <div>
+          <div class="admin-action__desc">
+            Checks all unlinked RTCs against current PAR data and links any
+            where the project number and task order now match a real Horizon record.
+            Runs automatically after each nightly PAR import.
+          </div>
+          <div class="admin-action__result" id="result-relink"></div>
+        </div>
+        <button class="btn" onclick="relinkPending(this)">Run now</button>
+      </div>
+
+      <div class="admin-action">
         <div class="admin-action__name">Import PAR actuals</div>
         <div>
           <div class="admin-action__desc">
@@ -349,6 +362,22 @@
           r.ok ? `✓  Rebuilt at ${d.rebuilt_at?.slice(0,19).replace("T"," ")}` : `✗  ${d.error}`,
           r.ok ? "ok" : "err");
       } catch(e) { setResult("result-rebuild", `✗  ${e.message}`, "err"); }
+      btn.disabled = false;
+    }
+
+    async function relinkPending(btn) {
+      setResult("result-relink", "Checking…", "");
+      btn.disabled = true;
+      try {
+        const r = await fetch("/admin/relink-pending", { method: "POST", headers: headers() });
+        const d = await r.json();
+        if (!r.ok) { setResult("result-relink", `✗  ${d.error}`, "err"); btn.disabled=false; return; }
+        setResult("result-relink",
+          d.linked > 0
+            ? `✓  ${d.linked} RTC${d.linked !== 1 ? "s" : ""} linked to Horizon`
+            : "✓  No pending RTCs found a match",
+          "ok");
+      } catch(e) { setResult("result-relink", `✗  ${e.message}`, "err"); }
       btn.disabled = false;
     }
 

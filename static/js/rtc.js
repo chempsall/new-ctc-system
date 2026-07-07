@@ -285,7 +285,25 @@ async function checkHorizon() {
 
   const isLinked = rtc.project_status === 'Active';
 
-  if (isLinked) return; // No popup needed
+  if (isLinked) {
+    // Check if this was auto-linked and needs user confirmation
+    try {
+      const r = await fetch(`/api/rtcs/${RTC_ID}/check-horizon`);
+      const d = await r.json();
+      if (d.auto_linked) {
+        showPopup(
+          'Automatically linked to Horizon',
+          `This RTC was automatically linked to a Horizon record: <strong>${esc(state.rtc.project_name || '')}</strong>.<br><br>` +
+          'Please confirm this is correct. If it is not, contact your system administrator.',
+          [{ label: 'Confirmed — this is correct', action: async () => {
+            closePopup();
+            await fetch(`/api/rtcs/${RTC_ID}/clear-auto-link`, { method: 'POST' });
+          }}]
+        );
+      }
+    } catch(e) { console.error('Auto-link check failed', e); }
+    return;
+  }
 
   // Check if a match is now available
   try {
