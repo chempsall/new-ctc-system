@@ -1525,7 +1525,8 @@ document.getElementById("filter-project-pm")?.addEventListener("change", e => {
   if (searchEl) {
     searchEl.addEventListener("input", () => {
       state.filters.search = searchEl.value.trim();
-      renderView();
+      if (state.activeView === "rtcs") loadRtcs();
+      else renderView();
     });
   }
 
