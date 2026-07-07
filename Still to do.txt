@@ -9,9 +9,11 @@ Can we have a HR extract for staff_list and what would it look like?
 Edge case - more than one PD (is the same possible for PM?)
 
 
-
+Filter free text has stopped working on the RTCs page
 
 Does the duplicate function work?
+
+Default sort order for the three pages?
 
 I'm still not satisfied with the "Days" display on the RTCs page. It shows remaining days excluding the current month (potentially misleading) - IS THIS TRUE? I don't think it is, I think it's total days.
 

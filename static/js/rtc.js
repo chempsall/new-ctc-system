@@ -41,6 +41,7 @@ window.addEventListener('beforeunload', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   await loadRtc();
   await loadAllStaff();
+  fetch(`/api/rtcs/${RTC_ID}/opened`, { method: 'POST' }); // fire and forget
   renderHeader();
   renderGrid();
   setTimeout(scrollToCurrentMonth, 100);

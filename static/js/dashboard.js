@@ -693,7 +693,7 @@ function showRtcDetail(rtc) {
 
   // Hide KPI badge and no-record warning (not applicable for RTCs)
   const kpiEl = document.getElementById("dp-kpi");
-  if (kpiEl) kpiEl.className = "kpi kpi--ok"; kpiEl.textContent = "";
+  if (kpiEl) { kpiEl.className = "kpi kpi--ok"; kpiEl.textContent = ""; }
   const warnEl = document.getElementById("dp-norec-warn");
   if (warnEl) warnEl.classList.add("hidden");
 
@@ -1032,8 +1032,8 @@ function updateStatusBar() {
   if (parts.length > 0) {
     el.innerHTML = parts.join(" &nbsp;&nbsp; ");
   } else {
-    el.innerHTML = '<strong>${s.staff.length}</strong> staff · ' +
-                   '<strong>${s.projects.length}</strong> projects';
+    el.innerHTML = `<strong>${s.staff.length}</strong> staff · ` +
+                   `<strong>${s.projects.length}</strong> projects`;
   }
 }
 
@@ -1547,16 +1547,6 @@ document.getElementById("filter-project-pm")?.addEventListener("change", e => {
   });
   document.getElementById("filter-rtc-archived")?.addEventListener("change", e => {
     state.rtcFilters.archived = e.target.checked;
-    if (state.activeView === "rtcs") loadRtcs();
-  });
-
-  // Also reload RTCs when the shared department/search filters change
-  // (those already re-render staff/projects, but RTCs need a fresh fetch)
-  const origSearchHandler = document.getElementById("filter-search")?._rtcHandler;
-  document.getElementById("filter-search")?.addEventListener("input", () => {
-    if (state.activeView === "rtcs") loadRtcs();
-  });
-  document.getElementById("filter-department")?.addEventListener("change", () => {
     if (state.activeView === "rtcs") loadRtcs();
   });
 

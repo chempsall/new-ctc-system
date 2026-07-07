@@ -521,12 +521,6 @@ def api_get_rtc(rtc_id):
     c    = conn.cursor()
 
     # Update last_opened
-    c.execute("""
-        UPDATE rtcs SET last_opened_by = ?, last_opened = ?
-        WHERE rtc_id = ?
-    """, (user, now, rtc_id))
-    conn.commit()
-
     rtc = c.execute("""
         SELECT r.*, p.project_number, p.task_order_number, p.project_name,
                p.task_name, p.project_organisation, p.project_customer,
@@ -842,8 +836,8 @@ def api_add_rtc_staff(rtc_id):
                 VALUES (?, ?, ?, 0, ?)
             """, (pid, rtc_id, p["period_start"], now))
             added += c.rowcount
-        except Exception:
-            pass
+        except Exception as e:
+            app.logger.error(f"Failed to insert allocation for {pid}: {e}")
 
     c.execute("""
         UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
@@ -1001,6 +995,19 @@ def api_extend_rtc(rtc_id):
     conn.close()
     return jsonify({"status": "ok", "periods_added": len(new_periods), "rows_added": added})
 
+@app.route("/api/rtcs/<int:rtc_id>/opened", methods=["POST"])
+def api_rtc_opened(rtc_id):
+    """Records that a user has opened this RTC for editing."""
+    user = get_current_user()
+    now  = datetime.now(timezone.utc).isoformat()
+    conn = database.get_connection()
+    conn.execute("""
+        UPDATE rtcs SET last_opened_by = ?, last_opened = ?
+        WHERE rtc_id = ?
+    """, (user, now, rtc_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
 
 @app.route("/api/rtcs/<int:rtc_id>/check-horizon")
 def api_check_horizon(rtc_id):
