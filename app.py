@@ -10,9 +10,11 @@ To start the development server:
 """
 
 import json
+import logging
 import secrets
 from datetime import datetime, timezone, date, timedelta
 from functools import wraps
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 try:
@@ -43,6 +45,41 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 import database
 import summary as summary_module
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+def _setup_logging():
+    log_dir = Path(config.BASE_DIR) / "logs"
+    log_dir.mkdir(exist_ok=True)
+    log_file = log_dir / "app.log"
+
+    fmt = logging.Formatter(
+        "%(asctime)s %(levelname)-8s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+
+    # Rotating handler — new file each day, keep 28 days
+    fh = TimedRotatingFileHandler(
+        log_file, when="midnight", backupCount=28,
+        encoding="utf-8", utc=True
+    )
+    fh.setFormatter(fmt)
+    fh.setLevel(logging.DEBUG)
+
+    # Console handler for dev
+    ch = logging.StreamHandler()
+    ch.setFormatter(fmt)
+    ch.setLevel(logging.INFO)
+
+    root = logging.getLogger("resource_forecast")
+    root.setLevel(logging.DEBUG)
+    root.addHandler(fh)
+    root.addHandler(ch)
+    return root
+
+logger = _setup_logging()
+
 from imports import staff_list as staff_import
 from imports import par_import
 
@@ -133,6 +170,7 @@ def _relink_pending_rtcs(conn=None):
 
     if linked:
         conn.commit()
+        logger.info(f"Auto-relinked {linked} RTC(s) to Horizon")
     if close_after:
         conn.close()
     return linked
@@ -143,26 +181,26 @@ def _nightly_imports():
     Runs at the configured time (default midnight).
     Re-imports staff and PAR data then rebuilds the summary cache.
     """
-    print(f"[{datetime.now(timezone.utc).isoformat()}] Starting nightly import")
+    logger.info("Nightly import starting")
 
     if config.STAFF_LIST_PATH and Path(config.STAFF_LIST_PATH).exists():
         r = staff_import.run(str(config.STAFF_LIST_PATH))
-        print(f"  Staff list: {r['rows_processed']} rows, "
-              f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
+        logger.info(f"Staff list: {r['rows_processed']} rows, "
+                    f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
     else:
-        print(f"  Staff list: path not found ({config.STAFF_LIST_PATH})")
+        logger.warning(f"Staff list: path not found ({config.STAFF_LIST_PATH})")
 
     r = par_import.run()
-    print(f"  PAR import: {r['rows_processed']} rows, "
-          f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
+    logger.info(f"PAR import: {r['rows_processed']} rows, "
+                f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
 
     relinked = _relink_pending_rtcs()
     if relinked:
-        print(f"  Re-linked {relinked} pending RTC(s) to Horizon")
+        logger.info(f"Re-linked {relinked} pending RTC(s) to Horizon")
 
     summary_module.build()
-    print(f"  Summary cache rebuilt")
-    print(f"[{datetime.now(timezone.utc).isoformat()}] Nightly import complete")
+    logger.info("Summary cache rebuilt")
+    logger.info("Nightly import complete")
 
 
 # ---------------------------------------------------------------------------
@@ -488,7 +526,8 @@ def api_create_rtc():
     conn.close()
 
     summary_module.mark_dirty()
-    return jsonify({"rtc_id": rtc_id}), 201
+    logger.info(f"RTC {rtc_id}: staff {pid} added by {user}")
+    return jsonify({"status": "ok", "periods_seeded": len(periods)})
 
 
 @app.route("/api/rtcs/<int:rtc_id>/duplicate", methods=["POST"])
@@ -1314,6 +1353,28 @@ def admin_run_cleanup():
     })
 
 
+@app.route("/admin/log")
+@require_admin
+def admin_log():
+    """Returns the last N lines of the application log."""
+    n = int(request.args.get("n", 500))
+    errors_only = request.args.get("errors_only", "0") == "1"
+    log_dir  = Path(config.BASE_DIR) / "logs"
+    log_file = log_dir / "app.log"
+    if not log_file.exists():
+        return jsonify({"lines": [], "total": 0})
+    try:
+        with open(log_file, encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+        if errors_only:
+            lines = [l for l in lines if " ERROR " in l or " WARNING " in l]
+        lines = [l.rstrip() for l in lines[-n:]]
+        return jsonify({"lines": lines, "total": len(lines)})
+    except Exception as e:
+        logger.error(f"Failed to read log: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/admin/config")
 @require_admin
 def admin_config():
@@ -1441,10 +1502,18 @@ def create_app():
     summary_module.build()
     summary_module.start_worker()
 
+    @app.errorhandler(404)
+    def handle_404(e):
+        return jsonify({"error": "Not found"}), 404
+
     @app.errorhandler(Exception)
     def handle_exception(e):
         """Return JSON for all unhandled exceptions."""
         import traceback
+        code = getattr(e, 'code', 500)
+        if code == 404:
+            return jsonify({"error": "Not found"}), 404
+        logger.error(f"Unhandled exception: {e}\n{traceback.format_exc()}")
         if config.FLASK_DEBUG:
             return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
         return jsonify({"error": "An unexpected error occurred"}), 500

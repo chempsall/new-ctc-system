@@ -277,7 +277,41 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 2 — DELETE RTC
+         SECTION 2 — APPLICATION LOG
+    ════════════════════════════════════════════════════════════════ -->
+    <p class="admin-section-title">Application Log</p>
+    <div class="admin-actions" style="margin-bottom:32px">
+      <div class="admin-action">
+        <div class="admin-action__name">View log</div>
+        <div>
+          <div class="admin-action__desc">
+            Shows the last 500 lines of the application log.
+            Use the errors-only filter to quickly find problems.
+            Log files are rotated daily and kept for 28 days.
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn--sm" onclick="loadLog(false)">View all</button>
+            <button class="btn btn--sm btn--secondary" onclick="loadLog(true)">Errors only</button>
+            <button class="btn btn--sm btn--secondary" onclick="clearLog()">Clear</button>
+          </div>
+          <div id="log-output" style="margin-top:10px;display:none">
+            <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">
+              <span id="log-count"></span>
+            </div>
+            <div id="log-lines" style="
+              font-family:var(--font-mono);font-size:11px;line-height:1.6;
+              background:var(--grey-50);border:1px solid var(--border);
+              border-radius:var(--radius-sm);padding:10px 12px;
+              max-height:400px;overflow-y:auto;white-space:pre-wrap;
+              word-break:break-all;
+            "></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         SECTION 3 — DELETE RTC
     ════════════════════════════════════════════════════════════════ -->
     <p class="admin-section-title">Delete RTC</p>
     <div class="delete-panel">
@@ -402,6 +436,41 @@
     }
 
     // ── IMPORT LOG ────────────────────────────────────────────────────────
+
+    async function loadLog(errorsOnly) {
+      const output  = document.getElementById("log-output");
+      const lines   = document.getElementById("log-lines");
+      const count   = document.getElementById("log-count");
+      lines.textContent = "Loading…";
+      output.style.display = "";
+      try {
+        const url = `/admin/log?n=500${errorsOnly ? "&errors_only=1" : ""}`;
+        const r   = await fetch(url, { headers: headers() });
+        const d   = await r.json();
+        if (!r.ok) { lines.textContent = `Error: ${d.error}`; return; }
+        count.textContent = `${d.total} line${d.total !== 1 ? "s" : ""}${errorsOnly ? " (errors/warnings only)" : ""}`;
+        if (!d.lines.length) {
+          lines.textContent = errorsOnly ? "No errors or warnings found." : "Log is empty.";
+          return;
+        }
+        // Colour-code by level
+        lines.innerHTML = d.lines.map(line => {
+          const col = line.includes(" ERROR ")
+            ? "var(--status-red)"
+            : line.includes(" WARNING ")
+            ? "var(--amber-dark)"
+            : "var(--text-primary)";
+          return `<span style="color:${col}">${escHtml(line)}</span>`;
+        }).join("\n");
+        // Scroll to bottom
+        lines.scrollTop = lines.scrollHeight;
+      } catch(e) { lines.textContent = `Error: ${e.message}`; }
+    }
+
+    function clearLog() {
+      document.getElementById("log-output").style.display = "none";
+      document.getElementById("log-lines").textContent = "";
+    }
 
     async function loadImportLog(btn) {
       setResult("result-log", "Loading…", "");

@@ -1,3 +1,4 @@
+import logging
 """
 summary.py
 Builds the pre-calculated summary JSON that the dashboard serves instantly.
@@ -425,7 +426,7 @@ def _rebuild_worker():
         try:
             build()
         except Exception as e:
-            print(f"Summary rebuild error: {e}")
+            logging.getLogger("resource_forecast").error(f"Summary rebuild error: {e}")
 
 def start_worker():
     """Start the background rebuild worker (called once at app startup)."""
