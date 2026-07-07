@@ -26,6 +26,21 @@ def get_connection():
     return conn
 
 
+from contextlib import contextmanager
+
+@contextmanager
+def db():
+    """Context manager for database connections.
+    Ensures connections are always closed even if an exception occurs.
+    Usage: with db() as conn:
+    """
+    conn = get_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
 def initialise_database():
     if DB_PATH is None:
         raise RuntimeError("No SQLite path configured.")

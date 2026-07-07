@@ -1362,6 +1362,14 @@ def create_app():
     summary_module.build()
     summary_module.start_worker()
 
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        """Return JSON for all unhandled exceptions."""
+        import traceback
+        if config.FLASK_DEBUG:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+        return jsonify({"error": "An unexpected error occurred"}), 500
+
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         _nightly_imports,

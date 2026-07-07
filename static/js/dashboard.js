@@ -853,7 +853,7 @@ function showProjectDetail(proj) {
   // Future days — sum of periods from current period onwards only
   const currentPeriodStart = state.summary.periods[0];
   const currentIdx = state.summary.periods.indexOf(state.activePeriod);
-  const futureLabels = new Set(state.summary.periods.slice(currentIdx + 1));
+  const futureLabels = new Set(state.summary.periods.slice(currentIdx));
   const futureDays = Object.entries(proj.total_days)
     .filter(([label]) => futureLabels.has(label))
     .reduce((sum, [, days]) => sum + days, 0);
