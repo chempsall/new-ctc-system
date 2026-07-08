@@ -911,6 +911,7 @@ def api_add_rtc_staff(rtc_id):
 
     conn.commit()
     conn.close()
+    logger.info(f"RTC {rtc_id}: staff {pid} added by {user} ({added} allocation rows)")
     return jsonify({"status": "ok", "periods_added": added})
 
 
