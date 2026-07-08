@@ -1,0 +1,649 @@
+
+CTC Migration Tool
+============================================================
+  Folder:      C:\CTC-files
+  Database:    C:\Users\UKCMH001\Dev\new-ctc-system\data\resource_forecast.db
+  From period: 2026-01-01
+  Files found: 315
+  Mode:        DRY RUN ù no changes will be made
+============================================================
+
+[  1/315] 161 Marsh Wall.xlsm                                  DEBUG: start=2026-07-01 end=2026-07-01 target=2027-06-01 blocks=1
+PREVIEW ù 00000000/000 (1 staff, starts 2026-07-01, 12-month grid)
+[  2/315] 2024UK336715 Durham Performing Arts Centre.xlsm      DEBUG: start=2026-04-01 end=2026-06-01 target=2027-03-01 blocks=1
+PREVIEW ù 2024UK336715-Durham University New Performing Arts Centre/2-Proposal (3 staff, starts 2026-04-01, 12-month grid)
+[  3/315] 2025UK367541 - 2 - Undershaft MEP Stage 3.xlsm       DEBUG: start=2026-01-01 end=2027-12-01 target=2027-12-01 blocks=2
+PREVIEW ù 2025UK367541/2 (16 staff, starts 2026-01-01, 24-month grid)
+[  4/315] 2025UK398694-RRSL NFDP - Task Order 11 - PCO Exten   DEBUG: start=2026-01-01 end=2026-02-01 target=2026-12-01 blocks=1
+PREVIEW ù 2025UK398694-RRSL NFDP - TASK ORDER 11 - PCO EXTENSION - RIBA 3/000-RRSL - WSP 2025 RIBA 3 (1 staff, starts 2026-01-01, 12-month grid)
+[  5/315] 2025UK398694-RRSL NFDP - Task Order 11 - PCO Exten   DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù 2025UK398694-RRSL NFDP - TASK ORDER 11 - PCO EXTENSION - RIBA 3/011.32-CE-32 ICT (1 staff, starts 2026-01-01, 12-month grid)
+[  6/315] 2025UK414275 - GOSH NEC Supervisor CCC.xlsm          DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù 2025UK414275-GOSH NEC SUPERVISOR CCC/100 (3 staff, starts 2026-01-01, 12-month grid)
+[  7/315] 2025UK442619 - 20 BS Morgan Stanley Workplace S3.x   DEBUG: start=2026-01-01 end=2027-02-01 target=2027-12-01 blocks=2
+PREVIEW ù UK0041884.2619/301 (18 staff, starts 2026-01-01, 24-month grid)
+[  8/315] 2025UK442821 161 Marsh Wall.xlsm                     DEBUG: start=2026-07-01 end=2026-09-01 target=2027-06-01 blocks=1
+PREVIEW ù 2025UK442821/99 - Delivery Planning (3 staff, starts 2026-07-01, 12-month grid)
+[  9/315] 2025UK448858-Refurb of BAT HQ.xlsm                   DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0043201.8858/303 (2 staff, starts 2026-01-01, 12-month grid)
+[ 10/315] 2025UK464903- National Theatre Framework.xlsm        DEBUG: start=2026-01-01 end=2026-05-01 target=2026-12-01 blocks=1
+PREVIEW ù 2025UK464903/000 (1 staff, starts 2026-01-01, 12-month grid)
+[ 11/315] 2025UK481155 - Stack - ZUR03 BMS Design.xlsm         DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù 2025UK502305-Stack - ZUR03 Design Stage 3/2-Proposal (7 staff, starts 2026-01-01, 12-month grid)
+[ 12/315] 2025UK487637 - Promenade Tower, Ellinikon.xlsm       DEBUG: start=2026-06-01 end=2027-02-01 target=2027-05-01 blocks=1
+PREVIEW ù 2025UK487637/000 (6 staff, starts 2026-06-01, 12-month grid)
+[ 13/315] 2025UK489034-Birmingham City Football Club - Train   DEBUG: start=2026-01-01 end=2026-09-01 target=2026-12-01 blocks=1
+PREVIEW ù 2025UK489034/Stage 2 + Stage 3 (4 staff, starts 2026-01-01, 12-month grid)
+[ 14/315] 2025UK490504 - 2 - 1CP L17_21 - Stage 5.xlsm         DEBUG: start=2026-10-01 end=2027-06-01 target=2027-09-01 blocks=1
+PREVIEW ù 2025UK490504/2 (6 staff, starts 2026-10-01, 12-month grid)
+[ 15/315] 2025UK492046 - 2 - 1CP L15_16_20 - Stage 5.xlsm      DEBUG: start=2027-05-01 end=2027-06-01 target=2028-04-01 blocks=1
+PREVIEW ù 2025UK492046/2 (5 staff, starts 2027-05-01, 12-month grid)
+[ 16/315] 2025UK493951-Knarf Production Facility.xlsm          DEBUG: start=2026-06-01 end=2026-08-01 target=2027-05-01 blocks=1
+PREVIEW ù 2025UK493951/000 (1 staff, starts 2026-06-01, 12-month grid)
+[ 17/315] 2025UK494634 - 50 Baker Street CMT.xlsm              DEBUG: start=2026-03-01 end=2026-12-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0045285.4634/100 (6 staff, starts 2026-03-01, 12-month grid)
+[ 18/315] 2025UK513776-City of London - Albert Island Scheme   DEBUG: start=2026-02-01 end=2026-04-01 target=2027-01-01 blocks=1
+PREVIEW ù 2025UK513776/99 (1 staff, starts 2026-02-01, 12-month grid)
+[ 19/315] 2025UK515631 - Worcester Library MEP.xlsm            DEBUG: start=2026-03-01 end=2026-06-01 target=2027-02-01 blocks=1
+PREVIEW ù 2025UK515631 Worcester Library/MEP (4 staff, starts 2026-03-01, 12-month grid)
+[ 20/315] 2025UK515631 Sir Lindsay Owen-Jones Library, Worce   DEBUG: start=2026-03-01 end=2028-12-01 target=2029-02-01 blocks=3
+PREVIEW ù 2025UK515631/000 (3 staff, starts 2026-03-01, 36-month grid)
+[ 21/315] 2025UK518642 - GPA Sanctuary Project 4.xlsm          DEBUG: start=2026-06-01 end=2026-11-01 target=2027-05-01 blocks=1
+PREVIEW ù 2025UK518642/000 (10 staff, starts 2026-06-01, 12-month grid)
+[ 22/315] 2026UK - 2 -1Undershaft_Utilities WIP.xlsm           DEBUG: start=2026-04-01 end=2026-10-01 target=2027-03-01 blocks=1
+PREVIEW ù 2025UK367541/2 (5 staff, starts 2026-04-01, 12-month grid)
+[ 23/315] 2026UK522750 - Wimbledon Pergola Project.xlsm        DEBUG: start=2026-05-01 end=2026-07-01 target=2027-04-01 blocks=1
+PREVIEW ù 2026UK522750/201 (3 staff, starts 2026-05-01, 12-month grid)
+[ 24/315] 2026UK522750-Wimbledon Pergola Stage 1-2.xlsm        DEBUG: start=2026-07-01 end=2026-10-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0045860.2750/201 (7 staff, starts 2026-07-01, 12-month grid)
+[ 25/315] 2026UK550993 - 2 -1Undershaft_StHelensChurch_MEP.x   DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù 2026UK550993/2 (7 staff, starts 2026-01-01, 12-month grid)
+[ 26/315] 2026UK556767 NEG Earth Lights Extension EXTERNAL.x   DEBUG: start=2026-06-01 end=2026-08-01 target=2027-05-01 blocks=1
+PREVIEW ù 2026UK556767/000 (3 staff, starts 2026-06-01, 12-month grid)
+[ 27/315] 2026UK557364 - RSS Initial Stage 2 Period.xlsm       DEBUG: start=2026-04-01 end=2026-08-01 target=2027-03-01 blocks=1
+PREVIEW ù 2026UK55734/001 (12 staff, starts 2026-04-01, 12-month grid)
+[ 28/315] 2026UK564329 - LIMMO MEP.xlsm                        DEBUG: start=2026-03-01 end=2026-07-01 target=2027-02-01 blocks=1
+PREVIEW ù 2026UK564329/MEP (5 staff, starts 2026-03-01, 12-month grid)
+[ 29/315] 2026UK582555 - Lancaster West Estate Lot 3.xlsm      DEBUG: start=2026-03-01 end=2026-04-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0045017.2555/100 (6 staff, starts 2026-03-01, 12-month grid)
+[ 30/315] 2026UK600671 - ArchCo - Bristol Avon EXTERNAL.xlsm   DEBUG: start=2026-05-01 end=2026-07-01 target=2027-04-01 blocks=1
+PREVIEW ù 00000000/000 (3 staff, starts 2026-05-01, 12-month grid)
+[ 31/315] 2026UK603847 - Harrods BMS Survey.xlsm               DEBUG: start=2026-05-01 end=2026-07-01 target=2027-04-01 blocks=1
+PREVIEW ù 00000000/000 (4 staff, starts 2026-05-01, 12-month grid)
+[ 32/315] 2026UK605751 Berkshire Polo.xlsm                     DEBUG: start=2026-04-01 end=2026-06-01 target=2027-03-01 blocks=1
+PREVIEW ù 2026UK605751/2 (4 staff, starts 2026-04-01, 12-month grid)
+[ 33/315] 2026UK609341 - Ganymede HEL12 HEL13.xlsm             DEBUG: start=2026-07-01 end=2026-07-01 target=2027-06-01 blocks=1
+PREVIEW ù 2026UK609341/2-Proposal (1 staff, starts 2026-07-01, 12-month grid)
+[ 34/315] 2026UK610592 Era4 - Erin DC.xlsm                     DEBUG: start=2026-05-01 end=2026-05-01 target=2027-04-01 blocks=1
+PREVIEW ù 2026UK610592/000 (3 staff, starts 2026-05-01, 12-month grid)
+[ 35/315] 2026UK621564 - Ladbroke Grove Mech Study.xlsm        DEBUG: start=2026-05-01 end=2026-07-01 target=2027-04-01 blocks=1
+PREVIEW ù 00000000/000 (3 staff, starts 2026-05-01, 12-month grid)
+[ 36/315] 2026UK623637- HSBC 2026 CMB Dartford Maidstone Rel   DEBUG: start=2026-03-01 end=2026-12-01 target=2027-02-01 blocks=1
+PREVIEW ù 2026UK623637/2 (5 staff, starts 2026-03-01, 12-month grid)
+[ 37/315] 2026UK623638- HSBC 2026 CMB Guildford Relocation.x   DEBUG: start=2026-03-01 end=2026-12-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/2 (5 staff, starts 2026-03-01, 12-month grid)
+[ 38/315] 2026UK640735 - University of Oulu - New campus.xls   DEBUG: start=2026-07-01 end=2026-10-01 target=2027-06-01 blocks=1
+PREVIEW ù 2026UK640735/01 (1 staff, starts 2026-07-01, 12-month grid)
+[ 39/315] 2026UK650493 - GSTT Becket House Exit Strategy - V   DEBUG: start=2026-07-01 end=2026-07-01 target=2027-06-01 blocks=1
+PREVIEW ù 2026UK650493/002 (3 staff, starts 2026-07-01, 12-month grid)
+[ 40/315] 70074857-212 - Marian Place, Bethnal Green - MEP -   DEBUG: start=2026-07-01 end=2027-12-01 target=2028-06-01 blocks=2
+PREVIEW ù UK-70074857/UK-70074857-212 (5 staff, starts 2026-07-01, 24-month grid)
+[ 41/315] 70075739-012 - Britannia Street  EXTERNAL.xlsm       DEBUG: start=2026-02-01 end=2026-05-01 target=2027-01-01 blocks=1
+PREVIEW ù UK-70075739_2/UK-70075739-012 (3 staff, starts 2026-02-01, 12-month grid)
+[ 42/315] 70077151 - Project Picnic.xlsm                       DEBUG: start=2026-06-01 end=2026-06-01 target=2027-05-01 blocks=1
+PREVIEW ù UK-70077151_1/UK-70077151-754 (2 staff, starts 2026-06-01, 12-month grid)
+[ 43/315] 70079927-900- Addenbrookes û DSS12 Stage 5-7.xlsm    DEBUG: start=2026-01-01 end=2026-04-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70079927/UK-70079927-900 (4 staff, starts 2026-01-01, 12-month grid)
+[ 44/315] 70090576-998 Tzameret City Post-Handover DD.xlsm     DEBUG: start=2026-02-01 end=2027-01-01 target=2027-01-01 blocks=1
+PREVIEW ù UK-70090575/DDS.TEBA.MD (5 staff, starts 2026-02-01, 12-month grid)
+[ 45/315] 70099408-005 - Nike MEP Stage 5 CMT.xlsm             DEBUG: start=2026-01-01 end=2027-01-01 target=2027-12-01 blocks=2
+PREVIEW ù UK-70099408_1/005 (7 staff, starts 2026-01-01, 24-month grid)
+[ 46/315] 70112093-HV1 - Project Alexander - HV Works.xlsm     DEBUG: start=2026-02-01 end=2026-10-01 target=2027-01-01 blocks=1
+PREVIEW ù UK-70112093/UK-70112093-C00 (3 staff, starts 2026-02-01, 12-month grid)
+[ 47/315] 70114957-ME5 - HSBC Project GOAT - Stage 5 and des   DEBUG: start=2026-07-01 end=2026-12-01 target=2027-06-01 blocks=1
+PREVIEW ù UK-70114957_1/UK-70114957-ME5 (20 staff, starts 2026-07-01, 12-month grid)
+[ 48/315] 70115266-P01 NHP OBC - JPUH Enabling Works.xlsm      DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù 2025UK415959/2025UK415959-102 (2 staff, starts 2026-01-01, 12-month grid)
+[ 49/315] 99900000-001 - General Commercial Support.xlsm       DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù 65535/001 (2 staff, starts 2026-01-01, 12-month grid)
+[ 50/315] Abu Dhabi Autonomous Vehicle (AV) & Smart Mobility   DEBUG: start=2026-08-01 end=2026-11-01 target=2027-07-01 blocks=1
+PREVIEW ù 00000000/000 (1 staff, starts 2026-08-01, 12-month grid)
+[ 51/315] BPR Block F - Stage 4 ICT.xlsm                       DEBUG: start=2026-02-01 end=2026-09-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0042811.9849-UK-Buckingham Palace Reservicing - T09 - F Block/400-FB Tender (2 staff, starts 2026-02-01, 12-month grid)
+[ 52/315] BPR Peninsula Block - Tender Issue ICT.xlsm          DEBUG: start=2026-01-01 end=2026-02-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0038482.9358-UK-Buckingham Palace Reservicing - TO7 - SW/200-T07 - MEP Design - South (1 staff, starts 2026-01-01, 12-month grid)
+[ 53/315] British Airways Heathrow BMS - awaiting active num   DEBUG: start=2026-08-01 end=2027-02-01 target=2027-07-01 blocks=1
+PREVIEW ù 00000000/000 (6 staff, starts 2026-08-01, 12-month grid)
+[ 54/315] CA0024655.8478-CA-OLN - Elevated Guideway.xlsm       DEBUG: start=2026-01-01 end=2026-04-01 target=2026-12-01 blocks=1
+PREVIEW ù CA0024655.8478-CA-OLN - Elevated Guideway/PWD.SDL-PWD - Stations Discipline Leadership (1 staff, starts 2026-01-01, 12-month grid)
+[ 55/315] CTC - DCM 201.xlsm                                   DEBUG: start=2026-06-01 end=2026-07-01 target=2027-05-01 blocks=1
+PREVIEW ù 2025 UK 499909/Proposal (2 staff, starts 2026-06-01, 12-month grid)
+[ 56/315] CTC Dummy - DCM 401.xlsm                             DEBUG: start=2026-04-01 end=2026-07-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0039471.6589/400.MEP (3 staff, starts 2026-04-01, 12-month grid)
+[ 57/315] CTC Dummy - ZUR03-Stage 3.xlsm                       DEBUG: start=2026-03-01 end=2026-05-01 target=2027-02-01 blocks=1
+PREVIEW ù 2025UK 502305/Stage-3 (3 staff, starts 2026-03-01, 12-month grid)
+[ 58/315] CTC Dummy - ZUR03-Stage 4.xlsm                       DEBUG: start=2026-05-01 end=2026-08-01 target=2027-04-01 blocks=1
+PREVIEW ù 2025UK 502348/Stage-4 (2 staff, starts 2026-05-01, 12-month grid)
+[ 59/315] CTC Dummy-DK 01B.xlsm                                DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù 2026UK562537/Stage-5 (3 staff, starts 2026-03-01, 12-month grid)
+[ 60/315] CTC-GB-2026UK594851- Site 25-Ganymede.xlsm           DEBUG: start=2026-06-01 end=2026-07-01 target=2027-05-01 blocks=1
+PREVIEW ù GB-2026UK594851/SDD (2 staff, starts 2026-06-01, 12-month grid)
+[ 61/315] CTC-UK0045974.8766-DC-Project Onyx.xlsm              DEBUG: start=2026-06-01 end=2026-06-01 target=2027-05-01 blocks=1
+PREVIEW ù UK 0045974.8766/TDD (2 staff, starts 2026-06-01, 12-month grid)
+[ 62/315] DACO - awaiting active number.xlsm                   DEBUG: start=2026-08-01 end=2027-07-01 target=2027-07-01 blocks=1
+PREVIEW ù 00000000/000 (9 staff, starts 2026-08-01, 12-month grid)
+[ 63/315] Dummy CTC - Dorsett Police Blanford.xlsm             DEBUG: start=2026-01-01 end=2026-05-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0038519.1748/000 (1 staff, starts 2026-01-01, 12-month grid)
+[ 64/315] Dummy CTC - Sandbanks Jetty.xlsm                     DEBUG: start=2026-01-01 end=2026-09-01 target=2026-12-01 blocks=1
+PREVIEW ù 700104733/000 (1 staff, starts 2026-01-01, 12-month grid)
+[ 65/315] Dummy CTC - UBB Basildon.xlsm                        DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù 70087837/000 (1 staff, starts 2026-01-01, 12-month grid)
+[ 66/315] EIT LMB and LMH Stage 4 onwards.xlsm                 DEBUG: start=2026-01-01 end=2026-09-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70102726_1/UK-70102726-M40 (9 staff, starts 2026-01-01, 12-month grid)
+[ 67/315] EIT Smart Masterplan UK0041229.0503.xlsm             DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041229.0503/701 (6 staff, starts 2026-01-01, 12-month grid)
+[ 68/315] EIT Visitor management.xlsm                          DEBUG: start=2026-07-01 end=2026-07-01 target=2027-06-01 blocks=1
+PREVIEW ù 00000000/000 (0 staff, starts 2026-07-01, 12-month grid)
+[ 69/315] Future Advanced Flight Training System ASCENT - aw   DEBUG: start=2026-08-01 end=2027-07-01 target=2027-07-01 blocks=1
+PREVIEW ù 00000000/000 (1 staff, starts 2026-08-01, 12-month grid)
+[ 70/315] HSBC Global Design Manager.xlsm                      DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù REFER TO DAVID GOODERHAM/REFER TO DAVID GOODERHAM (2 staff, starts 2026-01-01, 12-month grid)
+[ 71/315] IE0037137.7696 Dublin Metrolink Net Zero.xlsm        DEBUG: start=2026-07-01 end=2026-07-01 target=2027-06-01 blocks=1
+PREVIEW ù IE0037137.7696/DML Core Team - 001 (1 staff, starts 2026-07-01, 12-month grid)
+[ 72/315] Lisbon Airport Technical Advisory - awaiting activ   DEBUG: start=2026-07-01 end=2027-07-01 target=2028-06-01 blocks=2
+PREVIEW ù 00000000/000 (1 staff, starts 2026-07-01, 24-month grid)
+[ 73/315] MEP Embodied Carbon Tool.xlsm                        DEBUG: start=2026-05-01 end=2026-07-01 target=2027-04-01 blocks=1
+PREVIEW ù 00000000/000 (3 staff, starts 2026-05-01, 12-month grid)
+[ 74/315] NHP HDP Secondment.xlsm                              DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù NHP HDP/tba (1 staff, starts 2026-01-01, 12-month grid)
+[ 75/315] Project Garrison.xlsm                                DEBUG: start=2026-07-01 end=2026-07-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0039458.6640/UK0039458.6640 (4 staff, starts 2026-07-01, 12-month grid)
+[ 76/315] RRSL NFDP - PCO Stage 4.xlsm                         DEBUG: start=2026-05-01 end=2026-12-01 target=2027-04-01 blocks=1
+PREVIEW ù RRSL NFDP - PCO STAGE 4/TBC (3 staff, starts 2026-05-01, 12-month grid)
+[ 77/315] SA0065587.5477 Aurora Towers.xlsm                    DEBUG: start=2026-03-01 end=2026-04-01 target=2027-02-01 blocks=1
+PREVIEW ù SA0065587.5477/000 (2 staff, starts 2026-03-01, 12-month grid)
+[ 78/315] SA0065587.5477-SA-KSFD Iconic Towers-Concept Desig   DEBUG: start=2026-02-01 end=2026-12-01 target=2027-01-01 blocks=1
+PREVIEW ù SA0065587.5477/000 (5 staff, starts 2026-02-01, 12-month grid)
+[ 79/315] South Quay Plaza 2.xlsm                              DEBUG: start=2026-06-01 end=2026-06-01 target=2027-05-01 blocks=1
+PREVIEW ù 00000000/000 (3 staff, starts 2026-06-01, 12-month grid)
+[ 80/315] T3 IDL.xlsm                                          DEBUG: start=2026-06-01 end=2026-11-01 target=2027-05-01 blocks=1
+PREVIEW ù 2026UK630784/000 (7 staff, starts 2026-06-01, 12-month grid)
+[ 81/315] UK-0037289-8009-HSBC St Albans.xlsm                  DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0037289.8009/200 (1 staff, starts 2026-01-01, 12-month grid)
+[ 82/315] UK-50100528-391 - KCH CCU Roof Garden.xlsm           DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-50100528/UK-50100528-391 (3 staff, starts 2026-01-01, 12-month grid)
+[ 83/315] UK-62281746-013 - Hadlow School H&V.xlsm             DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-62281746/UK-62281746-013 (1 staff, starts 2026-01-01, 12-month grid)
+[ 84/315] UK-62281980-202 - DofE George Betts EXTERNAL.xlsm    DEBUG: start=2026-03-01 end=2026-03-01 target=2027-02-01 blocks=1
+PREVIEW ù UK-62281980/UK-62281980-202 (3 staff, starts 2026-03-01, 12-month grid)
+[ 85/315] UK-62281985-202 DofE St Andrews EXTERNAL.xlsm        DEBUG: start=2026-03-01 end=2026-03-01 target=2027-02-01 blocks=1
+PREVIEW ù UK-62281985/UK-62281985-202 (3 staff, starts 2026-03-01, 12-month grid)
+[ 86/315] UK-62282031-202 - DofE Hadlow EXTERNAL.xlsm          DEBUG: start=2026-03-01 end=2026-03-01 target=2027-02-01 blocks=1
+PREVIEW ù UK-62282031/UK-62282031-202 (1 staff, starts 2026-03-01, 12-month grid)
+[ 87/315] UK-62282031-202 - DofE Helena Romanes EXTERNAL.xls   DEBUG: start=2026-01-01 end=2026-05-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-62282031/UK-62282031-202 (5 staff, starts 2026-01-01, 12-month grid)
+[ 88/315] UK-62301223-012 - SLAM PH Defects.xlsm               DEBUG: start=2026-02-01 end=2026-08-01 target=2027-01-01 blocks=1
+PREVIEW ù UK-62301223/UK-62301223-012 (3 staff, starts 2026-02-01, 12-month grid)
+[ 89/315] UK-70064563-NAB 40LDH NABERS As-Built.xlsm           DEBUG: start=2026-01-01 end=2027-07-01 target=2027-12-01 blocks=2
+PREVIEW ù UK-70064563_2/UK-70064563-NAB (6 staff, starts 2026-01-01, 24-month grid)
+[ 90/315] UK-70064563_1-DEF - 40 Leadenhall Defects.xlsm       DEBUG: start=2026-02-01 end=2026-05-01 target=2027-01-01 blocks=1
+PREVIEW ù UK-70064563_1/UK-70064563-DEF (2 staff, starts 2026-02-01, 12-month grid)
+[ 91/315] UK-70075377-500 - KCH PRUH Endoscopy MEP Stage 5.x   DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70075377/UK-70075377-500 (5 staff, starts 2026-01-01, 12-month grid)
+[ 92/315] UK-70077151_1-108 - Project Picnic Stage 5 Project   DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70077151_1/UK-70077151-108 (15 staff, starts 2026-01-01, 12-month grid)
+[ 93/315] UK-70077151_1-120 - Project Picnic Stage 5 Project   DEBUG: start=2026-02-01 end=2027-12-01 target=2028-01-01 blocks=2
+PREVIEW ù UK-70077151_1/UK-70077151-120 (14 staff, starts 2026-02-01, 24-month grid)
+[ 94/315] UK-70080527-PEP - BPRP TO6 PWI 2324 - Fixed - Bill   DEBUG: start=2026-01-01 end=2026-04-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70080527/UK-70080527-PEP (2 staff, starts 2026-01-01, 12-month grid)
+[ 95/315] UK-70086766-DG1 Monklands Smart Hospital.xlsm        DEBUG: start=2026-06-01 end=2026-10-01 target=2027-05-01 blocks=1
+PREVIEW ù UK-70086766/UK-70086766-DG1 (4 staff, starts 2026-06-01, 12-month grid)
+[ 96/315] UK-70096062 - 200 - 40HOV MEP Stage 5.xlsm           DEBUG: start=2026-01-01 end=2027-09-01 target=2027-12-01 blocks=2
+PREVIEW ù UK-70096062/UK-70096062-200 (7 staff, starts 2026-01-01, 24-month grid)
+[ 97/315] UK-70096062 - MAN - 40HOV Management.xlsm            DEBUG: start=2026-01-01 end=2027-09-01 target=2027-12-01 blocks=2
+PREVIEW ù UK-70096062/UK-70096062-MAN (3 staff, starts 2026-01-01, 24-month grid)
+[ 98/315] UK-70097586-500 - Kidbrooke Park Road South.xlsm     DEBUG: start=2026-01-01 end=2027-06-01 target=2027-12-01 blocks=2
+PREVIEW ù UK-70097586/UK-70097586-500 (11 staff, starts 2026-01-01, 24-month grid)
+[ 99/315] UK-70099408_1_204- Nike Redesign E&S Stage 5.xlsm    DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70099408_1/204 (3 staff, starts 2026-01-01, 12-month grid)
+[100/315] UK-70099444-610 - KU John Galsworthy.xlsm            DEBUG: start=2026-02-01 end=2026-05-01 target=2027-01-01 blocks=1
+PREVIEW ù UK-70099444/UK-70099444-610 (1 staff, starts 2026-02-01, 12-month grid)
+[101/315] UK-70102726_1-EITM Centre Oxford - UK-70102726-3DL   DEBUG: start=2026-06-01 end=2026-07-01 target=2027-05-01 blocks=1
+PREVIEW ù UK-70102726_1/UK-70102726-3DL (2 staff, starts 2026-06-01, 12-month grid)
+[102/315] UK-70104969-134 - NZ House Tender Procurement Supp   DEBUG: start=2026-04-01 end=2026-10-01 target=2027-03-01 blocks=1
+PREVIEW ù UK-70104969/UK-70104969-134 (8 staff, starts 2026-04-01, 12-month grid)
+[103/315] UK-70105443_2-300 - HSBC House Jersey Refresh and    DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70105443_2/UK-70105443-300 (8 staff, starts 2026-01-01, 12-month grid)
+[104/315] UK-70108172-300 - Barclays Paris CAT B Fitout UK.x   DEBUG: start=2026-01-01 end=2027-12-01 target=2027-12-01 blocks=2
+PREVIEW ù UK-70108172/300 (3 staff, starts 2026-01-01, 24-month grid)
+[105/315] UK-70108172-MAN - Barlcays Paris - Management.xlsm   DEBUG: start=2026-07-01 end=2026-10-01 target=2027-06-01 blocks=1
+PREVIEW ù UK-70108172/MAN (4 staff, starts 2026-07-01, 12-month grid)
+[106/315] UK-70108945-EITM - Walkway and Littlemore Brook -    DEBUG: start=2026-06-01 end=2026-07-01 target=2027-05-01 blocks=1
+PREVIEW ù UK-70108945-EITM - Walkway and Littlemore Brook/UK-70108945-3DL-EIT LMB Lighting 3D Modelling (1 staff, starts 2026-06-01, 12-month grid)
+[107/315] UK-70108945-EITM - Walkway and Littlemore Brook.xl   DEBUG: start=2026-02-01 end=2026-08-01 target=2027-01-01 blocks=1
+PREVIEW ù UK-70108945/WW4 (3 staff, starts 2026-02-01, 12-month grid)
+[108/315] UK-70109022-LHR - T5C Level 30 CIP Lounge.xlsm       DEBUG: start=2026-04-01 end=2026-06-01 target=2027-03-01 blocks=1
+PREVIEW ù UK-70109022/UK-70109022-003-LHR - T5C Level 30 CIP Lounge - Carbon Assessment (4 staff, starts 2026-04-01, 12-month grid)
+[109/315] UK-70109739-600 - The Greenhouse Centre - Basement   DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70109739/UK-70109739-600 (4 staff, starts 2026-01-01, 12-month grid)
+[110/315] UK-70110010-300 - Barclays Monaco - Stage 5 6.xlsm   DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70110010/300 (3 staff, starts 2026-01-01, 12-month grid)
+[111/315] UK-70111537-Muse Blackpool NABERS.xlsm               DEBUG: start=2026-05-01 end=2026-08-01 target=2027-04-01 blocks=1
+PREVIEW ù UK-70111537/UK-70111537-103 (1 staff, starts 2026-05-01, 12-month grid)
+[112/315] UK-70112093-Project Alexander - LOR UK-70112093.xl   DEBUG: start=2026-01-01 end=2026-10-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70112093/UK-70112093-C00 (4 staff, starts 2026-01-01, 12-month grid)
+[113/315] UK-70114957-ES4to6 - HSBC Goat - WELL, BREEAM, LEE   DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70114957_1/UK-70114957-ES4to6 (2 staff, starts 2026-01-01, 12-month grid)
+[114/315] UK-70114957-EUI - HSBC Goat - LEED and BREEAM Ener   DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70114957_1/UK-70114957-EUI (2 staff, starts 2026-01-01, 12-month grid)
+[115/315] UK-70114957_1 GOAT Workplace Design Smart Stage 3    DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-70114957_1/UK-70114957-DSM (8 staff, starts 2026-01-01, 12-month grid)
+[116/315] UK-70116594-Kidbrooke Village Phase 5 Block A-B.xl   DEBUG: start=2026-03-01 end=2026-07-01 target=2027-02-01 blocks=1
+PREVIEW ù UK-WSP-70116594-Kidbrooke Village Phase 5 Block A-B UK-70116594/UK-70116594-P01-Kidbrooke Village Phase 5 Block A-B (2 staff, starts 2026-03-01, 12-month grid)
+[117/315] UK0028382.0747-UK-RRSL NFDP - Tranche 3 - TO13 - T   DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0028382.0747-UK-RRSL NFDP - TRANCHE 3 - TO13 - TSF RIBA STAGE 2/001-RIBA STAGE 2 (3 staff, starts 2026-01-01, 12-month grid)
+[118/315] UK0028382.3578-UK0028382.3578 - TASK ORDER 024-CE-   DEBUG: start=2026-04-01 end=2026-08-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0028382.3578-UK0028382.3578 - TASK ORDER 024-CE-40 - Temp ECC RIBA 0-1 AH/000-RRSL - WSP 2025 RIBA 3 (3 staff, starts 2026-04-01, 12-month grid)
+[119/315] UK0028382.5174-UK0028382.5174 - RRSL Sitewide Infr   DEBUG: start=2026-01-01 end=2026-09-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0028382.5174-UK0028382.5174/001.05-UTILITIES (3 staff, starts 2026-01-01, 12-month grid)
+[120/315] UK0028382.7627-UK0028382.7627 - TASK ORDER 005.13-   DEBUG: start=2026-03-01 end=2026-06-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0028382.7627-UK0028382.7627 - TASK ORDER 005.13-CE8 - RRSL - WSP IT (REBEL)/001-RIBA STAGE 2 (3 staff, starts 2026-03-01, 12-month grid)
+[121/315] UK0028382.8694-UK-RRSL NFDP - Task Order 11 - PCO    DEBUG: start=2026-02-01 end=2026-03-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0028382.8694-UK-RRSL NFDP - TASK ORDER 11 - PCO EXTENSION - RIBA 3/004-CE1 - RAD BAY RELOCATION FEASIBILITY STUDY (2 staff, starts 2026-02-01, 12-month grid)
+[122/315] UK0028382.8694-UK-RRSL NFDP - Task Order 11 - PCO    DEBUG: start=2026-05-01 end=2026-07-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0028382.8694-UK-RRSL NFDP - Task Order 11 - PCO Extension - RIBA 3/005.27-CE-27 Fire Engineering (1 staff, starts 2026-05-01, 12-month grid)
+[123/315] UK0028795.2398-201 - HBH New Build RIBA Stage 2.xl   DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0028795.2398/201 (22 staff, starts 2026-01-01, 12-month grid)
+[124/315] UK0028795.2398-xxx - HBH New Build RIBA Stage 3.xl   DEBUG: start=2026-08-01 end=2027-02-01 target=2027-07-01 blocks=1
+PREVIEW ù UK0028795.2398/xxx (20 staff, starts 2026-08-01, 12-month grid)
+[125/315] UK0028795.9224-110 - HBH Sitewide Infrastructure.x   DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0028795.9224/110 (8 staff, starts 2026-01-01, 12-month grid)
+[126/315] UK0028795.9224-171 - HBH Treatment Centre ER's for   DEBUG: start=2026-01-01 end=2026-10-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0028795.9224/171 (5 staff, starts 2026-01-01, 12-month grid)
+[127/315] UK0028795.9224-329 - HBH Service Wing Ext Lighting   DEBUG: start=2026-02-01 end=2026-07-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0028795.9224/329 (4 staff, starts 2026-02-01, 12-month grid)
+[128/315] UK0028795.9224-xxx - HBH Sitewide Infrastructure R   DEBUG: start=2026-10-01 end=2027-02-01 target=2027-09-01 blocks=1
+PREVIEW ù UK0028795.9224/000 (8 staff, starts 2026-10-01, 12-month grid)
+[129/315] UK0028859.8567 - KCH - PRUH Pendants Update.xlsm     DEBUG: start=2026-01-01 end=2026-10-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0028859.8567/100 (2 staff, starts 2026-01-01, 12-month grid)
+[130/315] UK0028885.1410-100 - GOSH PICB Central Imaging.xls   DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0028885.1410/100 (7 staff, starts 2026-01-01, 12-month grid)
+[131/315] UK0028885.4132-100 - GOSH MEP Technical Advisor CC   DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0028885.4132/UK0028885.4132-100 (4 staff, starts 2026-01-01, 12-month grid)
+[132/315] UK0028897.1649-310 - St Leonards Upgrade Block A L   DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0028897.1649/310 (4 staff, starts 2026-01-01, 12-month grid)
+[133/315] UK0029840.5134 - 111 - Barclays 1CP - Critical Coo   DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029840.5134/111 (9 staff, starts 2026-01-01, 12-month grid)
+[134/315] UK0029840.5134 - 121 - Barclays 1CP - LTHW FSD Pha   DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029840.5134/121 (13 staff, starts 2026-01-01, 12-month grid)
+[135/315] UK0029840.5134 - 131 - Barclays 1CP - LTHW Phase 1   DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029840.5134/131 (7 staff, starts 2026-01-01, 12-month grid)
+[136/315] UK0029840.5134 - 171 - Barclays 1CP - Central Vent   DEBUG: start=2026-03-01 end=2027-08-01 target=2028-02-01 blocks=2
+PREVIEW ù UK0029840.5134/171 (8 staff, starts 2026-03-01, 24-month grid)
+[137/315] UK0029936.0534-104-06 - GPA Sanctuary Caxton.xlsm    DEBUG: start=2026-01-01 end=2026-09-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029936.0534/104.06 (4 staff, starts 2026-01-01, 12-month grid)
+[138/315] UK0029936.1434 - GPA 2 Marsham Street.xlsm           DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029936.1434/102.01 (8 staff, starts 2026-01-01, 12-month grid)
+[139/315] UK0029936.2592 - GPA 36WH.xlsm                       DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029936.2592/103.01 Labour (3 staff, starts 2026-01-01, 12-month grid)
+[140/315] UK0029936.2592-103.01 - GPA 36 WH Stage 3.xlsm       DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029936.2592/103.01 (12 staff, starts 2026-01-01, 12-month grid)
+[141/315] UK0029936.2763-100.006 - GPA 10SC.xlsm               DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029936.2763/100.01 (4 staff, starts 2026-01-01, 12-month grid)
+[142/315] UK0029936.4690-UK-GPA - York Central - Stage 2 Des   DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029936.4690-UK-GPA - YORK CENTRAL - STAGE 2 DESIGN/000 (3 staff, starts 2026-01-01, 12-month grid)
+[143/315] UK0029936.7171-100.103.01 - GPA MDC.xlsm             DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029936.7171/100.103.01 (4 staff, starts 2026-01-01, 12-month grid)
+[144/315] UK0029938.0243 - UK-DEFRA CRPS Leewick Depot RIBA    DEBUG: start=2026-01-01 end=2026-05-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0029938.0243/206 (5 staff, starts 2026-01-01, 12-month grid)
+[145/315] UK0030728.3793-DCUK-Iridium Data Centre-70123793.x   DEBUG: start=2026-05-01 end=2026-07-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0030728.3793-DCUK-Iridium Data Centre-70123793/500.04-ICT Stage 5 (2 staff, starts 2026-05-01, 12-month grid)
+[146/315] UK0033170.6342 - Harrods FWFJ Public Health.xlsm     DEBUG: start=2026-03-01 end=2026-12-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0033170.7644/200 (3 staff, starts 2026-03-01, 12-month grid)
+[147/315] UK0033170.8387 - Harrods Superbrands Detailed Desi   DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0033170.8387/200 (10 staff, starts 2026-01-01, 12-month grid)
+[148/315] UK0033170.8387 - Harrods Superbrands Stage 5.xlsm    DEBUG: start=2026-08-01 end=2026-11-01 target=2027-07-01 blocks=1
+PREVIEW ù UK0033170.8387/200 (5 staff, starts 2026-08-01, 12-month grid)
+[149/315] UK0033367-100 - FFC London Reviews.xlsm              DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0033367.7609/100 (4 staff, starts 2026-01-01, 12-month grid)
+[150/315] UK0033488.3899-600.100 The Knightsbridge-BMS.xlsm    DEBUG: start=2026-01-01 end=2026-09-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0033488.3899/600.100 (2 staff, starts 2026-01-01, 12-month grid)
+[151/315] UK0037287.3053-UK-HSBC 2026 GES Update.xlsm          DEBUG: start=2026-02-01 end=2026-06-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0037287.3053-UK-HSBC 2026 GES Update/100-100 - HSBC GES Update 2026 (13 staff, starts 2026-02-01, 12-month grid)
+[152/315] UK0037288.3106 - HSBC Cork Street.xlsm               DEBUG: start=2026-04-01 end=2027-02-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0037288.3106/100 (5 staff, starts 2026-04-01, 12-month grid)
+[153/315] UK0037289.0309-002 - HSBC 2025 Retail Projects - O   DEBUG: start=2026-03-01 end=2026-07-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0037289.0309/002 (6 staff, starts 2026-03-01, 12-month grid)
+[154/315] UK0037289.0309-003 - HSBC 2025 Retail Projects - N   DEBUG: start=2026-01-01 end=2026-04-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0037289.0309/003 (3 staff, starts 2026-01-01, 12-month grid)
+[155/315] UK0037289.0309-005 - HSBC 2025 Retail Projects - B   DEBUG: start=2026-03-01 end=2026-06-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0037289.0309/005 (6 staff, starts 2026-03-01, 12-month grid)
+[156/315] UK0037289.0309-006 - HSBC 2025 Retail Projects - B   DEBUG: start=2026-01-01 end=2026-05-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0037289.0309/006 (3 staff, starts 2026-01-01, 12-month grid)
+[157/315] UK0037289.0309-007 - HSBC 2025 Retail Projects - G   DEBUG: start=2026-02-01 end=2026-07-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0037289.0309/007 (4 staff, starts 2026-02-01, 12-month grid)
+[158/315] UK0037289.0309-009 - HSBC 2025 Retail Projects - O   DEBUG: start=2026-05-01 end=2026-07-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0037289.0309/009 (6 staff, starts 2026-05-01, 12-month grid)
+[159/315] UK0037289.0309-010 - HSBC 2025 Retail Projects - P   DEBUG: start=2026-07-01 end=2026-08-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0037289.0309/E10 (2 staff, starts 2026-07-01, 12-month grid)
+[160/315] UK0037289.0309-011 - HSBC 2025 Retail Projects - M   DEBUG: start=2026-07-01 end=2026-09-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0037289.0309/011 (7 staff, starts 2026-07-01, 12-month grid)
+[161/315] UK0037289.0309-012 - HSBC 2025 Retail Projects - C   DEBUG: start=2026-07-01 end=2026-08-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0037289.0309/012 (1 staff, starts 2026-07-01, 12-month grid)
+[162/315] UK0037289.0309-013 - HSBC 2025 Retail Projects - S   DEBUG: start=2026-07-01 end=2026-08-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0037289.0309/013 (4 staff, starts 2026-07-01, 12-month grid)
+[163/315] UK0037289.0309-014 - HSBC 2025 Retail Projects - C   DEBUG: start=2026-07-01 end=2026-08-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0037289.0309/014 (2 staff, starts 2026-07-01, 12-month grid)
+[164/315] UK0037289.0309-E11 - HSBC 2025 Retail Projects - M   DEBUG: start=2026-07-01 end=2026-07-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0037289.0309/E11 (3 staff, starts 2026-07-01, 12-month grid)
+[165/315] UK0037289.0705-140 - HSBC Project Shield Stage 5.x   DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0037289.0705/140 (8 staff, starts 2026-01-01, 12-month grid)
+[166/315] UK0037289.0705-150 - HSBC Project Shield Stages 6-   DEBUG: start=2026-09-01 end=2026-10-01 target=2027-08-01 blocks=1
+PREVIEW ù UK0037289.0705/150 (7 staff, starts 2026-09-01, 12-month grid)
+[167/315] UK0037289.5849-500 - HSBC Project Sword Stage 5.xl   DEBUG: start=2026-07-01 end=2026-10-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0037289.5849/500 (10 staff, starts 2026-07-01, 12-month grid)
+[168/315] UK0037289.5849-600 - HSBC Project Sword Stages 6-7   DEBUG: start=2026-09-01 end=2026-12-01 target=2027-08-01 blocks=1
+PREVIEW ù UK0037289.5849/600 (6 staff, starts 2026-09-01, 12-month grid)
+[169/315] UK0037289.5849-UK-HSBC Project Sword.xlsm            DEBUG: start=2026-04-01 end=2026-09-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0037289.5849/450 (5 staff, starts 2026-04-01, 12-month grid)
+[170/315] UK0037289.7448 - HSBC Electra Business Park - Hist   DEBUG: start=2026-03-01 end=2026-07-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0037289.7448/100 (5 staff, starts 2026-03-01, 12-month grid)
+[171/315] UK0037289.8009-100 - HSBC St Albans.xlsm             DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0037289.8009/100 (5 staff, starts 2026-01-01, 12-month grid)
+[172/315] UK0037705.9035-100 - KCH DH Substation 17.xlsm       DEBUG: start=2026-01-01 end=2026-09-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0037705.9035/100 (6 staff, starts 2026-01-01, 12-month grid)
+[173/315] UK0037767.8090 DEFRA - Stage 3 & Beyond.xlsm         DEBUG: start=2026-07-01 end=2027-08-01 target=2028-06-01 blocks=2
+PREVIEW ù UK0037767.8090/007.WSP (3 staff, starts 2026-07-01, 24-month grid)
+[174/315] UK0037767.8090-UK-Defra SCAH RIBA 3 Animal Science   DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0037767.8090/NCE.000187 (2 staff, starts 2026-01-01, 12-month grid)
+[175/315] UK0037767.8090-UK-Defra SCAH RIBA 3 Lab Science.xl   DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0037767.8090/NCE.000188 (1 staff, starts 2026-01-01, 12-month grid)
+[176/315] UK0037767.8090-UK-Defra SCAH RIBA 4+.xlsm            DEBUG: start=2026-03-01 end=2026-07-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0037767.8090/NCE.000188 (3 staff, starts 2026-03-01, 12-month grid)
+[177/315] UK0038481.9360-100 BPRP T08 NW.xlsm                  DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0038481.9360/100 (1 staff, starts 2026-01-01, 12-month grid)
+[178/315] UK0038481.9360-201 BPRP T08 NW.xlsm                  DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0038481.9360/201 (8 staff, starts 2026-01-01, 12-month grid)
+[179/315] UK0038482.9358-100 BPRP T07 SW.xlsm                  DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0038482.9358/100 (1 staff, starts 2026-01-01, 12-month grid)
+[180/315] UK0038482.9358-201 BPRP T07 SW.xlsm                  DEBUG: start=2026-01-01 end=2027-02-01 target=2027-12-01 blocks=2
+PREVIEW ù UK0038482.9358/201 (11 staff, starts 2026-01-01, 24-month grid)
+[181/315] UK0038497.6493-500 - Pier Road CMT Construction.xl   DEBUG: start=2026-04-01 end=2028-03-01 target=2028-03-01 blocks=2
+PREVIEW ù UK0038497.6493/500 (4 staff, starts 2026-04-01, 24-month grid)
+[182/315] UK0038499.3908-200.201 OTC - MEP- Tender Support.x   DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0038499.3908/UK0038499.3908-200.201 (1 staff, starts 2026-01-01, 12-month grid)
+[183/315] UK0039165.8144-UK-Keflavik Airport.xlsm              DEBUG: start=2026-05-01 end=2026-07-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0039165.8144-UK-Keflavik Airport/AAS Relocation Design (1 staff, starts 2026-05-01, 12-month grid)
+[184/315] UK0039214.7655-UK-DWP-Middlesbrough Centre Square.   DEBUG: start=2026-07-01 end=2026-07-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0039214.7655/201 (3 staff, starts 2026-07-01, 12-month grid)
+[185/315] UK0039458.6640 - Project Garrison.xlsm               DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0039458.6640-UK-Project Garrison/MP2.01-MP2-Labor (2 staff, starts 2026-01-01, 12-month grid)
+[186/315] UK0039471.6576-DC-UK-Bulk N01 Zone 4 Masterplan IC   DEBUG: start=2026-04-01 end=2026-08-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0039471.6576-*DC*UK-Bulk N01 Zone 4 Masterplan/ICT-ICT & BMS (7 staff, starts 2026-04-01, 12-month grid)
+[187/315] UK0039471.6589-DCUK-Bulk DCM401 TASK ORDER 300.BTS   DEBUG: start=2026-04-01 end=2026-08-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0039471.6589-*DC*UK-Bulk DCM401/400.BTS-Stage 4 ICT/BMS (9 staff, starts 2026-04-01, 12-month grid)
+[188/315] UK0039517.4318-500 - Cyprus CMT Construction.xlsm    DEBUG: start=2026-04-01 end=2028-05-01 target=2029-03-01 blocks=3
+PREVIEW ù UK0039517.4318/500 (4 staff, starts 2026-04-01, 36-month grid)
+[189/315] UK0039606.2748 T2 G5 Carbon Assessment.xlsm          DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0039606.2748/202 (7 staff, starts 2026-01-01, 12-month grid)
+[190/315] UK0039898.4107-UK-Eden Project Morecambe.xlsm        DEBUG: start=2026-01-01 end=2026-10-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0042934.5680-UK-Eden Project Morecambe/S04.01.IT-Stage 4 - WSP ICT/AV (7 staff, starts 2026-01-01, 12-month grid)
+[191/315] UK0040081.4812 Heathrow CP12.xlsm                    DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0040081.4812/501 (8 staff, starts 2026-01-01, 12-month grid)
+[192/315] UK0040081.4812 Heathrow CP18.xlsm                    DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0040081.4812/502 (8 staff, starts 2026-01-01, 12-month grid)
+[193/315] UK0040081.4812 Heathrow CP19.xlsm                    DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0040081.4812/503 (8 staff, starts 2026-01-01, 12-month grid)
+[194/315] UK004073.8165 Exchequer Court.xlsm                   DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044073.8165-UK-Exchequer-Court RIBA 2/205-Ex Ct RIBA - Stage 2 - IT/AV (2 staff, starts 2026-01-01, 12-month grid)
+[195/315] UK0041019.2834 NNUH DSST Re-Design.xlsm              DEBUG: start=2026-01-01 end=2026-02-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041019.2834/100 (2 staff, starts 2026-01-01, 12-month grid)
+[196/315] UK0041199.8723 UoB Life and Health Sciences.xlsm     DEBUG: start=2026-07-01 end=2026-07-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0041199.8723/801 (1 staff, starts 2026-07-01, 12-month grid)
+[197/315] UK0041229.0503-UK-Oxford Science Park Infrastructu   DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0043376.3069/801 (2 staff, starts 2026-01-01, 12-month grid)
+[198/315] UK0041471.1131 - 401 - 1CP L19 - Stage 4.xlsm        DEBUG: start=2026-04-01 end=2026-07-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0041471.1131/401 (10 staff, starts 2026-04-01, 12-month grid)
+[199/315] UK0041471.1131 - 501 - 1CP L19 - Stage 5.xlsm        DEBUG: start=2026-04-01 end=2026-12-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0041471.1131/501 (9 staff, starts 2026-04-01, 12-month grid)
+[200/315] UK0041478.5553 - 401 - 1 CP L17 21 - Stage 4.xlsm    DEBUG: start=2026-09-01 end=2026-10-01 target=2027-08-01 blocks=1
+PREVIEW ù UK0041478.5553/401 (12 staff, starts 2026-09-01, 12-month grid)
+[201/315] UK0041478.5964 - 302 - 1 CP L30 31 - Stage 3 Light   DEBUG: start=2026-05-01 end=2026-06-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0041478.5964/302 (1 staff, starts 2026-05-01, 12-month grid)
+[202/315] UK0041478.5964 - 304 - 1 CP L30 31 - Stage 3 - L29   DEBUG: start=2026-05-01 end=2026-06-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0041478.5964/305 (4 staff, starts 2026-05-01, 12-month grid)
+[203/315] UK0041478.5964 - 401 - 1 CP L30 31 - Stage 4.xlsm    DEBUG: start=2026-04-01 end=2026-07-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0041478.5964/401 (10 staff, starts 2026-04-01, 12-month grid)
+[204/315] UK0041478.5964 - 500 - 1 CP L30 31 - Stage 5.xlsm    DEBUG: start=2026-05-01 end=2027-03-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0041478.5964/500 (16 staff, starts 2026-05-01, 12-month grid)
+[205/315] UK0041710.7996 - Bromley North MEP CMT.xlsm          DEBUG: start=2026-03-01 end=2026-12-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0041710.7996/100 (5 staff, starts 2026-03-01, 12-month grid)
+[206/315] UK0041753.9355-101 - MS 60 Threadneedle St Fitout    DEBUG: start=2026-01-01 end=2026-05-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041753.9355/101 (15 staff, starts 2026-01-01, 12-month grid)
+[207/315] UK0041753.9355-201 - MS 60 Threadneedle St Fitout    DEBUG: start=2026-05-01 end=2026-12-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0041753.9355/201 (6 staff, starts 2026-05-01, 12-month grid)
+[208/315] UK0041753.9355-MAN - MS 60 Threadneedle MAN.xlsm     DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041753.9355/MAN (3 staff, starts 2026-01-01, 12-month grid)
+[209/315] UK0041786.5661-New Hospitals Programme IDP.xlsm      DEBUG: start=2026-01-01 end=2026-05-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041786.5661/500 (1 staff, starts 2026-01-01, 12-month grid)
+[210/315] UK0041867.9081-401 - Tenter House Stage 4 - Stage    DEBUG: start=2026-02-01 end=2026-12-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0041867.9081/401 (8 staff, starts 2026-02-01, 12-month grid)
+[211/315] UK0041867.9081-Tenter House Stage 4.xlsm             DEBUG: start=2026-04-01 end=2026-12-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0041867.9081/404 (3 staff, starts 2026-04-01, 12-month grid)
+[212/315] UK0041870.3215 - UK-20 Bank Street Morgan Stanley    DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041870.3215/401 (29 staff, starts 2026-01-01, 12-month grid)
+[213/315] UK0041870.7464 Reimagine London MS IoT_OT Network.   DEBUG: start=2026-03-01 end=2026-09-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0041870.7464/305 (13 staff, starts 2026-03-01, 12-month grid)
+[214/315] UK0041870.7464 Reimagine London MS Smart - RFI&RFP   DEBUG: start=2026-01-01 end=2026-09-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041870.7464/000 (7 staff, starts 2026-01-01, 12-month grid)
+[215/315] UK0041870.7464 Reimagine London MS Smart - TEST LA   DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041870.7464/000 (5 staff, starts 2026-01-01, 12-month grid)
+[216/315] UK0041870.7464 Reimagine London MS Smart Stage 4.x   DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041870.7464/305 (6 staff, starts 2026-01-01, 12-month grid)
+[217/315] UK0041884.2619-UK-20 Bank Street Morgan Stanley -    DEBUG: start=2026-02-01 end=2026-08-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0041884.2619-UK-20 Bank Street Morgan Stanley - Workplace Stages 3 & 4/305 (7 staff, starts 2026-02-01, 12-month grid)
+[218/315] UK0041884.2619-UK-20 Bank Street Morgan Stanley -    DEBUG: start=2026-01-01 end=2027-03-01 target=2027-12-01 blocks=2
+PREVIEW ù UK0041884.2619/306 (11 staff, starts 2026-01-01, 24-month grid)
+[219/315] UK0041884.3189-1010 - 20 BS Morgan Stanley MAC L10   DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041884.3189/1010 (16 staff, starts 2026-01-01, 12-month grid)
+[220/315] UK0041884.3189-610 - 20 BS Morgan Stanley MAC L06.   DEBUG: start=2026-01-01 end=2026-05-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041884.3189/610 (7 staff, starts 2026-01-01, 12-month grid)
+[221/315] UK0041887.4380 - UK -CCC Decarbonisation Strategy.   DEBUG: start=2026-02-01 end=2026-06-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0041887.4380/000 (2 staff, starts 2026-02-01, 12-month grid)
+[222/315] UK0041935.3065-400.406 - Evermore_Stage 5.xlsm       DEBUG: start=2026-06-01 end=2027-04-01 target=2027-05-01 blocks=1
+PREVIEW ù UK0041935.3065/UK0041935.3065-501.105 (2 staff, starts 2026-06-01, 12-month grid)
+[223/315] UK0041935.3065-450 Stage 4A Energy Centre Longcros   DEBUG: start=2026-01-01 end=2026-04-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041935.3065/UK0041935.3065-400.450 (13 staff, starts 2026-01-01, 12-month grid)
+[224/315] UK0041935.3065-500 Longcross RIBA S5 MEP.xlsm        DEBUG: start=2026-02-01 end=2027-05-01 target=2028-01-01 blocks=2
+PREVIEW ù UK0041935.3065/UK0041935.3065-501.100 (12 staff, starts 2026-02-01, 24-month grid)
+[225/315] UK0041935.3065-900.01 Cedar House Longcross.xlsm     DEBUG: start=2026-01-01 end=2026-02-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0041935.3065-900/UK0041935.3065-900.01 (4 staff, starts 2026-01-01, 12-month grid)
+[226/315] UK0041935.3065-901.01 Leisure Centre Longcross.xls   DEBUG: start=2026-02-01 end=2026-04-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0041935.3065-900/UK0041935.3065-901.01 (5 staff, starts 2026-02-01, 12-month grid)
+[227/315] UK0041935.3065-902.01 Orangery Longcross.xlsm        DEBUG: start=2026-07-01 end=2026-10-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0041935.3065-900/UK0041935.3065-902.01 (4 staff, starts 2026-07-01, 12-month grid)
+[228/315] UK0041935.3065-UK-Longcross House - Multi-Disc Ser   DEBUG: start=2026-01-01 end=2027-03-01 target=2027-12-01 blocks=2
+PREVIEW ù UK0041935.3065/UK0041935.3065-501.104 (10 staff, starts 2026-01-01, 24-month grid)
+[229/315] UK0041935.3065-xxx RIBA Stage 2 Energy Centre Phas   DEBUG: start=2026-06-01 end=2026-08-01 target=2027-05-01 blocks=1
+PREVIEW ù UK0041935.3065/UK0041935.3065-400 (7 staff, starts 2026-06-01, 12-month grid)
+[230/315] UK0042094.2829-UK-One Undershaft - Phase 1 Constru   DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0042094.2829-UK-ONE UNDERSHAFT - PHASE 1 CONSTRUCTION/100.101.16-1US - PH1 CONSTRUCTION - IT & AV (3 staff, starts 2026-01-01, 12-month grid)
+[231/315] UK0042152.3931 - Project Brunel Cold Store Travel    DEBUG: start=2026-02-01 end=2026-03-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0042152.3931/03 (2 staff, starts 2026-02-01, 12-month grid)
+[232/315] UK0042303.6746-UK-DWC CON OPS.xlsm                   DEBUG: start=2026-08-01 end=2027-01-01 target=2027-07-01 blocks=1
+PREVIEW ù UK0042303.6746-UK-DWC CON OPS/101-S1 CONOPS AOS (1 staff, starts 2026-08-01, 12-month grid)
+[233/315] UK0042319.9850-400 - Berol Yard S73a.xlsm            DEBUG: start=2026-11-01 end=2026-12-01 target=2027-10-01 blocks=1
+PREVIEW ù UK0042319.9850/400 (2 staff, starts 2026-11-01, 12-month grid)
+[234/315] UK0042328.9493 - Apatura - Planning in Principle (   DEBUG: start=2026-07-01 end=2026-10-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0042328.9493-UK-Apatura - Planning in Principle (PPP) for DC sites in Scotland/201-Data Centre Planning in Principle - Technology Related (3 staff, starts 2026-07-01, 12-month grid)
+[235/315] UK0042338.9268 P320 UDX - ICT Stage 2 and Stage 3.   DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù 2025UK462544-P 320 UDX P 1340 - PMO & Leadership/Stage 2 and Stage 3 (2 staff, starts 2026-01-01, 12-month grid)
+[236/315] UK0042369.4312-UK-DK01 Bulk BMS and ICT.xlsm         DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0042369.4312/400.ICT-Stage 4 ICT (4 staff, starts 2026-01-01, 12-month grid)
+[237/315] UK0042383.8926-200 - UK-ELFT Luton 9 Bed Acute.xls   DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0042383.8926/200 (8 staff, starts 2026-01-01, 12-month grid)
+[238/315] UK0042384.3370 - 252.01 - Church Street Sites B &    DEBUG: start=2026-05-01 end=2026-09-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0042384.3370/252.01 (2 staff, starts 2026-05-01, 12-month grid)
+[239/315] UK0042384.3370 - Church Street sites B&C - MEP Sta   DEBUG: start=2026-05-01 end=2026-08-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0042384.3370/202.01 (9 staff, starts 2026-05-01, 12-month grid)
+[240/315] UK0042384.3370 - Church Street sites B&C.xlsm        DEBUG: start=2026-03-01 end=2026-11-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0042384.3370/702.01 (9 staff, starts 2026-03-01, 12-month grid)
+[241/315] UK0042528.8382 - Harrods ME&L Stage 5.xlsm           DEBUG: start=2026-05-01 end=2026-07-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0042528.8382/500 (5 staff, starts 2026-05-01, 12-month grid)
+[242/315] UK0042594.9910 - 201 - GF_1_2_3 - Stage 2.xlsm       DEBUG: start=2026-06-01 end=2026-09-01 target=2027-05-01 blocks=1
+PREVIEW ù UK0042594.9910/201 (18 staff, starts 2026-06-01, 12-month grid)
+[243/315] UK0042594.9910 - 301 - GF_1_2_3 - Stage 3.xlsm       DEBUG: start=2026-11-01 end=2027-02-01 target=2027-10-01 blocks=1
+PREVIEW ù UK0042594.9910/301 (17 staff, starts 2026-11-01, 12-month grid)
+[244/315] UK0042595.9914 - 401 - 1CP L15 16 20 - Stage 4.xls   DEBUG: start=2026-09-01 end=2026-12-01 target=2027-08-01 blocks=1
+PREVIEW ù UK0042595.9914/401 (12 staff, starts 2026-09-01, 12-month grid)
+[245/315] UK0042811.9849-100 BPRP T09 Management.xlsm          DEBUG: start=2026-01-01 end=2027-02-01 target=2027-12-01 blocks=2
+PREVIEW ù UK0042811.9849/100 (3 staff, starts 2026-01-01, 24-month grid)
+[246/315] UK0042811.9849-500 BPRP T09 St5.xlsm                 DEBUG: start=2026-03-01 end=2027-07-01 target=2028-02-01 blocks=2
+PREVIEW ù UK0042811.9849/500 (7 staff, starts 2026-03-01, 24-month grid)
+[247/315] UK0042833.0665 - ArchCo - Worcester EXTERNAL.xlsm    DEBUG: start=2026-04-01 end=2026-06-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0042833.0665/300.02 (3 staff, starts 2026-04-01, 12-month grid)
+[248/315] UK0042833.7122 - Andre Street Arches EXTERNAL.xlsm   DEBUG: start=2026-02-01 end=2026-05-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0042833.7122/200.03 (6 staff, starts 2026-02-01, 12-month grid)
+[249/315] UK0042866.8248-200 - Lygon House Heating Design+Si   DEBUG: start=2026-01-01 end=2026-09-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0042866.8248/200 (2 staff, starts 2026-01-01, 12-month grid)
+[250/315] UK0042934.5680 - Eden Project Morecambe Stage 4.xl   DEBUG: start=2026-03-01 end=2026-09-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0042934.5680/S04.01.SU (2 staff, starts 2026-03-01, 12-month grid)
+[251/315] UK0042981.0275 - Chroma Bankside Design and Constr   DEBUG: start=2026-01-01 end=2027-01-01 target=2027-12-01 blocks=2
+PREVIEW ù UK0042981.0275/100 (6 staff, starts 2026-01-01, 24-month grid)
+[252/315] UK0043037.7448-UK- WCC Brunel Building - Stage 2.x   DEBUG: start=2026-05-01 end=2026-10-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0043037.7448/xx (2 staff, starts 2026-05-01, 12-month grid)
+[253/315] UK0043040.5486 - GSTT Review.xlsm                    DEBUG: start=2026-01-01 end=2026-09-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0043040.5486/UK0043040.5486-101 (6 staff, starts 2026-01-01, 12-month grid)
+[254/315] UK0043201.8858-301 - BAT - Stage 3.xlsm              DEBUG: start=2026-01-01 end=2026-06-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0043201.8858/301 (14 staff, starts 2026-01-01, 12-month grid)
+[255/315] UK0043201.8858-401 - BAT - Stage 4.xlsm              DEBUG: start=2026-07-01 end=2026-09-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0043201.8858/301 (11 staff, starts 2026-07-01, 12-month grid)
+[256/315] UK0043240.5192-Bolton 225 Building Sustainability    DEBUG: start=2026-02-01 end=2026-06-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0043240.5192/200 (2 staff, starts 2026-02-01, 12-month grid)
+[257/315] UK0043266.7717-200 - GSMD Heating Cooling Ventilat   DEBUG: start=2026-04-01 end=2026-09-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0043266.7717/200 (3 staff, starts 2026-04-01, 12-month grid)
+[258/315] UK0043309.1703 - Heron Tower L20 21 MNK.xlsm         DEBUG: start=2026-01-01 end=2026-10-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0043309.1703/100 (3 staff, starts 2026-01-01, 12-month grid)
+[259/315] UK0043309.6693 - Heron Tower Level 25 Enhanced CAT   DEBUG: start=2026-07-01 end=2026-10-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0043309.6693/100 (2 staff, starts 2026-07-01, 12-month grid)
+[260/315] UK0043309.7713 - Heron Tower - Level 34 Full Floor   DEBUG: start=2026-03-01 end=2026-10-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0043309.7713/100 (1 staff, starts 2026-03-01, 12-month grid)
+[261/315] UK0043309.8056 - Heron Tower Level 6 - CAT A Reins   DEBUG: start=2026-04-01 end=2026-09-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0043309.8056/100 (2 staff, starts 2026-04-01, 12-month grid)
+[262/315] UK0043919.2816 T3 HBS.xlsm                           DEBUG: start=2026-06-01 end=2026-11-01 target=2027-05-01 blocks=1
+PREVIEW ù UK0043919.2816/005 (6 staff, starts 2026-06-01, 12-month grid)
+[263/315] UK0043920.8336 Heathrow CP25.xlsm                    DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0043920.8336/008 (7 staff, starts 2026-01-01, 12-month grid)
+[264/315] UK0044007.5139-100 - CMH CT Scanner Replacement.xl   DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044007.5139/100 (6 staff, starts 2026-01-01, 12-month grid)
+[265/315] UK0044043.3663 -503 - 40 HOV Stage 5 BREEAM.xlsm     DEBUG: start=2026-01-01 end=2028-12-01 target=2028-12-01 blocks=3
+PREVIEW ù UK0044043.3663/503 (2 staff, starts 2026-01-01, 36-month grid)
+[266/315] UK0044043.3663 -504 - 40 HOV Stage 5 Carbon.xlsm     DEBUG: start=2026-02-01 end=2028-12-01 target=2029-01-01 blocks=3
+PREVIEW ù UK0044043.3663/504 (2 staff, starts 2026-02-01, 36-month grid)
+[267/315] UK0044043.3663 -505 - 40 HOV Stage 5 WELL.xlsm       DEBUG: start=2026-02-01 end=2028-12-01 target=2029-01-01 blocks=3
+PREVIEW ù UK0044043.3663/505 (2 staff, starts 2026-02-01, 36-month grid)
+[268/315] UK0044043.3663 -509 - 40 HOV Stage 5 NABERS.xlsm     DEBUG: start=2026-01-01 end=2028-12-01 target=2028-12-01 blocks=3
+PREVIEW ù UK0044043.3663/509 (2 staff, starts 2026-01-01, 36-month grid)
+[269/315] UK0044054.7074 - Wimbledon AELTC.xlsm                DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044054.7074/100 (6 staff, starts 2026-01-01, 12-month grid)
+[270/315] UK0044073.8165 - UK-Exchequer Court RIBA 2 - E&S1.   DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044073.8165/213 (13 staff, starts 2026-01-01, 12-month grid)
+[271/315] UK0044073.8165-201 - Exchequer Court RIBA 2 MEP.xl   DEBUG: start=2026-01-01 end=2026-11-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044073.8165/201 (15 staff, starts 2026-01-01, 12-month grid)
+[272/315] UK0044102.5477 Villa Park.xlsm                       DEBUG: start=2026-03-01 end=2026-04-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0044102.5477/000 (2 staff, starts 2026-03-01, 12-month grid)
+[273/315] UK0044258.5773- Addenbrookes û DSS7.xlsm             DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044258.5773/100 (5 staff, starts 2026-01-01, 12-month grid)
+[274/315] UK0044281.1099 - 100 -33 Canada Square_Stage 3 MEP   DEBUG: start=2026-01-01 end=2026-10-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044281.1099/100 (14 staff, starts 2026-01-01, 12-month grid)
+[275/315] UK0044281.1099 - 200 -33 Canada Square_Stage 3 ICT   DEBUG: start=2026-01-01 end=2026-10-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044281.1099/200 (2 staff, starts 2026-01-01, 12-month grid)
+[276/315] UK0044281.1099 - 300 -33 Canada Square_Stage 3 Ene   DEBUG: start=2026-01-01 end=2026-10-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044281.1099/300 (5 staff, starts 2026-01-01, 12-month grid)
+[277/315] UK0044281.1099 - MAN -33 Canada Square_Stage 3 MAN   DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044281.1099/MAN (4 staff, starts 2026-01-01, 12-month grid)
+[278/315] UK0044281.1099-UK-33 Canada Square - Stage 3 - 200   DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044281.1099-UK-33 Canada Square - Stage 3/200-ICT (3 staff, starts 2026-01-01, 12-month grid)
+[279/315] UK0044281.1099-UK-33 Canada Square - Stage 3.xlsm    DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044281.1099/400 (8 staff, starts 2026-01-01, 12-month grid)
+[280/315] UK0044288.5211 - Kensington Palace Decarb.xlsm       DEBUG: start=2026-01-01 end=2026-07-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044288.5211/100 (10 staff, starts 2026-01-01, 12-month grid)
+[281/315] UK0044438.8812 LGW Concorde House.xlsm               DEBUG: start=2026-01-01 end=2026-08-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0044438.8821/000 (3 staff, starts 2026-01-01, 12-month grid)
+[282/315] UK0044496.1843-101-UK-LOR Honington SLA RIBA Stage   DEBUG: start=2026-02-01 end=2026-05-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0044496.1843/UK0044496.1843-101 (2 staff, starts 2026-02-01, 12-month grid)
+[283/315] UK00444XXXX Southampton Airport - Awaiting Active    DEBUG: start=2026-07-01 end=2026-11-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0044438.8821/000 (4 staff, starts 2026-07-01, 12-month grid)
+[284/315] UK0044889.4288 - 1 Portal Way 2026.xlsm              DEBUG: start=2026-03-01 end=2026-07-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0044889.4288/101 (7 staff, starts 2026-03-01, 12-month grid)
+[285/315] UK0045017.2555 - Lancaster West Estate Renovations   DEBUG: start=2026-03-01 end=2026-06-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0045017.2555/100 (5 staff, starts 2026-03-01, 12-month grid)
+[286/315] UK0045243.8773 Glasgow Airport Extension and Refur   DEBUG: start=2026-02-01 end=2026-11-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0045243.8773/700-ICT/AV/Security (4 staff, starts 2026-02-01, 12-month grid)
+[287/315] UK0045492.9236-UK - Bueno Optimisation - 40 LH.xls   DEBUG: start=2026-01-01 end=2026-12-01 target=2026-12-01 blocks=1
+PREVIEW ù UK0045492.9236/100-40 LH (3 staff, starts 2026-01-01, 12-month grid)
+[288/315] UK0045528.5631 - UK-Worcester College, UoO, Sir Li   DEBUG: start=2026-07-01 end=2026-08-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0045528.5631/305 (2 staff, starts 2026-07-01, 12-month grid)
+[289/315] UK0045528.5631 -205 Oxford Library.xlsm              DEBUG: start=2026-02-01 end=2026-07-01 target=2027-01-01 blocks=1
+PREVIEW ù UK0045528.5631/205 (5 staff, starts 2026-02-01, 12-month grid)
+[290/315] UK0045528.5631- Worcester College, UoO, Sir Lindsa   DEBUG: start=2026-06-01 end=2026-06-01 target=2027-05-01 blocks=1
+PREVIEW ù UK0045528.5631/201 (1 staff, starts 2026-06-01, 12-month grid)
+[291/315] UK0045576.6083 - L&G Utility Usage Investigations.   DEBUG: start=2026-04-01 end=2026-07-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0045576.6083/003 (3 staff, starts 2026-04-01, 12-month grid)
+[292/315] UK0045596.9645 - UK-Thames Court Fitout.xlsm         DEBUG: start=2026-04-01 end=2026-12-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0045596.9645/102 (4 staff, starts 2026-04-01, 12-month grid)
+[293/315] UK0045645.1750-UK-RSS  Stage 2 ES.xlsm               DEBUG: start=2026-05-01 end=2026-08-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0045645.1750/203 (1 staff, starts 2026-05-01, 12-month grid)
+[294/315] UK0045645.1750-UK-RSS - Stage 2.xlsm                 DEBUG: start=2026-07-01 end=2026-09-01 target=2027-06-01 blocks=1
+PREVIEW ù UK0045645.1750-UK-RSS - Stage 2/202-Stage 2 - ICT (4 staff, starts 2026-07-01, 12-month grid)
+[295/315] UK0045658.6634-100 - CBRE  20BS New Generator & En   DEBUG: start=2026-04-01 end=2026-09-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0045658.6634/100 (3 staff, starts 2026-04-01, 12-month grid)
+[296/315] UK0046083.6767 NEG.xlsm                              DEBUG: start=2026-06-01 end=2026-08-01 target=2027-05-01 blocks=1
+PREVIEW ù UK0046083.6767/201.06 (4 staff, starts 2026-06-01, 12-month grid)
+[297/315] UK0046173.3150 - Limmo Peninsula.xlsm                DEBUG: start=2026-04-01 end=2026-08-01 target=2027-03-01 blocks=1
+PREVIEW ù UK0046173.3150/302 (7 staff, starts 2026-04-01, 12-month grid)
+[298/315] UK0046252.6657-001- HSBC 2026 CMB Refresh Programm   DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/001 (5 staff, starts 2026-03-01, 12-month grid)
+[299/315] UK0046252.6657-004- HSBC 2026 CMB Refresh Programm   DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/004 (5 staff, starts 2026-03-01, 12-month grid)
+[300/315] UK0046252.6657-006- HSBC 2026 CMB Refresh Programm   DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/006 (5 staff, starts 2026-03-01, 12-month grid)
+[301/315] UK0046252.6657-009- HSBC 2026 CMB Refresh Programm   DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/009 (5 staff, starts 2026-03-01, 12-month grid)
+[302/315] UK0046252.6657-010- HSBC 2026 CMB Refresh Programm   DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/010 (5 staff, starts 2026-03-01, 12-month grid)
+[303/315] UK0046252.6657-011- HSBC 2026 CMB Refresh Programm   DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/011 (5 staff, starts 2026-03-01, 12-month grid)
+[304/315] UK0046252.6657-013- HSBC 2026 CMB Refresh Programm   DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/013 (5 staff, starts 2026-03-01, 12-month grid)
+[305/315] UK0046252.6657-014- HSBC 2026 CMB Refresh Programm   DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/014 (5 staff, starts 2026-03-01, 12-month grid)
+[306/315] UK0046252.6657-015- HSBC 2026 CMB Refresh Programm   DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/015 (5 staff, starts 2026-03-01, 12-month grid)
+[307/315] UK0046252.6657-016- HSBC 2026 CMB Refresh Programm   DEBUG: start=2026-03-01 end=2026-08-01 target=2027-02-01 blocks=1
+PREVIEW ù UK0046252.6657/016 (5 staff, starts 2026-03-01, 12-month grid)
+[308/315] UK0046272.9631 - Euston Masterplan.xlsm              DEBUG: start=2026-05-01 end=2027-01-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0046272.9631/202 (5 staff, starts 2026-05-01, 12-month grid)
+[309/315] UK0046272.9631 - Euston T1-T2.xlsm                   DEBUG: start=2026-05-01 end=2026-12-01 target=2027-04-01 blocks=1
+PREVIEW ù UK0046272.9631/000 (8 staff, starts 2026-05-01, 12-month grid)
+[310/315] UK62281981- DfE Hill West EXTERNAL.xlsm              DEBUG: start=2026-01-01 end=2026-03-01 target=2026-12-01 blocks=1
+PREVIEW ù UK-62281981/UK-62281981-300 (4 staff, starts 2026-01-01, 12-month grid)
+[311/315] UK62281981- DfE Stow Heath EXTERNAL.xlsm             DEBUG: start=2026-04-01 end=2026-04-01 target=2027-03-01 blocks=1
+PREVIEW ù UK-62281988/UK-62281988-300 (3 staff, starts 2026-04-01, 12-month grid)
+[312/315] UK70109022 T3 CSA.xlsm                               DEBUG: start=2026-07-01 end=2026-10-01 target=2027-06-01 blocks=1
+PREVIEW ù UK-70092442/018 (4 staff, starts 2026-07-01, 12-month grid)
+[313/315] UKxxxxxxxxx Jaegerhofpalais Wiredscore PreCheck +    DEBUG: start=2026-03-01 end=2027-12-01 target=2028-02-01 blocks=2
+PREVIEW ù xxxxxxxxxx/xxxxxxxxxx (2 staff, starts 2026-03-01, 24-month grid)
+[314/315] Victoria House Energy.xlsm                           DEBUG: start=2026-02-01 end=2026-07-01 target=2027-01-01 blocks=1
+PREVIEW ù 2026UK559466/000 (4 staff, starts 2026-02-01, 12-month grid)
+[315/315] Victoria Industrial Estate PH Review.xlsm            DEBUG: start=2026-06-01 end=2026-07-01 target=2027-05-01 blocks=1
+PREVIEW ù 00000000/000 (2 staff, starts 2026-06-01, 12-month grid)
+
+============================================================
+  Processed:     315
+  Collisions:    0
+  Skipped:       0
+  Errors:        0
+============================================================
+
+This was a DRY RUN. Set DRY_RUN = False to write to the database.

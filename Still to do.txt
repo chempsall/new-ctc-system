@@ -9,9 +9,12 @@ Edge case - more than one PD (is the same possible for PM?)
 
 
 
+Admin login is a bit rubbish
 
 
 
+
+Quirk in "Linked to Horizon" - it will show this even if it's an opportunity <= IMPORTANT
 
 
 With a correct Project Number and task number but before the Horizon records are available it shows "Not linked" (as expected). However, when the Horizon record is available it doesn't automatically link (debatable how desirable this is) AND required me to delete the task order number and re-insert it before it would link.

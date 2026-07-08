@@ -24,8 +24,9 @@ from datetime import date, datetime, timezone
 
 CTC_FOLDER  = r"C:\CTC-files"
 DB_PATH     = r"C:\Users\UKCMH001\Dev\new-ctc-system\data\resource_forecast.db"
-FROM_PERIOD = "2026-01-01"
-DRY_RUN     = False           # set False to actually write to the database
+FROM_PERIOD  = "2026-01-01"   # import allocations from this date (includes history)
+FUTURE_CUTOFF = "2026-07-01"  # files must have work from this date to be imported
+DRY_RUN     = True           # set False to actually write to the database
 DEFAULT_DEPT = "UK010117-UK-BSV-Services London"  # used when Horizon lookup fails
 
 # ── Dependencies check ───────────────────────────────────────────────────────
@@ -106,7 +107,7 @@ def process_file(path, conn, stats):
     Returns a dict with the results for this file.
     """
     try:
-        wb = openpyxl.load_workbook(path, data_only=True)
+        wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
     except Exception as e:
         return {"file": path.name, "status": "ERROR", "error": str(e)}
 
@@ -118,7 +119,9 @@ def process_file(path, conn, stats):
     # Read header fields
     proj_num  = cell_val(ws, "G4")
     task_num  = cell_val(ws, "G5")
-    dept      = cell_val(ws, "G7") or DEFAULT_DEPT
+    dept      = cell_val(ws, "G7")
+    if not dept or "No Horizon Record Found" in dept:
+        dept = DEFAULT_DEPT
     pd_raw    = clean_name(cell_val(ws, "G11"))
     pm_raw    = clean_name(cell_val(ws, "G12"))
 
@@ -133,7 +136,7 @@ def process_file(path, conn, stats):
     for col in range(10, 60):  # columns J (10) to BH (60)
         cell = ws.cell(row=15, column=col)
         period = parse_period_label(cell.value)
-        if period and period >= FROM_PERIOD:
+        if period and period >= FUTURE_CUTOFF:
             period_cols[period] = col
 
     # period_cols may be empty if all allocations are in the past — that's fine,
@@ -160,14 +163,12 @@ def process_file(path, conn, stats):
         if allocations:  # only include staff with actual allocations in scope
             staff_allocations.append({"name": name, "allocations": allocations})
 
-    if not staff_allocations:
-        # Still import staff but with empty allocations
-        # so the RTC exists and can be updated or archived
-        for row in range(16, 56):
-            name_cell = ws.cell(row=row, column=6)
-            name = str(name_cell.value).strip() if name_cell.value else ""
-            if name:
-                staff_allocations.append({"name": name, "allocations": {}})
+    # Check if any staff have future allocations
+    has_future_work = any(s["allocations"] for s in staff_allocations)
+    
+    if not has_future_work:
+        return {"file": path.name, "status": "SKIPPED",
+                "error": "No future allocations — excluded from migration"}
 
     # Calculate start and target periods from actual allocation data
     from datetime import date as _date
@@ -180,8 +181,11 @@ def process_file(path, conn, stats):
         _first_alloc = min(_periods_with_data)
         _last_alloc  = max(_periods_with_data)
     else:
-        _first_alloc = FROM_PERIOD
-        _last_alloc  = FROM_PERIOD
+        from datetime import date as _d2
+        _current_month = _d2.today().replace(day=1).isoformat()
+        _first_alloc = _current_month
+        _last_alloc  = _current_month
+
     start_period = _first_alloc
     _start  = _date.fromisoformat(start_period)
     _end    = _date.fromisoformat(_last_alloc)
@@ -190,6 +194,8 @@ def process_file(path, conn, stats):
     while target < _end:
         target  += _rd(months=12)
         _blocks += 1
+
+    print(f"  DEBUG: start={start_period} end={_last_alloc} target={target} blocks={_blocks}")
 
     result = {
         "file":        path.name,
@@ -224,8 +230,9 @@ def process_file(path, conn, stats):
         AND project_status = 'Active'
     """, (proj_num, task_num)).fetchone()
 
-    if not proj_row:
-        # Try project-only match
+    if not proj_row and not is_placeholder(task_num):
+        # Try project-only match — only if task number is real
+        # (placeholder task numbers should never share an existing project)
         proj_row = c.execute("""
             SELECT project_id, project_name FROM projects
             WHERE project_number = ?
@@ -249,16 +256,24 @@ def process_file(path, conn, stats):
             VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?)
         """, (proj_num, unique_task,
               f"{proj_num} / {task_num}",
-              f"{proj_num} / {task_num}",
-              None, pd_raw or None, pm_raw or None,
+              "",
+              None,
+              None if not pd_raw or "No Horizon Record Found" in pd_raw else pd_raw,
+              None if not pm_raw or "No Horizon Record Found" in pm_raw else pm_raw,
               now))
         project_id = c.lastrowid
         result["horizon"] = "pending"
 
-    # Check if RTC already exists for this project
+    # Check if RTC already exists for this project — flag as collision
     existing_rtc = c.execute("""
         SELECT rtc_id FROM rtcs WHERE project_id = ?
     """, (project_id,)).fetchone()
+
+    if existing_rtc:
+        result["status"]    = "COLLISION"
+        result["error"]     = f"RTC already exists for {proj_num}/{task_num} — possible duplicate project number"
+        conn.rollback()
+        return result
 
     if existing_rtc:
         rtc_id = existing_rtc["rtc_id"]
@@ -332,6 +347,37 @@ def process_file(path, conn, stats):
     result["staff_skipped"] = staff_skipped
     return result
 
+def preflight_check(files):
+    """Scan all files and report duplicate project+task combinations."""
+    print("\nPre-flight check — scanning for duplicate project/task numbers...")
+    seen = {}  # (proj_num, task_num) -> list of filenames
+    for f in files:
+        try:
+            wb = openpyxl.load_workbook(f, data_only=True, read_only=True)
+            if "Resources" not in wb.sheetnames:
+                wb.close()
+                continue
+            ws = wb["Resources"]
+            proj_num = str(ws["G4"].value or "").strip() or "00000000"
+            task_num = str(ws["G5"].value or "").strip() or "000"
+            wb.close()
+            key = (proj_num, task_num)
+            seen.setdefault(key, []).append(f.name)
+        except Exception:
+            pass
+
+    duplicates = {k: v for k, v in seen.items() if len(v) > 1}
+    if duplicates:
+        print(f"\nWARNING: {len(duplicates)} duplicate project/task combinations found:")
+        for (proj, task), fnames in sorted(duplicates.items()):
+            print(f"  {proj} / {task}:")
+            for fname in fnames:
+                print(f"    - {fname}")
+        print()
+        return False
+    else:
+        print(f"  OK — no duplicates found across {len(files)} files\n")
+        return True
 
 def main():
     folder = Path(CTC_FOLDER)
@@ -339,10 +385,72 @@ def main():
         print(f"ERROR: Folder not found: {CTC_FOLDER}")
         sys.exit(1)
 
-    files = sorted(folder.glob("*.xlsm"))
-    if not files:
+    all_files = sorted(folder.glob("*.xlsm"))
+    if not all_files:
         print(f"ERROR: No .xlsm files found in {CTC_FOLDER}")
         sys.exit(1)
+
+    # Step 1: Filter to files with future work only
+    print(f"Scanning {len(all_files)} files for future allocations...")
+    files = []
+    no_future = []
+    for f in all_files:
+        try:
+            wb = openpyxl.load_workbook(f, data_only=True, read_only=True)
+            if "Resources" not in wb.sheetnames:
+                no_future.append(f.name)
+            if has_future:
+                if f.name == "UK0042369.4312-UK-DK01 Bulk BMS and ICT.xlsm":
+                    print(f"  DEBUG: passed filter, period_cols count={len(period_cols)}")
+                    for row in range(16, 56):
+                        name = str(ws.cell(row=row, column=6).value or "").strip()
+                        if not name:
+                            continue
+                        for period, col in period_cols.items():
+                            val = ws.cell(row=row, column=col).value
+                            if val is not None and val != 0 and val != "":
+                                print(f"    Row {row}, period {period}, col {col}, val={val!r}")
+                files.append(f)
+                wb.close()
+                continue
+            ws = wb["Resources"]
+            has_future = False
+            # Read period headers from row 15
+            period_cols = {}
+            for col in range(10, 60):
+                cell = ws.cell(row=15, column=col)
+                period = parse_period_label(cell.value)
+                if period and period >= FROM_PERIOD:
+                    period_cols[period] = col
+            # Check if any cell in the allocation area has a value >= FROM_PERIOD
+            for row in range(16, 56):
+                name = str(ws.cell(row=row, column=6).value or "").strip()
+                if not name:
+                    continue
+                for period, col in period_cols.items():
+                    val = ws.cell(row=row, column=col).value
+                    try:
+                        if val and float(val) > 0:
+                            has_future = True
+                            break
+                    except (ValueError, TypeError):
+                        pass
+                if has_future:
+                    break
+            wb.close()
+            if has_future:
+                files.append(f)
+            else:
+                no_future.append(f.name)
+            if not has_future or len(period_cols) == 0:
+                print(f"  CHECK: {f.name} — period_cols={sorted(period_cols.keys())[:3]}, has_future={has_future}")
+                print(f"  EXCLUDED: {f.name}")
+        except Exception as e:
+            print(f"  WARNING: Could not read {f.name}: {e}")
+            no_future.append(f.name)
+
+    print(f"  {len(files)} files have future allocations")
+    print(f"  {len(no_future)} files excluded (no future work)\n")
 
     print(f"\nCTC Migration Tool")
     print(f"{'='*60}")
@@ -355,6 +463,12 @@ def main():
 
     if not DRY_RUN:
         confirm = input("Type YES to proceed with live import: ").strip()
+        if confirm != "YES":
+            print("Aborted.")
+            sys.exit(0)
+
+    if not preflight_check(files):
+        confirm = input("Duplicates found. Type YES to continue anyway, or press Enter to abort: ").strip()
         if confirm != "YES":
             print("Aborted.")
             sys.exit(0)
@@ -381,6 +495,9 @@ def main():
             stats["ok"] += 1
             print(f"PREVIEW — {result.get('proj_num','?')}/{result.get('task_num','?')} "
                   f"({result.get('staff',0)} staff, starts {result.get('start_period','?')}, {result.get('grid_months',12)}-month grid)")
+        elif status == "COLLISION":
+            stats["collisions"] = stats.get("collisions", 0) + 1
+            print(f"COLLISION — {result.get('error','')}")
         elif status == "SKIPPED":
             stats["skipped"] += 1
             print(f"SKIP — {result.get('error','')}")
@@ -394,6 +511,7 @@ def main():
 
     print(f"\n{'='*60}")
     print(f"  Processed:     {stats['ok']}")
+    print(f"  Collisions:    {stats.get('collisions', 0)}")
     print(f"  Skipped:       {stats['skipped']}")
     print(f"  Errors:        {stats['errors']}")
     if stats["staff_skipped"]:
