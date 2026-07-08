@@ -13,7 +13,7 @@
 const state = {
   summary:        null,    // Full summary payload from /api/summary
   activePeriod:   null,    // Currently selected month label e.g. "Apr-2026"
-  activeView: (["rtcs","staff","projects"].includes(window.location.hash.replace("#","")))
+  activeView: (["rtcs","staff","projects","mgmt"].includes(window.location.hash.replace("#","")))
               ? window.location.hash.replace("#","")
               : "rtcs",
   filters: {
@@ -342,22 +342,214 @@ function filteredProjects() {
 // ---------------------------------------------------------------------------
 // Render main view
 // ---------------------------------------------------------------------------
+// ── Management Summary ──────────────────────────────────────────────────────
+
+function renderMgmtSummary() {
+  const container = document.getElementById("mgmt-container");
+  if (!container) return;
+  const s   = state.summary;
+  if (!s) { container.innerHTML = '<div class="empty-state">Loading…</div>'; return; }
+
+  const dept = state.filters.department !== "all" ? state.filters.department : null;
+  const p    = state.activePeriod;
+
+  // Filter staff by department
+  const staff = s.staff.filter(ps =>
+    !dept || ps.department === dept
+  );
+
+  // Filter RTCs by department
+  const rtcs = state.rtcs.filter(r =>
+    !dept || r.department === dept
+  );
+
+  // Headline metrics
+  const totalStaff    = staff.filter(s => !s.id.startsWith("GENERIC-")).length;
+  const totalFte      = staff.reduce((sum, ps) => sum + (ps.fte[p] || 0), 0).toFixed(1);
+  const overCount     = staff.filter(ps => ps.kpi[p] === "over").length;
+  const underCount    = staff.filter(ps => ps.kpi[p] === "under").length;
+  const allocDays     = staff.reduce((sum, ps) => sum + (ps.allocated[p] || 0), 0);
+  const horizonDays   = staff.reduce((sum, ps) => sum + (ps.horizon_days[p] || 0), 0);
+  const noRecDays     = staff.reduce((sum, ps) => sum + (ps.no_record_days[p] || 0), 0);
+
+  // RTC status breakdown
+  const statusCounts = { current: 0, due_review: 0, overdue_review: 0,
+                         awaiting_archiving: 0, archived: 0 };
+  rtcs.forEach(r => { if (r.status in statusCounts) statusCounts[r.status]++; });
+
+  // Horizon linked vs unlinked
+  const linkedRtcs   = rtcs.filter(r => r.horizon_status === "linked");
+  const unlinkedRtcs = rtcs.filter(r => r.horizon_status !== "linked");
+  const linkedDays   = linkedRtcs.reduce((sum, r) => sum + (r.future_days || 0), 0);
+  const unlinkedDays = unlinkedRtcs.reduce((sum, r) => sum + (r.future_days || 0), 0);
+
+  // Utilisation by month (next 6 periods)
+  const periods6 = s.periods.slice(s.periods.indexOf(p), s.periods.indexOf(p) + 6);
+
+  // Top projects by future days
+  const projects = s.projects
+    .filter(pr => !dept || pr.department === dept)
+    .filter(pr => Object.values(pr.total_days).some(d => d > 0))
+    .sort((a, b) => {
+      const fa = Object.entries(a.total_days)
+        .filter(([l]) => s.periods.indexOf(l) >= s.periods.indexOf(p))
+        .reduce((s, [,d]) => s + d, 0);
+      const fb = Object.entries(b.total_days)
+        .filter(([l]) => s.periods.indexOf(l) >= s.periods.indexOf(p))
+        .reduce((s, [,d]) => s + d, 0);
+      return fb - fa;
+    })
+    .slice(0, 10);
+
+  // Staff at risk (over-allocated next 3 months)
+  const periods3 = s.periods.slice(s.periods.indexOf(p), s.periods.indexOf(p) + 3);
+  const atRisk = staff
+    .filter(ps => !ps.id.startsWith("GENERIC-"))
+    .filter(ps => periods3.some(per => ps.kpi[per] === "over"))
+    .sort((a, b) => (b.allocated[p] || 0) - (a.allocated[p] || 0))
+    .slice(0, 10);
+
+  const statusLabel = { current: "Current", due_review: "Due for review",
+    overdue_review: "Overdue review", awaiting_archiving: "Awaiting archiving",
+    archived: "Archived" };
+  const statusColour = { current: "var(--green-dark)", due_review: "var(--amber-dark)",
+    overdue_review: "var(--status-red)", awaiting_archiving: "var(--grey-500)",
+    archived: "var(--grey-400)" };
+
+  container.innerHTML = `
+    <div class="mgmt-grid">
+
+      <!-- Headline metrics -->
+      <div class="mgmt-card mgmt-card--wide">
+        <div class="mgmt-card__title">This month at a glance</div>
+        <div class="mgmt-metrics">
+          <div class="mgmt-metric">
+            <div class="mgmt-metric__value">${totalStaff}</div>
+            <div class="mgmt-metric__label">Staff</div>
+          </div>
+          <div class="mgmt-metric">
+            <div class="mgmt-metric__value">${totalFte}</div>
+            <div class="mgmt-metric__label">FTE</div>
+          </div>
+          <div class="mgmt-metric">
+            <div class="mgmt-metric__value">${fmt.days(allocDays)}d</div>
+            <div class="mgmt-metric__label">Allocated</div>
+          </div>
+          <div class="mgmt-metric" style="color:var(--status-red)">
+            <div class="mgmt-metric__value">${overCount}</div>
+            <div class="mgmt-metric__label">Over-allocated</div>
+          </div>
+          <div class="mgmt-metric" style="color:var(--green-dark)">
+            <div class="mgmt-metric__value">${underCount}</div>
+            <div class="mgmt-metric__label">Under-resourced</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Horizon linked vs unlinked -->
+      <div class="mgmt-card">
+        <div class="mgmt-card__title">Horizon link status (future days)</div>
+        <div class="mgmt-horizon-row">
+          <div class="mgmt-horizon-item mgmt-horizon-item--linked">
+            <div class="mgmt-horizon-item__count">${linkedRtcs.length}</div>
+            <div class="mgmt-horizon-item__label">Linked RTCs</div>
+            <div class="mgmt-horizon-item__days">${fmt.days(linkedDays)}d</div>
+          </div>
+          <div class="mgmt-horizon-item mgmt-horizon-item--unlinked">
+            <div class="mgmt-horizon-item__count">${unlinkedRtcs.length}</div>
+            <div class="mgmt-horizon-item__label">Not linked</div>
+            <div class="mgmt-horizon-item__days">${fmt.days(unlinkedDays)}d at risk</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RTC health -->
+      <div class="mgmt-card">
+        <div class="mgmt-card__title">RTC review status</div>
+        ${Object.entries(statusCounts)
+          .filter(([k]) => k !== "archived")
+          .map(([k, v]) => `
+          <div class="mgmt-status-row">
+            <div class="mgmt-status-row__label" style="color:${statusColour[k]}">${statusLabel[k]}</div>
+            <div class="mgmt-status-row__bar-wrap">
+              <div class="mgmt-status-row__bar" style="width:${rtcs.length ? Math.round(v/rtcs.length*100) : 0}%;background:${statusColour[k]}"></div>
+            </div>
+            <div class="mgmt-status-row__count">${v}</div>
+          </div>`).join("")}
+      </div>
+
+      <!-- Top projects -->
+      <div class="mgmt-card mgmt-card--wide">
+        <div class="mgmt-card__title">Top projects by days remaining</div>
+        <table class="mgmt-table">
+          <thead><tr>
+            <th>Project</th><th>Department</th>
+            <th style="text-align:right">This month</th>
+            <th style="text-align:right">Future days</th>
+            <th>Horizon</th>
+          </tr></thead>
+          <tbody>
+          ${projects.map(pr => {
+            const futureDays = Object.entries(pr.total_days)
+              .filter(([l]) => s.periods.indexOf(l) >= s.periods.indexOf(p))
+              .reduce((sum, [,d]) => sum + d, 0);
+            const linked = pr.horizon_status === "linked";
+            return `<tr>
+              <td><div class="proj-name">${escHtml(pr.name)}</div>
+                  <div class="proj-task" style="font-size:10px;color:var(--text-tertiary)">${escHtml(pr.task_name || "")}</div></td>
+              <td><span class="team-badge">${escHtml(pr.department || "—")}</span></td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt.days(pr.total_days[p] || 0)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt.days(futureDays)}d</td>
+              <td><span class="horizon horizon--${linked ? "linked" : "norecord"}">
+                <span class="horizon--dot"></span>${linked ? "Linked" : "No record"}</span></td>
+            </tr>`;
+          }).join("")}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Staff at risk -->
+      ${atRisk.length ? `
+      <div class="mgmt-card">
+        <div class="mgmt-card__title">Staff over-allocated (next 3 months)</div>
+        <table class="mgmt-table">
+          <thead><tr><th>Name</th><th>Grade</th>
+            ${periods3.map(per => `<th style="text-align:center">${per}</th>`).join("")}
+          </tr></thead>
+          <tbody>
+          ${atRisk.map(ps => `<tr>
+            <td>${escHtml(ps.name)}</td>
+            <td style="font-size:11px;color:var(--text-tertiary)">${escHtml(fmt.gradeShort(ps.job_title))}</td>
+            ${periods3.map(per => {
+              const kpi = ps.kpi[per] || "ok";
+              const col = kpi === "over" ? "var(--status-red)" : kpi === "under" ? "var(--green-dark)" : "";
+              return `<td style="text-align:center;font-family:var(--font-mono);font-size:11px;color:${col}">${fmt.days(ps.allocated[per] || 0)}d</td>`;
+            }).join("")}
+          </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>` : ""}
+
+    </div>
+  `;
+}
+
 function renderView() {
+  const panels = ["staff-panel", "projects-panel", "rtcs-panel", "mgmt-panel"];
+  panels.forEach(id => document.getElementById(id)?.classList.add("hidden"));
+
   if (state.activeView === "staff") {
     renderStaffTable();
     document.getElementById("staff-panel").classList.remove("hidden");
-    document.getElementById("projects-panel").classList.add("hidden");
-    document.getElementById("rtcs-panel").classList.add("hidden");
   } else if (state.activeView === "projects") {
     renderProjectTable();
     document.getElementById("projects-panel").classList.remove("hidden");
-    document.getElementById("staff-panel").classList.add("hidden");
-    document.getElementById("rtcs-panel").classList.add("hidden");
+  } else if (state.activeView === "mgmt") {
+    renderMgmtSummary();
+    document.getElementById("mgmt-panel").classList.remove("hidden");
   } else {
     renderRtcTable();
     document.getElementById("rtcs-panel").classList.remove("hidden");
-    document.getElementById("staff-panel").classList.add("hidden");
-    document.getElementById("projects-panel").classList.add("hidden");
   }
   renderMetrics();
 }
@@ -916,6 +1108,7 @@ function switchView(view) {
     rtcs:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status"],
     staff:    ["filter-job-title", "filter-job-function"],
     projects: ["filter-project-pd", "filter-project-pm", "filter-horizon"],
+    mgmt:     [],
   };
   const hiddenSlots = {
     staff: ["filter-rtc-status"],
@@ -940,9 +1133,11 @@ function switchView(view) {
 
   // Month tabs only relevant for staff and projects views
  const monthTabs = document.getElementById("month-tabs");
-  if (monthTabs) monthTabs.style.display = view === "rtcs" ? "none" : "";
+  if (monthTabs) monthTabs.style.display = (view === "rtcs" || view === "mgmt") ? "none" : "";
   const rtcBar = document.getElementById("rtc-actions-bar");
   if (rtcBar) rtcBar.style.display = view === "rtcs" ? "" : "none";
+  const detailPanel = document.getElementById("detail-panel");
+  if (detailPanel && view === "mgmt") detailPanel.classList.remove("open");
 
   // Reload data fresh on every tab switch so changes made on one tab
   // are reflected immediately on the others without needing a page refresh
@@ -1566,8 +1761,7 @@ function escHtml(str) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replace(/"/g, "&quot;");
 }
 
 // ---------------------------------------------------------------------------

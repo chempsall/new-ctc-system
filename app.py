@@ -549,8 +549,7 @@ def api_create_rtc():
     conn.close()
 
     summary_module.mark_dirty()
-    logger.info(f"RTC {rtc_id}: staff {pid} added by {user}")
-    return jsonify({"status": "ok", "periods_seeded": len(periods)})
+    return jsonify({"status": "ok"})
 
 
 @app.route("/api/rtcs/<int:rtc_id>/duplicate", methods=["POST"])

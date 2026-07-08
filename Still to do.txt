@@ -11,22 +11,18 @@ Edge case - more than one PD (is the same possible for PM?)
 
 
 
+
+
+
 With a correct Project Number and task number but before the Horizon records are available it shows "Not linked" (as expected). However, when the Horizon record is available it doesn't automatically link (debatable how desirable this is) AND required me to delete the task order number and re-insert it before it would link.
 
 
 Ading a project that lives in another department still lists 010117 as home.
 
 
-
-
-
-
 Does the duplicate function work?
 
 Default sort order for the three pages?
-
-I'm still not satisfied with the "Days" display on the RTCs page. It shows remaining days excluding the current month (potentially misleading) - IS THIS TRUE? I don't think it is, I think it's total days.
-
 
 
 
