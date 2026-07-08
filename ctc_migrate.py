@@ -24,7 +24,7 @@ from datetime import date, datetime, timezone
 
 CTC_FOLDER  = r"C:\CTC-files"
 DB_PATH     = r"C:\Users\UKCMH001\Dev\new-ctc-system\data\resource_forecast.db"
-FROM_PERIOD = "2026-07-01"   # only import allocations from July 2026 onwards
+FROM_PERIOD = "2026-01-01"
 DRY_RUN     = False           # set False to actually write to the database
 DEFAULT_DEPT = "UK010117-UK-BSV-Services London"  # used when Horizon lookup fails
 
@@ -169,15 +169,39 @@ def process_file(path, conn, stats):
             if name:
                 staff_allocations.append({"name": name, "allocations": {}})
 
+    # Calculate start and target periods from actual allocation data
+    from datetime import date as _date
+    from dateutil.relativedelta import relativedelta as _rd
+    _periods_with_data = [
+        period for s in staff_allocations
+        for period in s["allocations"].keys()
+    ]
+    if _periods_with_data:
+        _first_alloc = min(_periods_with_data)
+        _last_alloc  = max(_periods_with_data)
+    else:
+        _first_alloc = FROM_PERIOD
+        _last_alloc  = FROM_PERIOD
+    start_period = _first_alloc
+    _start  = _date.fromisoformat(start_period)
+    _end    = _date.fromisoformat(_last_alloc)
+    target  = _start + _rd(months=11)
+    _blocks = 1
+    while target < _end:
+        target  += _rd(months=12)
+        _blocks += 1
+
     result = {
-        "file":       path.name,
-        "proj_num":   proj_num,
-        "task_num":   task_num,
-        "dept":       dept,
-        "pd":         pd_raw,
-        "pm":         pm_raw,
-        "staff":      len(staff_allocations),
-        "periods":    sorted(period_cols.keys()),
+        "file":        path.name,
+        "proj_num":    proj_num,
+        "task_num":    task_num,
+        "dept":        dept,
+        "pd":          pd_raw,
+        "pm":          pm_raw,
+        "staff":       len(staff_allocations),
+        "periods":     sorted(period_cols.keys()),
+        "grid_months": _blocks * 12,
+        "start_period": start_period,
     }
 
     if DRY_RUN:
@@ -247,21 +271,12 @@ def process_file(path, conn, stats):
                  created_by, created_at, last_updated_by, last_updated_at,
                  is_archived, auto_linked)
             VALUES (?, ?, ?, 'Migration', ?, 'Migration', ?, 0, 0)
-        """, (project_id, dept, FROM_PERIOD, now, now))
+        """, (project_id, dept, start_period, now, now))
         rtc_id = c.lastrowid
         result["rtc"] = "created"
 
-    # Ensure at least 12 reporting periods exist from FROM_PERIOD
+    # Ensure reporting periods exist through target
     import database as db_module
-    from datetime import date as _date
-    from dateutil.relativedelta import relativedelta as _rd
-    all_periods_in_file = [p for p in period_cols.keys()]
-    file_end = _date.fromisoformat(max(all_periods_in_file)) if all_periods_in_file else _date.fromisoformat(FROM_PERIOD)
-    start    = _date.fromisoformat(FROM_PERIOD)
-    # Extend in 12-month blocks until we cover the file's last period
-    target = start + _rd(months=11)  # first 12-month block ends here
-    while target < file_end:
-        target = target + _rd(months=12)
     db_module.ensure_periods_through(conn, target)
 
     # Add staff and allocations
@@ -289,12 +304,12 @@ def process_file(path, conn, stats):
 
         pid = staff_row["horizon_person_number"]
 
-        # Seed zero rows for all 12 minimum periods
+        # Seed zero rows for all periods up to target
         all_periods = c.execute("""
             SELECT period_start FROM reporting_periods
-            WHERE period_start >= ?
-            ORDER BY period_start LIMIT 12
-        """, (FROM_PERIOD,)).fetchall()
+            WHERE period_start >= ? AND period_start <= ?
+            ORDER BY period_start
+        """, (start_period, target.isoformat())).fetchall()
 
         for p_row in all_periods:
             period = p_row["period_start"]
@@ -361,11 +376,11 @@ def main():
         if status == "OK":
             stats["ok"] += 1
             print(f"OK   — {result.get('project_name','?')} "
-                  f"({result.get('staff',0)} staff, {result.get('rows_added',0)} allocation rows)")
+                  f"({result.get('staff',0)} staff, starts {result.get('start_period','?')}, {result.get('rows_added',0)} allocation rows)")
         elif status == "DRY_RUN":
             stats["ok"] += 1
             print(f"PREVIEW — {result.get('proj_num','?')}/{result.get('task_num','?')} "
-                  f"({result.get('staff',0)} staff)")
+                  f"({result.get('staff',0)} staff, starts {result.get('start_period','?')}, {result.get('grid_months',12)}-month grid)")
         elif status == "SKIPPED":
             stats["skipped"] += 1
             print(f"SKIP — {result.get('error','')}")

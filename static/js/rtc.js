@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   fetch(`/api/rtcs/${RTC_ID}/opened`, { method: 'POST' }); // fire and forget
   renderHeader();
   renderGrid();
-  setTimeout(scrollToCurrentMonth, 100);
+  setTimeout(scrollToCurrentMonth, 200);
   checkHorizon();
   wireEvents();
 });
@@ -473,11 +473,15 @@ function fmt(days) {
 // ── Scroll to current month ───────────────────────────────────────────────────
 
 function scrollToCurrentMonth() {
-  const th = document.querySelector('.rtc-grid th.month-current');
-  if (th) {
-    const wrap = document.querySelector('.rtc-grid-wrap');
-    wrap.scrollLeft = Math.max(0, th.offsetLeft - 380 - 72);
-  }
+  const allThs = document.querySelectorAll('.rtc-grid th.month-col');
+  const currentTh = document.querySelector('.rtc-grid th.month-current');
+  if (!allThs.length || !currentTh) return;
+  const wrap = document.querySelector('.rtc-grid-wrap');
+  if (!wrap) return;
+  const idx       = Array.from(allThs).indexOf(currentTh);
+  const colWidth  = allThs[0].getBoundingClientRect().width || 72;
+  const frozenWidth = 380 + 72;
+  wrap.scrollLeft = Math.max(0, idx * colWidth);
 }
 
 // ── Cell editing ──────────────────────────────────────────────────────────────
