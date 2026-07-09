@@ -8,6 +8,11 @@
   <style>
     body { font-family: var(--font-body); background: var(--bg); padding: 0; scrollbar-gutter: stable; }
 
+    .ctc-drop-zone--active {
+      border-color: var(--wsp-red) !important;
+      background: var(--surface-2);
+    }
+
     /* ── Top bar ─────────────────────────────────────────────────────── */
     .admin-topbar {
       height: var(--nav-h);
@@ -277,7 +282,60 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 2 — APPLICATION LOG
+         SECTION 2 — EXCEL IMPORT
+    ════════════════════════════════════════════════════════════════ -->
+    <p class="admin-section-title">Import from Excel (CTC)</p>
+    <div class="admin-actions" style="margin-bottom:32px">
+      <div class="admin-action">
+        <div class="admin-action__name">Import CTC file</div>
+        <div>
+          <div class="admin-action__desc">
+            Upload an existing CTC Excel file (.xlsm) to create a new RTC.
+            The file will be read in your browser — nothing is sent to the server
+            until you confirm the import.
+          </div>
+          <div style="margin-top:10px">
+            <input type="file" id="ctc-file-input" accept=".xlsm,.xlsx"
+                   style="display:none" onchange="handleCtcFile(this)">
+            <div id="ctc-drop-zone"
+                 onclick="document.getElementById('ctc-file-input').click()"
+                 ondragover="event.preventDefault();this.classList.add('ctc-drop-zone--active')"
+                 ondragleave="this.classList.remove('ctc-drop-zone--active')"
+                 ondrop="event.preventDefault();this.classList.remove('ctc-drop-zone--active');handleCtcFile({files:event.dataTransfer.files})"
+                 style="border:2px dashed var(--border);border-radius:var(--radius-sm);
+                        padding:24px;text-align:center;cursor:pointer;
+                        color:var(--text-tertiary);font-size:13px;
+                        transition:border-color 0.15s,background 0.15s">
+              <div style="font-size:24px;margin-bottom:8px">📂</div>
+              Drop a CTC Excel file here, or click to browse
+              <div id="ctc-file-name" style="margin-top:6px;font-size:12px;color:var(--text-primary);font-weight:500"></div>
+            </div>
+          </div>
+          <div class="admin-action__result" id="result-ctc-import"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTC Import confirmation popup -->
+    <div class="modal-overlay hidden" id="ctc-import-overlay">
+      <div class="modal" style="max-width:600px">
+        <div class="modal__header">
+          <h2 class="modal__title">Confirm CTC Import</h2>
+          <button class="modal__close" onclick="closeCTCPopup()">×</button>
+        </div>
+        <div class="modal__body">
+          <div id="ctc-import-details"></div>
+        </div>
+        <div class="modal__footer">
+          <div class="form-error hidden" id="ctc-import-error"></div>
+          <button class="btn btn--secondary" onclick="closeCTCPopup()">Cancel</button>
+          <button class="btn" id="ctc-import-confirm" onclick="confirmCTCImport()">Import RTC</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         SECTION 3 — APPLICATION LOG
     ════════════════════════════════════════════════════════════════ -->
     <p class="admin-section-title">Application Log</p>
     <div class="admin-actions" style="margin-bottom:32px">
@@ -681,6 +739,163 @@
       }
     }
 
+
+    // ── CTC Excel Import ─────────────────────────────────────────────────
+
+    let _ctcData = null;
+
+    function closeCTCPopup() {
+      document.getElementById('ctc-import-overlay').classList.add('hidden');
+      _ctcData = null;
+      document.getElementById('ctc-file-input').value = '';
+      document.getElementById('ctc-file-name').textContent = '';
+    }
+
+    function handleCtcFile(input) {
+      const file = input.files[0];
+      if (!file) return;
+      document.getElementById('ctc-file-name').textContent = file.name;
+      setResult('result-ctc-import', 'Reading file…', '');
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb   = XLSX.read(data, { type: 'array', cellDates: true });
+          const ws   = wb.Sheets['Resources'];
+          if (!ws) {
+            setResult('result-ctc-import', '✗  No "Resources" sheet found', 'err');
+            return;
+          }
+
+          // Read header fields
+          const projNum  = (ws['G4']?.v || '').toString().trim() || '00000000';
+          const taskNum  = (ws['G5']?.v || '').toString().trim() || '000';
+          const dept     = (ws['G7']?.v || '').toString().trim();
+          const pdRaw    = (ws['G11']?.v || '').toString().trim().replace(/\s*\([^)]+\)\s*$/, '');
+          const pmRaw    = (ws['G12']?.v || '').toString().trim().replace(/\s*\([^)]+\)\s*$/, '');
+
+          // Read month headers from row 15, cols J(10) to AS(45)
+          const FROM_PERIOD   = '2026-01-01';
+          const FUTURE_CUTOFF = '2026-07-01';
+          const periodCols = {};
+          for (let col = 10; col <= 45; col++) {
+            const addr = XLSX.utils.encode_cell({r: 14, c: col - 1});
+            const cell = ws[addr];
+            if (!cell) continue;
+            let dt = cell.v;
+            if (dt instanceof Date) {
+              const iso = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-01`;
+              if (iso >= FROM_PERIOD) periodCols[iso] = col;
+            }
+          }
+
+          // Read staff rows 16-55
+          const staff = [];
+          const futurePeriods = Object.keys(periodCols).filter(p => p >= FUTURE_CUTOFF);
+          for (let row = 16; row <= 55; row++) {
+            const nameAddr = XLSX.utils.encode_cell({r: row-1, c: 5}); // col F
+            const name = (ws[nameAddr]?.v || '').toString().trim();
+            if (!name) continue;
+            const allocs = {};
+            let hasAny = false;
+            for (const [period, col] of Object.entries(periodCols)) {
+              const addr = XLSX.utils.encode_cell({r: row-1, c: col-1});
+              const val  = parseFloat(ws[addr]?.v || 0);
+              if (val > 0) { allocs[period] = val; hasAny = true; }
+            }
+            if (hasAny || futurePeriods.length === 0) {
+              staff.push({ name, allocs });
+            }
+          }
+
+          const futureStaff = staff.filter(s =>
+            Object.keys(s.allocs).some(p => p >= FUTURE_CUTOFF)
+          );
+
+          if (futureStaff.length === 0) {
+            setResult('result-ctc-import', '✗  No staff with future allocations found', 'err');
+            return;
+          }
+
+          // Calculate grid size
+          const allPeriods = Object.keys(periodCols).filter(p => p >= FROM_PERIOD);
+          const allocPeriods = futureStaff.flatMap(s => Object.keys(s.allocs));
+          const firstAlloc = allocPeriods.length ? allocPeriods.reduce((a,b) => a<b?a:b) : FUTURE_CUTOFF;
+          const lastAlloc  = allocPeriods.length ? allocPeriods.reduce((a,b) => a>b?a:b) : FUTURE_CUTOFF;
+
+          _ctcData = { projNum, taskNum, dept, pdRaw, pmRaw, staff: futureStaff,
+                       firstAlloc, lastAlloc, fileName: file.name };
+
+          // Show confirmation popup
+          const noHorizon = 'No Horizon Record Found';
+          const pdDisplay = pdRaw && !pdRaw.includes(noHorizon) ? pdRaw : '(not specified)';
+          const pmDisplay = pmRaw && !pmRaw.includes(noHorizon) ? pmRaw : '(not specified)';
+          const deptDisplay = dept && !dept.includes(noHorizon) ? dept : 'London Building Services';
+
+          document.getElementById('ctc-import-details').innerHTML = `
+            <table style="width:100%;font-size:13px;border-collapse:collapse">
+              <tr><td style="padding:4px 8px;color:var(--text-tertiary);width:140px">Project number</td>
+                  <td style="padding:4px 8px"><strong>${escHtml(projNum)}</strong></td></tr>
+              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Task order</td>
+                  <td style="padding:4px 8px"><strong>${escHtml(taskNum)}</strong></td></tr>
+              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Department</td>
+                  <td style="padding:4px 8px">${escHtml(deptDisplay)}</td></tr>
+              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Project Director</td>
+                  <td style="padding:4px 8px">${escHtml(pdDisplay)}</td></tr>
+              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Project Manager</td>
+                  <td style="padding:4px 8px">${escHtml(pmDisplay)}</td></tr>
+              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Staff found</td>
+                  <td style="padding:4px 8px">${futureStaff.length} with future allocations</td></tr>
+              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Date range</td>
+                  <td style="padding:4px 8px">${firstAlloc} to ${lastAlloc}</td></tr>
+            </table>
+            <p style="margin-top:12px;font-size:12px;color:var(--text-tertiary)">
+              Staff not found in the database will be skipped.
+              Please confirm the details above are correct before importing.
+            </p>
+          `;
+
+          document.getElementById('ctc-import-overlay').classList.remove('hidden');
+          setResult('result-ctc-import', '', '');
+
+        } catch(err) {
+          setResult('result-ctc-import', `✗  Error reading file: ${err.message}`, 'err');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    async function confirmCTCImport() {
+      if (!_ctcData) return;
+      const btn = document.getElementById('ctc-import-confirm');
+      btn.disabled = true;
+      btn.textContent = 'Importing…';
+
+      try {
+        const r = await fetch('/admin/import-ctc', {
+          method: 'POST',
+          headers: { ...headers(), 'Content-Type': 'application/json' },
+          body: JSON.stringify(_ctcData),
+        });
+        const d = await r.json();
+        closeCTCPopup();
+        if (r.ok) {
+          setResult('result-ctc-import',
+            `✓  RTC created — ${d.staff_added} staff, ${d.rows_added} allocation rows. ` +
+            `${d.staff_skipped ? d.staff_skipped + ' staff not found in database.' : ''}`,
+            'ok');
+        } else {
+          setResult('result-ctc-import', `✗  ${d.error || 'Import failed'}`, 'err');
+        }
+      } catch(err) {
+        setResult('result-ctc-import', `✗  ${err.message}`, 'err');
+      }
+      btn.disabled = false;
+      btn.textContent = 'Import RTC';
+    }
+
   </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>

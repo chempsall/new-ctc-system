@@ -1255,6 +1255,154 @@ def admin_import_log():
     return jsonify(result)
 
 
+@app.route("/admin/import-ctc", methods=["POST"])
+@require_admin
+def admin_import_ctc():
+    """
+    Imports a single CTC Excel file's data as a new RTC.
+    Data is pre-parsed by the browser using SheetJS and sent as JSON.
+    """
+    data     = request.json or {}
+    user     = get_current_user()
+    now      = datetime.now(timezone.utc).isoformat()
+    conn     = database.get_connection()
+    c        = conn.cursor()
+
+    proj_num   = (data.get("projNum") or "00000000").strip()
+    task_num   = (data.get("taskNum") or "000").strip()
+    dept       = (data.get("dept") or "").strip()
+    pd_raw     = (data.get("pdRaw") or "").strip()
+    pm_raw     = (data.get("pmRaw") or "").strip()
+    staff_list = data.get("staff", [])
+    first_alloc = data.get("firstAlloc", datetime.now(timezone.utc).date().replace(day=1).isoformat())
+    last_alloc  = data.get("lastAlloc", first_alloc)
+
+    NO_HORIZON = "No Horizon Record Found"
+    if not dept or NO_HORIZON in dept:
+        dept = "UK010117-UK-BSV-Services London"
+    pd_clean = None if not pd_raw or NO_HORIZON in pd_raw else pd_raw
+    pm_clean = None if not pm_raw or NO_HORIZON in pm_raw else pm_raw
+
+    # Look up project — exact match only
+    proj_row = c.execute("""
+        SELECT project_id, project_name FROM projects
+        WHERE project_number = ? AND task_order_number = ?
+        AND project_status = 'Active'
+    """, (proj_num, task_num)).fetchone()
+
+    if proj_row:
+        project_id = proj_row["project_id"]
+        # Check for existing RTC
+        existing = c.execute(
+            "SELECT rtc_id FROM rtcs WHERE project_id = ?", (project_id,)
+        ).fetchone()
+        if existing:
+            conn.close()
+            return jsonify({"error": f"An RTC already exists for {proj_num}/{task_num}"}), 409
+    else:
+        # Create Pending project row
+        from datetime import datetime as _dt
+        suffix = _dt.now().strftime("%Y%m%dT%H%M%S%f")[:20]
+        unique_task = f"{task_num}_{suffix}" if task_num not in {"000","","tbc","tbd"} else f"PLACEHOLDER_{suffix}"
+        c.execute("""
+            INSERT INTO projects
+                (project_number, task_order_number, project_name, task_name,
+                 project_customer, project_director, project_manager,
+                 project_status, last_imported)
+            VALUES (?, ?, ?, '', NULL, ?, ?, 'Pending', ?)
+        """, (proj_num, unique_task,
+              f"{proj_num} / {task_num}",
+              pd_clean, pm_clean, now))
+        project_id = c.lastrowid
+
+    # Create RTC
+    file_name = data.get("fileName", "")
+    # Check if this filename has been imported before
+    if file_name:
+        existing_import = c.execute(
+            "SELECT rtc_id FROM rtcs WHERE source_file = ?", (file_name,)
+        ).fetchone()
+        if existing_import:
+            conn.close()
+            return jsonify({"error": f"This file has already been imported ({file_name})"}), 409
+
+    c.execute("""
+        INSERT INTO rtcs
+            (project_id, department, start_date,
+             created_by, created_at, last_updated_by, last_updated_at,
+             is_archived, auto_linked, source_file)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+    """, (project_id, dept, first_alloc, user, now, user, now, file_name))
+    rtc_id = c.lastrowid
+
+    # Ensure reporting periods cover the full range + 12 months
+    from datetime import date as _date
+    from dateutil.relativedelta import relativedelta as _rd
+    _start  = _date.fromisoformat(first_alloc)
+    _end    = _date.fromisoformat(last_alloc)
+    target  = _start + _rd(months=11)
+    while target < _end:
+        target += _rd(months=12)
+    database.ensure_periods_through(conn, target)
+
+    # Get all periods from first_alloc to target
+    periods = c.execute("""
+        SELECT period_start FROM reporting_periods
+        WHERE period_start >= ? AND period_start <= ?
+        ORDER BY period_start
+    """, (first_alloc, target.isoformat())).fetchall()
+    period_starts = [p["period_start"] for p in periods]
+
+    # Add staff and allocations
+    staff_added   = 0
+    staff_skipped = 0
+    rows_added    = 0
+
+    for s in staff_list:
+        name = s.get("name", "").strip()
+        if not name:
+            continue
+        # Look up by exact name then partial
+        staff_row = c.execute("""
+            SELECT horizon_person_number FROM staff
+            WHERE name = ? AND (end_date IS NULL OR end_date > ?)
+        """, (name, first_alloc)).fetchone()
+        if not staff_row:
+            parts = name.split(",")
+            if parts:
+                staff_row = c.execute("""
+                    SELECT horizon_person_number FROM staff
+                    WHERE name LIKE ? AND (end_date IS NULL OR end_date > ?)
+                    LIMIT 1
+                """, (f"%{parts[0].strip()}%", first_alloc)).fetchone()
+        if not staff_row:
+            staff_skipped += 1
+            continue
+
+        pid    = staff_row["horizon_person_number"]
+        allocs = s.get("allocs", {})
+        staff_added += 1
+
+        for period in period_starts:
+            days = float(allocs.get(period, 0))
+            c.execute("""
+                INSERT OR IGNORE INTO allocations
+                    (horizon_person_number, rtc_id, period_start, days, last_updated)
+                VALUES (?, ?, ?, ?, ?)
+            """, (pid, rtc_id, period, days, now))
+            if days > 0:
+                rows_added += 1
+
+    conn.commit()
+    conn.close()
+    summary_module.mark_dirty()
+    logger.info(f"Admin: CTC import — RTC {rtc_id} created for {proj_num}/{task_num}, "
+                f"{staff_added} staff, {rows_added} allocation rows")
+    return jsonify({"status": "ok", "rtc_id": rtc_id,
+                    "staff_added": staff_added, "staff_skipped": staff_skipped,
+                    "rows_added": rows_added})
+
+
 @app.route("/admin/relink-pending", methods=["POST"])
 @require_admin
 def admin_relink_pending():

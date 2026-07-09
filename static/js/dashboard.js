@@ -191,7 +191,8 @@ const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && (ps.capac
   const fte = realStaff.reduce((sum, ps) => sum + (ps.fte?.[p] || 0), 0);
   document.getElementById("metric-staff").textContent    = realStaff.length;
   document.getElementById("metric-fte").textContent      = fte.toFixed(1);
-  document.getElementById("metric-projects").textContent = projects.length;
+  document.getElementById("metric-projects").textContent = 
+    state.activeView === "rtcs" ? filteredRtcs().length : projects.length;
   document.getElementById("metric-over").textContent     = overCount;
   document.getElementById("metric-norec").textContent    = noRecProj;
 
@@ -700,10 +701,13 @@ async function loadRtcs() {
     state.rtcs = await r.json();
     buildFilterOptions();
     renderRtcTable();
+    renderMetrics();
   } catch(e) {
     console.error("Failed to load RTCs:", e);
   }
 }
+
+
 
 function filteredRtcs() {
   const statusFilter = state.rtcFilters.status;
