@@ -1150,7 +1150,9 @@ def api_link_horizon(rtc_id):
     c    = conn.cursor()
 
     real_project = c.execute("""
-        SELECT project_id FROM projects
+        SELECT project_id, project_name, task_name, project_customer,
+               project_director, project_manager, project_organisation
+        FROM projects
         WHERE project_number = ? AND task_order_number = ?
         AND project_status != 'Placeholder'
     """, (proj_num, task_order)).fetchone()
@@ -1171,9 +1173,27 @@ def api_link_horizon(rtc_id):
     user = get_current_user()
 
     c.execute("""
-        UPDATE rtcs SET project_id = ?, last_updated_by = ?, last_updated_at = ?
+        UPDATE rtcs SET project_id = ?, last_updated_by = ?, last_updated_at = ?,
+                        department = COALESCE(?, department)
         WHERE rtc_id = ?
-    """, (real_project["project_id"], user, now, rtc_id))
+    """, (real_project["project_id"], user, now,
+          real_project["project_organisation"] or None, rtc_id))
+
+    # Update the old placeholder project row with authoritative PAR data
+    c.execute("""
+        UPDATE projects SET
+            project_name     = COALESCE(?, project_name),
+            task_name        = COALESCE(?, task_name),
+            project_customer = COALESCE(?, project_customer),
+            project_director = COALESCE(?, project_director),
+            project_manager  = COALESCE(?, project_manager)
+        WHERE project_id = ?
+    """, (real_project["project_name"],
+          real_project["task_name"],
+          real_project["project_customer"],
+          real_project["project_director"],
+          real_project["project_manager"],
+          real_project["project_id"]))
 
     # Clean up orphaned placeholder project row
     other_refs = c.execute(
@@ -1414,6 +1434,43 @@ def admin_import_ctc():
                     "staff_added": staff_added, "staff_skipped": staff_skipped,
                     "rows_added": rows_added})
 
+@app.route("/admin/refresh-linked", methods=["POST"])
+@require_admin
+def admin_refresh_linked():
+    """
+    Re-pulls PAR data for all linked RTCs, updating project name, task name,
+    customer, PD, PM and department from the authoritative PAR record.
+    """
+    conn = database.get_connection()
+    c    = conn.cursor()
+    now  = datetime.now(timezone.utc).isoformat()
+
+    # Find all RTCs linked to Active projects
+    rows = c.execute("""
+        SELECT r.rtc_id, r.department,
+               p.project_id, p.project_name, p.task_name,
+               p.project_customer, p.project_director,
+               p.project_manager, p.project_organisation
+        FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE p.project_status = 'Active'
+        AND r.is_archived = 0
+    """).fetchall()
+
+    updated = 0
+    for row in rows:
+        new_dept = row["project_organisation"] or row["department"]
+        c.execute("""
+            UPDATE rtcs SET department = ?, last_updated_at = ?
+            WHERE rtc_id = ?
+        """, (new_dept, now, row["rtc_id"]))
+        updated += 1
+
+    conn.commit()
+    conn.close()
+    summary_module.mark_dirty()
+    logger.info(f"Admin: refreshed PAR data for {updated} linked RTCs")
+    return jsonify({"status": "ok", "updated": updated})
 
 @app.route("/admin/relink-pending", methods=["POST"])
 @require_admin

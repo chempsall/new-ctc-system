@@ -219,6 +219,19 @@
       </div>
 
       <div class="admin-action">
+        <div class="admin-action__name">Refresh linked RTCs from PAR</div>
+        <div>
+          <div class="admin-action__desc">
+            Re-pulls department, project name, task name, customer, PD and PM
+            from the PAR record for all currently linked RTCs. Use this after
+            a PAR import to ensure all linked RTCs have the latest information.
+          </div>
+          <div class="admin-action__result" id="result-refresh-linked"></div>
+        </div>
+        <button class="btn" onclick="refreshLinked(this)">Run now</button>
+      </div>
+
+      <div class="admin-action">
         <div class="admin-action__name">Import PAR actuals</div>
         <div>
           <div class="admin-action__desc">
@@ -470,6 +483,18 @@
             : "✓  No pending RTCs found a match",
           "ok");
       } catch(e) { setResult("result-relink", `✗  ${e.message}`, "err"); }
+      btn.disabled = false;
+    }
+
+    async function refreshLinked(btn) {
+      setResult("result-refresh-linked", "Refreshing…", "");
+      btn.disabled = true;
+      try {
+        const r = await fetch("/admin/refresh-linked", { method: "POST", headers: headers() });
+        const d = await r.json();
+        if (!r.ok) { setResult("result-refresh-linked", `✗  ${d.error}`, "err"); btn.disabled=false; return; }
+        setResult("result-refresh-linked", `✓  Updated ${d.updated} RTC${d.updated !== 1 ? "s" : ""}`, "ok");
+      } catch(e) { setResult("result-refresh-linked", `✗  ${e.message}`, "err"); }
       btn.disabled = false;
     }
 
