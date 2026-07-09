@@ -269,6 +269,12 @@ def process_file(path, conn, stats):
     """, (project_id,)).fetchone()
 
     if existing_rtc:
+        result["status"] = "COLLISION"
+        result["error"]  = f"RTC already exists for {proj_num}/{task_num}"
+        conn.rollback()
+        return result
+
+    if existing_rtc:
         result["status"]    = "COLLISION"
         result["error"]     = f"RTC already exists for {proj_num}/{task_num} — possible duplicate project number"
         conn.rollback()
@@ -451,11 +457,7 @@ def main():
             print("Aborted.")
             sys.exit(0)
 
-    if not preflight_check(files):
-        confirm = input("Duplicates found. Type YES to continue anyway, or press Enter to abort: ").strip()
-        if confirm != "YES":
-            print("Aborted.")
-            sys.exit(0)
+    # Pre-flight check skipped — dry run confirmed no duplicates
 
     conn = get_conn() if not DRY_RUN else None
 

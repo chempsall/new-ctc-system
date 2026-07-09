@@ -1,0 +1,15 @@
+DRY_RUN = False
+Scanning 314 files for future allocations...
+  235 files have future allocations
+  79 files excluded (no future work)
+
+
+CTC Migration Tool
+============================================================
+  Folder:      C:\CTC-files
+  Database:    C:\Users\UKCMH001\Dev\new-ctc-system\data\resource_forecast.db
+  From period: 2026-01-01
+  Files found: 235
+  Mode:        LIVE ù writing to database
+============================================================
+
