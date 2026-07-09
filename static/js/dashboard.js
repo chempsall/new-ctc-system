@@ -185,7 +185,7 @@ function renderMetrics() {
 
   const overCount  = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && ps.kpi[p] === "over").length;
   const underCount = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && ps.kpi[p] === "under").length;
-  const noRecProj = projects.filter(pr => pr.horizon_status !== "linked").length;
+  const noRecProj = projects.filter(pr => pr.horizon_status === "norecord").length;
 
 const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && (ps.capacity?.[p] ?? 1) > 0);
   const fte = realStaff.reduce((sum, ps) => sum + (ps.fte?.[p] || 0), 0);
@@ -307,10 +307,7 @@ function filteredProjects() {
   const p = state.activePeriod;
   const base = state.summary.projects.filter(proj => {
     if (f.department !== "all" && proj.department !== f.department) return false;
-    if (f.horizon !== "all") {
-      if (f.horizon === "linked"   && proj.horizon_status !== "linked")   return false;
-      if (f.horizon === "norecord" && proj.horizon_status === "linked")   return false;
-    }
+    if (f.horizon !== "all" && proj.horizon_status !== f.horizon) return false;
     if (f.project_pm !== "all" && proj.pm !== f.project_pm) return false;
     if (f.project_pd !== "all" && proj.director !== f.project_pd) return false;
     // Exclude projects with no allocation in the current period
@@ -380,8 +377,10 @@ function renderMgmtSummary() {
 
   // Horizon linked vs unlinked
   const linkedRtcs   = rtcs.filter(r => r.horizon_status === "linked");
-  const unlinkedRtcs = rtcs.filter(r => r.horizon_status !== "linked");
+  const oppRtcs      = rtcs.filter(r => r.horizon_status === "opportunity");
+  const unlinkedRtcs = rtcs.filter(r => r.horizon_status === "norecord");
   const linkedDays   = linkedRtcs.reduce((sum, r) => sum + (r.future_days || 0), 0);
+  const oppDays      = oppRtcs.reduce((sum, r) => sum + (r.future_days || 0), 0);
   const unlinkedDays = unlinkedRtcs.reduce((sum, r) => sum + (r.future_days || 0), 0);
 
   // Utilisation by month (next 6 periods)
@@ -453,8 +452,13 @@ function renderMgmtSummary() {
         <div class="mgmt-horizon-row">
           <div class="mgmt-horizon-item mgmt-horizon-item--linked">
             <div class="mgmt-horizon-item__count">${linkedRtcs.length}</div>
-            <div class="mgmt-horizon-item__label">Linked RTCs</div>
+            <div class="mgmt-horizon-item__label">Fee earning</div>
             <div class="mgmt-horizon-item__days">${fmt.days(linkedDays)}d</div>
+          </div>
+          <div class="mgmt-horizon-item mgmt-horizon-item--opportunity">
+            <div class="mgmt-horizon-item__count">${oppRtcs.length}</div>
+            <div class="mgmt-horizon-item__label">Opportunity</div>
+            <div class="mgmt-horizon-item__days">${fmt.days(oppDays)}d</div>
           </div>
           <div class="mgmt-horizon-item mgmt-horizon-item--unlinked">
             <div class="mgmt-horizon-item__count">${unlinkedRtcs.length}</div>
@@ -501,8 +505,7 @@ function renderMgmtSummary() {
               <td><span class="team-badge">${escHtml(pr.department || "—")}</span></td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt.days(pr.total_days[p] || 0)}d</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt.days(futureDays)}d</td>
-              <td><span class="horizon horizon--${linked ? "linked" : "norecord"}">
-                <span class="horizon--dot"></span>${linked ? "Linked" : "No record"}</span></td>
+              <td>${horizonBadge(r.horizon_status)}</td>
             </tr>`;
           }).join("")}
           </tbody>
@@ -656,10 +659,7 @@ function renderProjectTable() {
       </td>
       <td><span class="team-badge">${escHtml(proj.department || "—")}</span></td>
       <td style="text-align:center">
-        <span class="horizon horizon--${linked ? "linked" : "norecord"}">
-          <span class="horizon--dot"></span>
-          ${linked ? "Linked" : "No record"}
-        </span>
+        ${horizonBadge(pr.horizon_status)}
       </td>
       <td style="font-size:11px;color:var(--text-secondary)">
         ${escHtml(proj.pm || "—")}
@@ -727,6 +727,17 @@ function filteredRtcs() {
     last_updated: r => r.last_updated_at,
   });
 }
+
+const horizonBadge = hs => {
+    const map = {
+      linked:      ["horizon horizon--linked",      "Linked to Horizon"],
+      opportunity: ["horizon horizon--opportunity",  "Opportunity"],
+      other:       ["horizon horizon--other",        "Other record"],
+      norecord:    ["horizon horizon--norecord",     "Not linked"],
+    };
+    const [cls, label] = map[hs] || ["horizon horizon--norecord", "Not linked"];
+    return `<span class="${cls}"><span class="horizon--dot"></span>${label}</span>`;
+  };
 
 function renderRtcTable() {
   const tbody  = document.getElementById("rtc-tbody");
@@ -968,8 +979,7 @@ function showStaffDetail(person) {
       const name   = proj ? proj.name : `Project ${pr.project_id}`;
       const days   = pr.days[p] || 0;
       return `<div class="detail-project-row">
-        <span class="horizon horizon--${linked ? "linked" : "norecord"}" style="flex-shrink:0">
-          <span class="horizon--dot"></span>
+        ${horizonBadge(rtc.horizon_status)}
         </span>
         <span class="detail-proj-name" title="${escHtml(name)}">${escHtml(name)}</span>
         <span class="detail-proj-days">${fmt.days(days)}d</span>
@@ -1021,9 +1031,17 @@ function showProjectDetail(proj) {
   document.getElementById("dp-stat-remain").textContent = proj.pm || "—";
   document.getElementById("dp-stat-remain").style.color = "";
 
-  document.getElementById("dp-kpi").className = `horizon horizon--${linked ? "linked" : "norecord"}`;
+  const hs = rtc.horizon_status || (linked ? "linked" : "norecord");
+  const hsMap = {
+    linked: ["linked", "Linked to Horizon"],
+    opportunity: ["opportunity", "Opportunity"],
+    other: ["other", "Other record"],
+    norecord: ["norecord", "Not linked to Horizon"],
+  };
+  const [hsCls, hsLabel] = hsMap[hs] || ["norecord", "Not linked"];
+  document.getElementById("dp-kpi").className = `horizon horizon--${hsCls}`;
   document.getElementById("dp-kpi").innerHTML =
-    `<span class="horizon--dot"></span>${linked ? "Linked" : "No record"}`;
+    `<span class="horizon--dot"></span>${hsLabel}`;
 
   // No-record warning
   const warnEl = document.getElementById("dp-norec-warn");

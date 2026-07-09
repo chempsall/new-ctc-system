@@ -443,6 +443,7 @@ def api_rtcs():
             p.project_director,
             p.project_manager,
             p.project_status,
+            p.project_type,
             COALESCE((
                 SELECT SUM(a.days)
                 FROM allocations a
@@ -500,6 +501,17 @@ def api_rtcs():
                 status = "overdue_review"
 
         row["status"] = status
+        # Compute horizon_status from project_type
+        ptype = (row["project_type"] or "").strip()
+        pstat = (row["project_status"] or "").strip().lower()
+        if pstat == "active" and ptype == "UK Direct":
+            row["horizon_status"] = "linked"
+        elif pstat == "active" and ptype == "UK Opportunity":
+            row["horizon_status"] = "opportunity"
+        elif pstat == "active":
+            row["horizon_status"] = "other"
+        else:
+            row["horizon_status"] = "norecord"
         result.append(row)
 
     # Sort: current_month_days descending, then project_name ascending

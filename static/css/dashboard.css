@@ -586,8 +586,10 @@ a:hover { text-decoration: underline; }
   font-size: 10px; font-weight: 600;
   white-space: nowrap;
 }
-.horizon--linked   { background: var(--green-light); color: var(--green-dark); }
-.horizon--norecord { background: var(--status-red-light); color: var(--status-red-dark); }
+.horizon--linked      { background: var(--green-light);      color: var(--green-dark);      }
+.horizon--opportunity { background: var(--amber-light);      color: var(--amber-dark);      }
+.horizon--other       { background: var(--grey-100);         color: var(--grey-500);        }
+.horizon--norecord    { background: var(--status-red-light); color: var(--status-red-dark); }
 .horizon--dot {
   width: 5px; height: 5px; border-radius: 50%;
 }
@@ -1114,6 +1116,10 @@ th.sortable:hover {
 .mgmt-horizon-item--linked {
   background: var(--green-light);
   color: var(--green-dark);
+}
+.mgmt-horizon-item--opportunity {
+  background: var(--amber-light);
+  color: var(--amber-dark);
 }
 .mgmt-horizon-item--unlinked {
   background: var(--status-red-light);

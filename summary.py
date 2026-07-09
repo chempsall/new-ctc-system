@@ -289,12 +289,17 @@ def build() -> dict:
             label = period["label"]
             period_days[label] = round(proj_days_map.get(project_id, {}).get(ps, 0), 2)
 
-        # A project is "linked" if it came from PAR with Active status
-        horizon_status = (
-            "linked"
-            if p["project_status"] and p["project_status"].lower() == "active"
-            else "No Horizon Record Found"
-        )
+        # Horizon status based on project_status and project_type
+        _ptype = (p["project_type"] or "").strip()
+        _pstat = (p["project_status"] or "").strip().lower()
+        if _pstat == "active" and _ptype == "UK Direct":
+            horizon_status = "linked"
+        elif _pstat == "active" and _ptype == "UK Opportunity":
+            horizon_status = "opportunity"
+        elif _pstat == "active":
+            horizon_status = "other"
+        else:
+            horizon_status = "norecord"
 
         projects_list.append({
             "project_id":       project_id,
