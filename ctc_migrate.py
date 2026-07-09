@@ -26,7 +26,7 @@ CTC_FOLDER  = r"C:\CTC-files"
 DB_PATH     = r"C:\Users\UKCMH001\Dev\new-ctc-system\data\resource_forecast.db"
 FROM_PERIOD  = "2026-01-01"   # import allocations from this date (includes history)
 FUTURE_CUTOFF = "2026-07-01"  # files must have work from this date to be imported
-DRY_RUN     = True           # set False to actually write to the database
+DRY_RUN     = False           # set False to actually write to the database
 DEFAULT_DEPT = "UK010117-UK-BSV-Services London"  # used when Horizon lookup fails
 
 # ── Dependencies check ───────────────────────────────────────────────────────
@@ -230,20 +230,19 @@ def process_file(path, conn, stats):
         AND project_status = 'Active'
     """, (proj_num, task_num)).fetchone()
 
-    if not proj_row and not is_placeholder(task_num):
-        # Try project-only match — only if task number is real
-        # (placeholder task numbers should never share an existing project)
-        proj_row = c.execute("""
-            SELECT project_id, project_name FROM projects
-            WHERE project_number = ?
-            AND project_status = 'Active'
-            LIMIT 1
-        """, (proj_num,)).fetchone()
-
     if proj_row:
         project_id = proj_row["project_id"]
         result["horizon"] = "linked"
         result["project_name"] = proj_row["project_name"]
+        # Check if another RTC already uses this project
+        existing_check = c.execute("""
+            SELECT rtc_id FROM rtcs WHERE project_id = ?
+        """, (project_id,)).fetchone()
+        if existing_check:
+            result["status"]  = "COLLISION"
+            result["error"]   = f"Project {proj_num}/{task_num} already has an RTC — possible duplicate"
+            conn.rollback()
+            return result
     else:
         # Create a Pending project row
         suffix = make_suffix()
@@ -366,7 +365,8 @@ def preflight_check(files):
         except Exception:
             pass
 
-    duplicates = {k: v for k, v in seen.items() if len(v) > 1}
+    duplicates = {k: v for k, v in seen.items() 
+                  if len(v) > 1 and not (is_placeholder(k[0]) and is_placeholder(k[1]))}
     if duplicates:
         print(f"\nWARNING: {len(duplicates)} duplicate project/task combinations found:")
         for (proj, task), fnames in sorted(duplicates.items()):
@@ -380,6 +380,7 @@ def preflight_check(files):
         return True
 
 def main():
+    print(f"DRY_RUN = {DRY_RUN}")
     folder = Path(CTC_FOLDER)
     if not folder.exists():
         print(f"ERROR: Folder not found: {CTC_FOLDER}")
@@ -395,39 +396,26 @@ def main():
     files = []
     no_future = []
     for f in all_files:
+        has_future = False
         try:
             wb = openpyxl.load_workbook(f, data_only=True, read_only=True)
             if "Resources" not in wb.sheetnames:
-                no_future.append(f.name)
-            if has_future:
-                if f.name == "UK0042369.4312-UK-DK01 Bulk BMS and ICT.xlsm":
-                    print(f"  DEBUG: passed filter, period_cols count={len(period_cols)}")
-                    for row in range(16, 56):
-                        name = str(ws.cell(row=row, column=6).value or "").strip()
-                        if not name:
-                            continue
-                        for period, col in period_cols.items():
-                            val = ws.cell(row=row, column=col).value
-                            if val is not None and val != 0 and val != "":
-                                print(f"    Row {row}, period {period}, col {col}, val={val!r}")
-                files.append(f)
                 wb.close()
+                no_future.append(f.name)
                 continue
             ws = wb["Resources"]
-            has_future = False
-            # Read period headers from row 15
-            period_cols = {}
+            # Find columns that correspond to periods >= FUTURE_CUTOFF
+            future_cols = []
             for col in range(10, 60):
-                cell = ws.cell(row=15, column=col)
-                period = parse_period_label(cell.value)
-                if period and period >= FROM_PERIOD:
-                    period_cols[period] = col
-            # Check if any cell in the allocation area has a value >= FROM_PERIOD
+                period = parse_period_label(ws.cell(row=15, column=col).value)
+                if period and period >= FUTURE_CUTOFF:
+                    future_cols.append(col)
+            # Check if any staff row has a non-zero value in a future column
             for row in range(16, 56):
                 name = str(ws.cell(row=row, column=6).value or "").strip()
                 if not name:
                     continue
-                for period, col in period_cols.items():
+                for col in future_cols:
                     val = ws.cell(row=row, column=col).value
                     try:
                         if val and float(val) > 0:
@@ -438,15 +426,11 @@ def main():
                 if has_future:
                     break
             wb.close()
-            if has_future:
-                files.append(f)
-            else:
-                no_future.append(f.name)
-            if not has_future or len(period_cols) == 0:
-                print(f"  CHECK: {f.name} — period_cols={sorted(period_cols.keys())[:3]}, has_future={has_future}")
-                print(f"  EXCLUDED: {f.name}")
         except Exception as e:
             print(f"  WARNING: Could not read {f.name}: {e}")
+        if has_future:
+            files.append(f)
+        else:
             no_future.append(f.name)
 
     print(f"  {len(files)} files have future allocations")
@@ -489,8 +473,11 @@ def main():
         status = result.get("status", "?")
         if status == "OK":
             stats["ok"] += 1
-            print(f"OK   — {result.get('project_name','?')} "
+            rtc_status = result.get('rtc', 'created')
+            print(f"{'NEW' if rtc_status == 'created' else 'MERGED'} — {result.get('project_name', result.get('proj_num','?'))} "
                   f"({result.get('staff',0)} staff, starts {result.get('start_period','?')}, {result.get('rows_added',0)} allocation rows)")
+            if rtc_status == 'existing':
+                stats['merged'] = stats.get('merged', 0) + 1
         elif status == "DRY_RUN":
             stats["ok"] += 1
             print(f"PREVIEW — {result.get('proj_num','?')}/{result.get('task_num','?')} "
@@ -514,6 +501,9 @@ def main():
     print(f"  Collisions:    {stats.get('collisions', 0)}")
     print(f"  Skipped:       {stats['skipped']}")
     print(f"  Errors:        {stats['errors']}")
+    print(f"  Processed:     {stats['ok']}")
+    print(f"  New RTCs:      {stats['ok'] - stats.get('merged', 0)}")
+    print(f"  Merged:        {stats.get('merged', 0)}")
     if stats["staff_skipped"]:
         unique_skipped = sorted(set(stats["staff_skipped"]))
         print(f"  Staff not found in database ({len(unique_skipped)}):")
