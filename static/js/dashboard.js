@@ -659,7 +659,7 @@ function renderProjectTable() {
       </td>
       <td><span class="team-badge">${escHtml(proj.department || "—")}</span></td>
       <td style="text-align:center">
-        ${horizonBadge(pr.horizon_status)}
+        ${horizonBadge(proj.horizon_status)}
       </td>
       <td style="font-size:11px;color:var(--text-secondary)">
         ${escHtml(proj.pm || "—")}
@@ -979,8 +979,6 @@ function showStaffDetail(person) {
       const name   = proj ? proj.name : `Project ${pr.project_id}`;
       const days   = pr.days[p] || 0;
       return `<div class="detail-project-row">
-        ${horizonBadge(rtc.horizon_status)}
-        </span>
         <span class="detail-proj-name" title="${escHtml(name)}">${escHtml(name)}</span>
         <span class="detail-proj-days">${fmt.days(days)}d</span>
       </div>`;
@@ -1031,7 +1029,7 @@ function showProjectDetail(proj) {
   document.getElementById("dp-stat-remain").textContent = proj.pm || "—";
   document.getElementById("dp-stat-remain").style.color = "";
 
-  const hs = rtc.horizon_status || (linked ? "linked" : "norecord");
+  const hs = proj.horizon_status || (linked ? "linked" : "norecord");
   const hsMap = {
     linked: ["linked", "Linked to Horizon"],
     opportunity: ["opportunity", "Opportunity"],
