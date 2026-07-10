@@ -593,8 +593,9 @@ a:hover { text-decoration: underline; }
 .horizon--dot {
   width: 5px; height: 5px; border-radius: 50%;
 }
-.horizon--linked   .horizon--dot { background: var(--green); }
-.horizon--norecord .horizon--dot { background: var(--status-red); }
+.horizon--linked      .horizon--dot { background: var(--green); }
+.horizon--opportunity .horizon--dot { background: var(--amber); }
+.horizon--norecord    .horizon--dot { background: var(--status-red); }
 
 /* Team badge */
 .team-badge {

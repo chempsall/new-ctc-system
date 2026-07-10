@@ -114,7 +114,9 @@ function buildFilterOptions() {
   const s = state.summary;
 
   // Teams — from unique values in staff
-  const depts = (s.departments || []).map(d => d.department);
+  const staffDepts   = (s.departments || []).map(d => d.department);
+  const projectDepts = (s.projects || []).map(p => p.department).filter(Boolean);
+  const depts = [...new Set([...staffDepts, ...projectDepts])].sort();
   populateSelect("filter-department", depts, "Department");
 
   const deptWidth = document.getElementById("filter-department")?.offsetWidth;
