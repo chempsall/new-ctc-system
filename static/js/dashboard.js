@@ -49,7 +49,8 @@ const fmt = {
     if (d === null || d === undefined) return "—";
     const n = parseFloat(d);
     if (isNaN(n)) return "—";
-    return n % 1 === 0 ? n.toString() : n.toFixed(1);
+    const str = n % 1 === 0 ? n.toString() : n.toFixed(1);
+    return str.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   },
   initials: name => {
     if (!name) return "?";
@@ -551,7 +552,11 @@ function renderView() {
     renderProjectTable();
     document.getElementById("projects-panel").classList.remove("hidden");
   } else if (state.activeView === "mgmt") {
-    renderMgmtSummary();
+    if (!state.rtcs.length) {
+      loadRtcs().then(renderMgmtSummary);
+    } else {
+      renderMgmtSummary();
+    }
     document.getElementById("mgmt-panel").classList.remove("hidden");
   } else {
     renderRtcTable();
@@ -862,12 +867,15 @@ function showRtcDetail(rtc) {
       day: "numeric", month: "short"
     }) : "Never";
   document.getElementById("dp-stat-remain").style.color = "";
+  const lblsR = document.querySelectorAll(".detail-stat__label");
+  if (lblsR[0]) lblsR[0].textContent = "This month";
+  if (lblsR[1]) lblsR[1].textContent = "Future days";
+  if (lblsR[2]) lblsR[2].textContent = "Last opened";
 
   // Hide KPI badge and no-record warning (not applicable for RTCs)
   const kpiEl = document.getElementById("dp-kpi");
   if (kpiEl) { kpiEl.className = "kpi kpi--ok"; kpiEl.textContent = ""; }
-  const warnEl = document.getElementById("dp-norec-warn");
-  if (warnEl) warnEl.classList.add("hidden");
+
 
   // Format start date as "July 2026" not "2026-07-01"
   const startFmt = rtc.start_date
@@ -945,6 +953,16 @@ function showStaffDetail(person) {
   document.getElementById("dp-stat-alloc").textContent    = fmt.days(alloc) + "d";
   document.getElementById("dp-stat-cap").textContent      = fmt.days(cap) + "d";
   document.getElementById("dp-stat-remain").textContent   = fmt.days(cap - alloc) + "d";
+  // Set stat labels for People view
+  const lbls = document.querySelectorAll(".detail-stat__label");
+  if (lbls[0]) lbls[0].textContent = "Allocated";
+  if (lbls[1]) lbls[1].textContent = "Capacity";
+  if (lbls[2]) lbls[2].textContent = "Remaining";
+  // Hide RTC-specific elements
+  let warnEl = document.getElementById("dp-norec-warn");
+  if (warnEl) warnEl.classList.add("hidden");
+  let kpiEl = document.getElementById("dp-kpi");
+  if (kpiEl) { kpiEl.className = ""; kpiEl.innerHTML = ""; }
   document.getElementById("dp-stat-remain").style.color   =
     (cap - alloc) < 0 ? "var(--red)" : "var(--green-dark)";
 
