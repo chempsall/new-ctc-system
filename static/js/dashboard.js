@@ -508,7 +508,7 @@ function renderMgmtSummary() {
               <td><span class="team-badge">${escHtml(pr.department || "—")}</span></td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt.days(pr.total_days[p] || 0)}d</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt.days(futureDays)}d</td>
-              <td>${horizonBadge(r.horizon_status)}</td>
+              <td>${horizonBadge(pr.horizon_status)}</td>
             </tr>`;
           }).join("")}
           </tbody>
@@ -875,6 +875,7 @@ function showRtcDetail(rtc) {
   // Hide KPI badge and no-record warning (not applicable for RTCs)
   const kpiEl = document.getElementById("dp-kpi");
   if (kpiEl) { kpiEl.className = "kpi kpi--ok"; kpiEl.textContent = ""; }
+  document.getElementById("dp-norec-warn")?.classList.add("hidden");
 
 
   // Format start date as "July 2026" not "2026-07-01"
@@ -888,10 +889,6 @@ function showRtcDetail(rtc) {
   const projContainer = document.getElementById("dp-projects");
   projContainer.innerHTML = `
     <div style="font-size:11px;line-height:1.8;color:var(--text-secondary)">
-
-
-
-
     <div><strong>Project number</strong> ${(rtc.project_number || "").match(/_\d{8}T\d+$/) ? "Placeholder" : escHtml(rtc.project_number || "\u2014")}</div>
     <div><strong>Task number</strong> ${(rtc.task_order_number || "").match(/_\d{8}T\d+$/) ? "Placeholder" : escHtml(rtc.task_order_number || "\u2014")}</div>
     <div><strong>Project name</strong> ${escHtml(rtc.project_name || "\u2014")}</div>
@@ -900,11 +897,6 @@ function showRtcDetail(rtc) {
     <div><strong>PD</strong> ${escHtml(rtc.project_director || "\u2014")}</div>
     <div><strong>PM</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
     <div><strong>Created by</strong> ${escHtml(rtc.created_by || "\u2014")}</div>
-
-
-
-
-
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <a href="/rtc/${rtc.rtc_id}" class="btn-open-rtc">Open to edit \u2192</a>
         <button class="btn btn--sm btn--secondary"
@@ -959,10 +951,10 @@ function showStaffDetail(person) {
   if (lbls[1]) lbls[1].textContent = "Capacity";
   if (lbls[2]) lbls[2].textContent = "Remaining";
   // Hide RTC-specific elements
-  let warnEl = document.getElementById("dp-norec-warn");
-  if (warnEl) warnEl.classList.add("hidden");
-  let kpiEl = document.getElementById("dp-kpi");
-  if (kpiEl) { kpiEl.className = ""; kpiEl.innerHTML = ""; }
+  // Hide RTC/project-specific elements
+  document.getElementById("dp-norec-warn")?.classList.add("hidden");
+  const staffKpiEl = document.getElementById("dp-kpi");
+  if (staffKpiEl) { staffKpiEl.className = ""; staffKpiEl.innerHTML = ""; }
   document.getElementById("dp-stat-remain").style.color   =
     (cap - alloc) < 0 ? "var(--red)" : "var(--green-dark)";
 
