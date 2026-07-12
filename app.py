@@ -747,7 +747,7 @@ def api_update_rtc(rtc_id):
 
     # Update scalar fields if provided
     updates = {}
-    for field in ["start_date", "department"]:
+    for field in ["start_date", "department", "notes"]:
         if field in data:
             updates[field] = data[field]
 

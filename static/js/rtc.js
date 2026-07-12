@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   fetch(`/api/rtcs/${RTC_ID}/opened`, { method: 'POST' }); // fire and forget
   renderHeader();
   renderGrid();
+  renderNotes();
   setTimeout(scrollToCurrentMonth, 200);
   checkHorizon();
   wireEvents();
@@ -833,6 +834,46 @@ async function extendRtc() {
   }
   btn.disabled = false;
   btn.textContent = "+ 12 months";
+}
+
+// ── Notes ──────────────────────────────────────────────────────────────────
+
+function renderNotes() {
+  const input = document.getElementById("rtc-notes-input");
+  const indicator = document.getElementById("rtc-notes-indicator");
+  if (!input) return;
+  const notes = state.rtc?.notes || "";
+  input.value = notes;
+  indicator.textContent = notes ? "●" : "";
+  indicator.style.color = "var(--wsp-red)";
+}
+
+function toggleNotes() {
+  const body = document.getElementById("rtc-notes-body");
+  body.classList.toggle("hidden");
+  if (!body.classList.contains("hidden")) {
+    document.getElementById("rtc-notes-input").focus();
+  }
+}
+
+let _notesTimer = null;
+function onNotesChange() {
+  const notes = document.getElementById("rtc-notes-input").value;
+  const indicator = document.getElementById("rtc-notes-indicator");
+  indicator.textContent = notes ? "●" : "";
+  clearTimeout(_notesTimer);
+  _notesTimer = setTimeout(async () => {
+    setSaveStatus("saving");
+    try {
+      const r = await fetch(`/api/rtcs/${RTC_ID}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes }),
+      });
+      setSaveStatus(r.ok ? "saved" : "error");
+      if (r.ok && state.rtc) state.rtc.notes = notes;
+    } catch(e) { setSaveStatus("error"); }
+  }, 800);
 }
 
 // ── Wire events ───────────────────────────────────────────────────────────────

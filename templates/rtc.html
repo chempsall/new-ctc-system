@@ -115,6 +115,41 @@
       border: 1px solid var(--amber);
     }
 
+    /* ── Notes ──────────────────────────────────────────────────────── */
+    .rtc-notes-bar {
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .rtc-notes-toggle {
+      background: none;
+      border: none;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-family: var(--font-body);
+      color: var(--text-secondary);
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+    }
+    .rtc-notes-toggle:hover { color: var(--text-primary); }
+    .rtc-notes-body {
+      padding: 8px 16px 12px;
+    }
+    .rtc-notes-input {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: var(--font-body);
+      font-size: 12px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text-primary);
+      resize: vertical;
+      outline: none;
+    }
+    .rtc-notes-input:focus { border-color: var(--wsp-red); }
+
     /* ── Grid card ─────────────────────────────────────────────────── */
     .rtc-grid-card {
       background: var(--surface);
@@ -386,6 +421,19 @@
           + 12 months
         </button>
       </div>
+      <!-- Notes section -->
+      <div class="rtc-notes-bar" id="rtc-notes-bar">
+        <button class="rtc-notes-toggle" id="rtc-notes-toggle" onclick="toggleNotes()">
+          📝 Notes <span id="rtc-notes-indicator"></span>
+        </button>
+        <div class="rtc-notes-body hidden" id="rtc-notes-body">
+          <textarea class="rtc-notes-input" id="rtc-notes-input"
+                    placeholder="Add notes about this RTC…"
+                    rows="4"
+                    oninput="onNotesChange()"></textarea>
+        </div>
+      </div>
+
       <div class="rtc-grid-wrap">
         <table class="rtc-grid" id="rtc-grid">
           <thead id="grid-head"></thead>

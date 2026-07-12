@@ -962,15 +962,6 @@ function showStaffDetail(person) {
   document.getElementById("dp-kpi").className = `kpi kpi--${kpi}`;
   document.getElementById("dp-kpi").textContent = kpi;
 
-  // No-record warning
-  const warnEl = document.getElementById("dp-norec-warn");
-  if (ndays > 0) {
-    warnEl.classList.remove("hidden");
-    document.getElementById("dp-norec-days").textContent = fmt.days(ndays);
-  } else {
-    warnEl.classList.add("hidden");
-  }
-
   // Projects breakdown
   const projContainer = document.getElementById("dp-projects");
   const projectLookup = Object.fromEntries(
@@ -981,13 +972,27 @@ function showStaffDetail(person) {
     .filter(pr => (pr.days[p] || 0) > 0)
     .sort((a, b) => (b.days[p] || 0) - (a.days[p] || 0));
 
+  // Count unlinked projects for this person this period
+  const unlinkedCount = rows.filter(pr => {
+    const proj = projectLookup[pr.project_id];
+    return proj && proj.horizon_status === "norecord";
+  }).length;
+
+  const warnEl = document.getElementById("dp-norec-warn");
+  if (unlinkedCount > 0) {
+    warnEl.classList.remove("hidden");
+    document.getElementById("dp-norec-days").textContent =
+      `${unlinkedCount} of these project${unlinkedCount !== 1 ? "s are" : " is"} not linked to Horizon and will not generate revenue`;
+  } else {
+    warnEl.classList.add("hidden");
+  }
+
   if (rows.length === 0) {
     projContainer.innerHTML =
       `<div class="empty-state" style="padding:16px">No allocations this period</div>`;
   } else {
     projContainer.innerHTML = rows.map(pr => {
       const proj   = projectLookup[pr.project_id];
-      const linked = proj && proj.horizon_status === "linked";
       const name   = proj ? proj.name : `Project ${pr.project_id}`;
       const days   = pr.days[p] || 0;
       return `<div class="detail-project-row">

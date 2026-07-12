@@ -176,7 +176,8 @@ def initialise_database():
             last_opened     TEXT,
             is_archived     INTEGER NOT NULL DEFAULT 0,
             auto_linked     INTEGER NOT NULL DEFAULT 0,
-            source_file     TEXT
+            source_file     TEXT,
+            notes           TEXT
         )
     """)
 
