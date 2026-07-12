@@ -360,8 +360,14 @@ function renderMgmtSummary() {
   );
 
   // Filter RTCs by department
+  const pd      = state.rtcFilters.pd  || "";
+  const pm      = state.rtcFilters.pm  || "";
+  const horizon = state.filters.horizon !== "all" ? state.filters.horizon : "";
   const rtcs = state.rtcs.filter(r =>
-    !dept || r.department === dept
+    (!dept    || r.department === dept) &&
+    (!pd      || r.project_director === pd) &&
+    (!pm      || r.project_manager === pm) &&
+    (!horizon || r.horizon_status === horizon)
   );
 
   // Headline metrics
@@ -1145,7 +1151,7 @@ function switchView(view) {
     rtcs:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status"],
     staff:    ["filter-job-title", "filter-job-function"],
     projects: ["filter-project-pd", "filter-project-pm", "filter-horizon"],
-    mgmt:     [],
+    mgmt:     ["filter-rtc-pd", "filter-rtc-pm", "filter-horizon"],
   };
   const hiddenSlots = {
     staff: ["filter-rtc-status"],
@@ -1639,6 +1645,46 @@ function updateSortIndicators(view, cols) {
 }
 
 // ---------------------------------------------------------------------------
+// ── Notes helpers (called from RTC editing screen) ──────────────────────────
+
+function renderNotes() {
+  const input = document.getElementById("rtc-notes-input");
+  const indicator = document.getElementById("rtc-notes-indicator");
+  if (!input) return;
+  const notes = window.state?.rtc?.notes || "";
+  input.value = notes;
+  if (indicator) { indicator.textContent = notes ? "●" : ""; indicator.style.color = "var(--wsp-red)"; }
+}
+
+function toggleNotes() {
+  const body = document.getElementById("rtc-notes-body");
+  if (body) {
+    body.classList.toggle("hidden");
+    if (!body.classList.contains("hidden")) document.getElementById("rtc-notes-input")?.focus();
+  }
+}
+
+let _notesTimer = null;
+function onNotesChange() {
+  const notes = document.getElementById("rtc-notes-input")?.value || "";
+  const indicator = document.getElementById("rtc-notes-indicator");
+  if (indicator) { indicator.textContent = notes ? "●" : ""; }
+  clearTimeout(_notesTimer);
+  _notesTimer = setTimeout(async () => {
+    if (typeof setSaveStatus === "function") setSaveStatus("saving");
+    try {
+      const RTC_ID = window.RTC_ID;
+      if (!RTC_ID) return;
+      const r = await fetch(`/api/rtcs/${RTC_ID}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes }),
+      });
+      if (typeof setSaveStatus === "function") setSaveStatus(r.ok ? "saved" : "error");
+    } catch(e) { if (typeof setSaveStatus === "function") setSaveStatus("error"); }
+  }, 800);
+}
+
 // Wire up events
 // ---------------------------------------------------------------------------
 function wireEvents() {

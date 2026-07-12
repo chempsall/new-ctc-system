@@ -244,6 +244,20 @@
       </div>
 
       <div class="admin-action">
+        <div class="admin-action__name">Initialise / refresh special RTCs</div>
+        <div>
+          <div class="admin-action__desc">
+            Creates or updates the Annual Leave &amp; Public Holidays, Training, and
+            Day Release &amp; Study Leave RTCs for all departments. Adds new staff,
+            pre-fills bank holidays, and removes allocation rows older than 12 months.
+            Runs automatically every night.
+          </div>
+          <div class="admin-action__result" id="result-special-rtcs"></div>
+        </div>
+        <button class="btn" onclick="runSpecialRtcs(this)">Run now</button>
+      </div>
+
+      <div class="admin-action">
         <div class="admin-action__name">Rebuild summary cache</div>
         <div>
           <div class="admin-action__desc">
@@ -483,6 +497,18 @@
             : "✓  No pending RTCs found a match",
           "ok");
       } catch(e) { setResult("result-relink", `✗  ${e.message}`, "err"); }
+      btn.disabled = false;
+    }
+
+    async function runSpecialRtcs(btn) {
+      setResult("result-special-rtcs", "Running…", "");
+      btn.disabled = true;
+      try {
+        const r = await fetch("/admin/special-rtcs", { method: "POST", headers: headers() });
+        const d = await r.json();
+        if (!r.ok) { setResult("result-special-rtcs", `✗  ${d.error}`, "err"); btn.disabled=false; return; }
+        setResult("result-special-rtcs", "✓  Special RTCs updated — check application log for details", "ok");
+      } catch(e) { setResult("result-special-rtcs", `✗  ${e.message}`, "err"); }
       btn.disabled = false;
     }
 

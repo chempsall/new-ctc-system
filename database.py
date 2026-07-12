@@ -251,6 +251,15 @@ def initialise_database():
         CREATE INDEX IF NOT EXISTS idx_allocations_person
         ON allocations(horizon_person_number, period_start)
     """)
+
+    # Bank holidays cache
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS bank_holidays (
+            date        TEXT PRIMARY KEY,
+            days        INTEGER NOT NULL DEFAULT 1,
+            last_updated TEXT
+        )
+    """)
     
     _seed_reporting_periods(c)
     _seed_generic_staff(c)

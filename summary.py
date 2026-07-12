@@ -290,9 +290,13 @@ def build() -> dict:
             period_days[label] = round(proj_days_map.get(project_id, {}).get(ps, 0), 2)
 
         # Horizon status based on project_status and project_type
-        _ptype = (p["project_type"] or "").strip()
-        _pstat = (p["project_status"] or "").strip().lower()
-        if _pstat == "active" and _ptype == "UK Direct":
+        _ptype   = (p["project_type"] or "").strip()
+        _pstat   = (p["project_status"] or "").strip().lower()
+        _pnum    = (p["project_number"] or "").strip()
+        _special = _pnum in {"ID-06", "ID-04", "IDUK-01"}
+        if _special:
+            horizon_status = "other"
+        elif _pstat == "active" and _ptype == "UK Direct":
             horizon_status = "linked"
         elif _pstat == "active" and _ptype == "UK Opportunity":
             horizon_status = "opportunity"

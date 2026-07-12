@@ -60,7 +60,11 @@ async function loadRtc() {
     state.rtc     = d.rtc;
     state.periods = d.periods;
     if (d.server_period) TODAY_MONTH = d.server_period;
+    const isSpecial = ["ID-06", "ID-04", "IDUK-01"].includes(state.rtc?.project_number);
     state.staff   = d.staff.sort((a, b) => {
+      if (isSpecial) {
+        return (a.name || '').localeCompare(b.name || '');
+      }
       const aGeneric = a.horizon_person_number.startsWith('GENERIC-');
       const bGeneric = b.horizon_person_number.startsWith('GENERIC-');
       if (aGeneric && !bGeneric) return 1;
