@@ -16,6 +16,10 @@ Admin login is a bit rubbish
 
 Quirk in "Linked to Horizon" - it will show this even if it's an opportunity <= IMPORTANT
 
+Days remaining is formatted as 1200d - it should be 1,200 d
+
+
+
 
 With a correct Project Number and task number but before the Horizon records are available it shows "Not linked" (as expected). However, when the Horizon record is available it doesn't automatically link (debatable how desirable this is) AND required me to delete the task order number and re-insert it before it would link.
 
@@ -44,5 +48,8 @@ Staff leavers on RTCs — when a staff member leaves, future allocations should 
 
 Post-alpha:
 Name changes — when a staff member's name changes, project_manager and project_director text fields on existing project rows are not automatically updated. Consider storing Horizon person numbers for PM/PD instead of plain text names.
+
+
+
 
 
