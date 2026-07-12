@@ -558,6 +558,7 @@ function renderView() {
     renderProjectTable();
     document.getElementById("projects-panel").classList.remove("hidden");
   } else if (state.activeView === "mgmt") {
+    document.getElementById("detail-panel").style.display = "none";
     if (!state.rtcs.length) {
       loadRtcs().then(renderMgmtSummary);
     } else {
@@ -565,6 +566,7 @@ function renderView() {
     }
     document.getElementById("mgmt-panel").classList.remove("hidden");
   } else {
+    document.getElementById("detail-panel").style.display = "";
     renderRtcTable();
     document.getElementById("rtcs-panel").classList.remove("hidden");
   }
@@ -1198,7 +1200,9 @@ function switchView(view) {
 // Close detail panel
 // ---------------------------------------------------------------------------
 function closeDetailPanel() {
-  document.getElementById("detail-panel").classList.remove("open");
+  const panel = document.getElementById("detail-panel");
+  panel.classList.remove("open");
+  panel.style.display = state.activeView === "mgmt" ? "none" : "";
   state.selectedStaff   = null;
   state.selectedProject = null;
   renderView();
