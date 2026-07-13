@@ -36,7 +36,7 @@ SPECIAL_RTC_CONFIGS = [
         "task_order":     "DAYRELEASE",
         "name":           "Day Release & Study Leave",
         "has_bank_holidays": False,
-        "grades":         ["P0", "P1"],
+        "grades":         ["P0"],
     },
 ]
 

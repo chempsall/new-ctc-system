@@ -250,6 +250,18 @@ async function horizonLookup(projNum, taskOrder) {
       msgEl.className = 'rtc-horizon-msg rtc-horizon-msg--found';
       if (d.match_type === 'project_only') {
         msgEl.innerHTML = `<strong>Project found in Horizon</strong> — this task order is not yet in PAR. Project-level details have been auto-filled and will update automatically when the task order appears in the next PAR import.`;
+        // PATCH the RTC with the real project number + task order so
+        // _relink_pending_rtcs can match it when the task order lands in PAR
+        fetch(`/api/rtcs/${RTC_ID}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project_number:    projNum,
+            task_order_number: taskOrder,
+          }),
+        }).then(async r => {
+          if (r.ok) { await loadRtc(); renderHeader(); }
+        }).catch(() => {});
       } else {
         window._horizonMatch = d;
         msgEl.innerHTML = `<strong>Horizon record found:</strong> ${esc(d.project_name || '')}
