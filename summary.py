@@ -16,6 +16,7 @@ import json
 from datetime import datetime, timezone, date
 from database import get_connection
 import config
+from services.projects import display_number, is_suffixed, is_placeholder
 
 
 HORIZON_MONTHS = config.FORECAST_HORIZON_MONTHS
@@ -320,6 +321,10 @@ def build() -> dict:
             "rtc_id":           p["rtc_id"] if "rtc_id" in p.keys() else None,
             "number":           proj_number,
             "task_order":       task_order,
+            "display_project_number": display_number(proj_number),
+            "display_task_order":     display_number(task_order),
+            "is_placeholder_number":  (is_suffixed(proj_number) or
+                                       is_placeholder(proj_number)),
             "name":             p["project_name"] or "No Horizon Record Found",
             "task_name":        p["task_name"] or "No Horizon Record Found",
             "organisation":     p["project_organisation"] or "No Horizon Record Found",

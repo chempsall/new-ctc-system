@@ -663,8 +663,8 @@ function renderProjectTable() {
         ${(() => {
           const pn = proj.number || "";
           const to = proj.task_order || "";
-          const pnOk = !pn.match(/_\d{8}T\d+$/);
-          const toOk = !to.match(/_\d{8}T\d+$/);
+          const pnOk = !proj.is_placeholder_number;
+          const toOk = !proj.is_placeholder_number;
           if (!pnOk) return "";
           return `<div class="proj-number">${escHtml(pn)}${toOk && to ? " " + escHtml(to) : ""}</div>`;
         })()}
@@ -804,8 +804,8 @@ function renderRtcTable() {
         ${(() => {
           const pn = r.project_number || "";
           const to = r.task_order_number || "";
-          const pnOk = !pn.match(/_\d{8}T\d+$/);
-          const toOk = !to.match(/_\d{8}T\d+$/);
+          const pnOk = !r.is_placeholder_number;
+          const toOk = !r.is_placeholder_number;
           if (!pnOk) return "";
           return `<div class="proj-number">${escHtml(pn)}${toOk && to ? " " + escHtml(to) : ""}</div>`;
         })()}
@@ -898,8 +898,8 @@ function showRtcDetail(rtc) {
   const projContainer = document.getElementById("dp-projects");
   projContainer.innerHTML = `
     <div style="font-size:11px;line-height:1.8;color:var(--text-secondary)">
-    <div><strong>Project number</strong> ${(rtc.project_number || "").match(/_\d{8}T\d+$/) ? "Placeholder" : escHtml(rtc.project_number || "\u2014")}</div>
-    <div><strong>Task number</strong> ${(rtc.task_order_number || "").match(/_\d{8}T\d+$/) ? "Placeholder" : escHtml(rtc.task_order_number || "\u2014")}</div>
+    <div><strong>Project number</strong> ${rtc.is_placeholder_number ? "Placeholder" : escHtml(rtc.display_project_number || rtc.project_number || "\u2014")}</div>
+    <div><strong>Task number</strong> ${rtc.is_placeholder_number ? "Placeholder" : escHtml(rtc.display_task_order || rtc.task_order_number || "\u2014")}</div>
     <div><strong>Project name</strong> ${escHtml(rtc.project_name || "\u2014")}</div>
     <div><strong>Task name</strong> ${escHtml(rtc.task_name || "\u2014")}</div>
     ${rtc.project_customer ? `<div><strong>Customer</strong> ${escHtml(rtc.project_customer)}</div>` : ""}

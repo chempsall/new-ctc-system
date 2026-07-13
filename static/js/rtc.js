@@ -146,13 +146,13 @@ function renderHeader() {
       <div class="rtc-field">
         <span class="rtc-field__label">Project number</span>
         <input class="rtc-field__input" id="field-proj-number"
-               value="${esc((rtc.project_number || '').replace(/_\d{8}T\d+$/, ''))}"
+               value="${esc(rtc.display_project_number || rtc.project_number || '')}"
                placeholder="e.g. UK0041867">
       </div>
       <div class="rtc-field">
         <span class="rtc-field__label">Task order</span>
         <input class="rtc-field__input" id="field-task-order"
-                value="${esc((rtc.task_order_number || '').replace(/_\d{8}T\d+$/, ''))}"
+                value="${esc(rtc.display_task_order || rtc.task_order_number || '')}"
                placeholder="e.g. 9081">
       </div>
       <div class="rtc-field">

@@ -15,6 +15,7 @@ import summary as summary_module
 from services.identity import get_current_user
 from services.projects import get_or_create_project
 from services.special_rtcs import SPECIAL_PROJECT_NUMBERS
+from services.projects import display_number, is_suffixed, is_placeholder
 
 logger = logging.getLogger("resource_forecast.rtcs")
 
@@ -139,6 +140,13 @@ def api_rtcs():
             row["horizon_status"] = "other"
         else:
             row["horizon_status"] = "norecord"
+        # Add server-side display fields (§4.4) so frontend never parses project numbers
+        proj_num_val = row["project_number"] or ""
+        task_num_val = row["task_order_number"] or ""
+        row["display_project_number"] = display_number(proj_num_val)
+        row["display_task_order"]     = display_number(task_num_val)
+        row["is_placeholder_number"]  = (is_suffixed(proj_num_val) or
+                                         is_placeholder(proj_num_val))
         result.append(row)
 
     # Sort: future_days descending, then project_name ascending
@@ -332,8 +340,13 @@ def api_get_rtc(rtc_id):
             }
         people[pid]["allocations"][row["period_start"]] = row["days"]
 
+    rtc_dict = dict(rtc)
+    rtc_dict["display_project_number"] = display_number(rtc["project_number"] or "")
+    rtc_dict["display_task_order"]     = display_number(rtc["task_order_number"] or "")
+    rtc_dict["is_placeholder_number"]  = (is_suffixed(rtc["project_number"] or "") or
+                                           is_placeholder(rtc["project_number"] or ""))
     return jsonify({
-        "rtc":            dict(rtc),
+        "rtc":            rtc_dict,
         "periods":        [dict(p) for p in periods],
         "staff":          list(people.values()),
         "server_period":  datetime.now(timezone.utc).date().replace(day=1).isoformat(),
