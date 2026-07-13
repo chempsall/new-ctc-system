@@ -359,12 +359,43 @@
 
     <!-- CTC Import confirmation popup -->
     <div class="modal-overlay hidden" id="ctc-import-overlay">
-      <div class="modal" style="max-width:600px">
+      <div class="modal" style="max-width:640px">
         <div class="modal__header">
           <h2 class="modal__title">Confirm CTC Import</h2>
           <button class="modal__close" onclick="closeCTCPopup()">×</button>
         </div>
-        <div class="modal__body">
+        <div class="modal__body" style="max-height:70vh;overflow-y:auto">
+          <!-- Filename for reference -->
+          <div id="ctc-filename" style="font-size:11px;color:var(--text-tertiary);
+               background:var(--surface-2);padding:6px 10px;border-radius:var(--radius-sm);
+               margin-bottom:12px;word-break:break-all"></div>
+
+          <!-- Horizon link status -->
+          <div id="ctc-horizon-status" style="margin-bottom:12px;padding:8px 12px;
+               border-radius:var(--radius-sm);font-size:12px;font-weight:500"></div>
+
+          <!-- Editable fields -->
+          <div style="display:grid;grid-template-columns:140px 1fr;gap:6px 12px;
+                      align-items:center;font-size:13px;margin-bottom:12px">
+            <label style="color:var(--text-tertiary)">Project number</label>
+            <input id="ctc-proj-num" class="form-input" style="font-size:13px;padding:4px 8px"
+                   oninput="ctcCheckHorizon()">
+            <label style="color:var(--text-tertiary)">Task order</label>
+            <input id="ctc-task-num" class="form-input" style="font-size:13px;padding:4px 8px"
+                   oninput="ctcCheckHorizon()">
+            <label style="color:var(--text-tertiary)">Project name</label>
+            <input id="ctc-proj-name" class="form-input" style="font-size:13px;padding:4px 8px">
+            <label style="color:var(--text-tertiary)">Task name</label>
+            <input id="ctc-task-name" class="form-input" style="font-size:13px;padding:4px 8px">
+            <label style="color:var(--text-tertiary)">Department</label>
+            <input id="ctc-dept" class="form-input" style="font-size:13px;padding:4px 8px">
+            <label style="color:var(--text-tertiary)">Project Director</label>
+            <input id="ctc-pd" class="form-input" style="font-size:13px;padding:4px 8px">
+            <label style="color:var(--text-tertiary)">Project Manager</label>
+            <input id="ctc-pm" class="form-input" style="font-size:13px;padding:4px 8px">
+          </div>
+
+          <!-- Staff summary -->
           <div id="ctc-import-details"></div>
         </div>
         <div class="modal__footer">
@@ -819,11 +850,52 @@
 
     let _ctcData = null;
 
+    let _ctcHorizonTimer = null;
+
     function closeCTCPopup() {
       document.getElementById('ctc-import-overlay').classList.add('hidden');
       _ctcData = null;
       document.getElementById('ctc-file-input').value = '';
       document.getElementById('ctc-file-name').textContent = '';
+      if (_ctcHorizonTimer) { clearTimeout(_ctcHorizonTimer); _ctcHorizonTimer = null; }
+    }
+
+    function ctcCheckHorizon() {
+      clearTimeout(_ctcHorizonTimer);
+      _ctcHorizonTimer = setTimeout(async () => {
+        const pn = document.getElementById('ctc-proj-num').value.trim();
+        const to = document.getElementById('ctc-task-num').value.trim();
+        const el = document.getElementById('ctc-horizon-status');
+        if (!pn) { el.textContent = ''; return; }
+        el.textContent = 'Checking Horizon…';
+        el.style.background = 'var(--surface-2)';
+        el.style.color = 'var(--text-secondary)';
+        try {
+          const r = await fetch(`/api/project?project_number=${encodeURIComponent(pn)}&task_order_number=${encodeURIComponent(to)}`, { headers: headers() });
+          const d = await r.json();
+          if (d.match_type === 'full') {
+            el.style.background = 'var(--green-light)';
+            el.style.color = 'var(--green-dark)';
+            el.textContent = `✓ Linked to Horizon — ${d.project_name || pn}`;
+            // Auto-fill fields from PAR
+            if (d.project_name) document.getElementById('ctc-proj-name').value = d.project_name;
+            if (d.task_name)    document.getElementById('ctc-task-name').value = d.task_name;
+            if (d.project_organisation) document.getElementById('ctc-dept').value = d.project_organisation;
+            if (d.project_director) document.getElementById('ctc-pd').value = d.project_director;
+            if (d.project_manager)  document.getElementById('ctc-pm').value = d.project_manager;
+          } else if (d.match_type === 'project_only') {
+            el.style.background = 'var(--amber-light)';
+            el.style.color = 'var(--amber-dark)';
+            el.textContent = `⚠ Project found but task order not yet in PAR — will create pending record`;
+          } else {
+            el.style.background = 'var(--status-red-light)';
+            el.style.color = 'var(--status-red-dark)';
+            el.textContent = '✗ Not found in Horizon — will create pending project';
+          }
+        } catch(e) {
+          el.textContent = 'Could not check Horizon';
+        }
+      }, 500);
     }
 
     function handleCtcFile(input) {
@@ -901,40 +973,46 @@
           const firstAlloc = allocPeriods.length ? allocPeriods.reduce((a,b) => a<b?a:b) : FUTURE_CUTOFF;
           const lastAlloc  = allocPeriods.length ? allocPeriods.reduce((a,b) => a>b?a:b) : FUTURE_CUTOFF;
 
-          _ctcData = { projNum, taskNum, dept, pdRaw, pmRaw, staff: futureStaff,
-                       firstAlloc, lastAlloc, fileName: file.name };
-
-          // Show confirmation popup
           const noHorizon = 'No Horizon Record Found';
-          const pdDisplay = pdRaw && !pdRaw.includes(noHorizon) ? pdRaw : '(not specified)';
-          const pmDisplay = pmRaw && !pmRaw.includes(noHorizon) ? pmRaw : '(not specified)';
-          const deptDisplay = dept && !dept.includes(noHorizon) ? dept : 'London Building Services';
+          const pdClean   = pdRaw && !pdRaw.includes(noHorizon) ? pdRaw : '';
+          const pmClean   = pmRaw && !pmRaw.includes(noHorizon) ? pmRaw : '';
+          const deptClean = dept && !dept.includes(noHorizon) ? dept : 'London Building Services';
 
+          _ctcData = { projNum, taskNum, dept: deptClean, pdRaw: pdClean, pmRaw: pmClean,
+                       staff: futureStaff, firstAlloc, lastAlloc, fileName: file.name };
+
+          // Populate editable fields
+          document.getElementById('ctc-filename').textContent = file.name.replace(/\.xlsm?$/i, '');
+          document.getElementById('ctc-proj-num').value  = projNum;
+          document.getElementById('ctc-task-num').value  = taskNum;
+          document.getElementById('ctc-proj-name').value = '';
+          document.getElementById('ctc-task-name').value = '';
+          document.getElementById('ctc-dept').value      = deptClean;
+          document.getElementById('ctc-pd').value        = pdClean;
+          document.getElementById('ctc-pm').value        = pmClean;
+
+          // Staff details
           document.getElementById('ctc-import-details').innerHTML = `
-            <table style="width:100%;font-size:13px;border-collapse:collapse">
-              <tr><td style="padding:4px 8px;color:var(--text-tertiary);width:140px">Project number</td>
-                  <td style="padding:4px 8px"><strong>${escHtml(projNum)}</strong></td></tr>
-              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Task order</td>
-                  <td style="padding:4px 8px"><strong>${escHtml(taskNum)}</strong></td></tr>
-              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Department</td>
-                  <td style="padding:4px 8px">${escHtml(deptDisplay)}</td></tr>
-              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Project Director</td>
-                  <td style="padding:4px 8px">${escHtml(pdDisplay)}</td></tr>
-              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Project Manager</td>
-                  <td style="padding:4px 8px">${escHtml(pmDisplay)}</td></tr>
-              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Staff found</td>
-                  <td style="padding:4px 8px">${futureStaff.length} with future allocations</td></tr>
-              <tr><td style="padding:4px 8px;color:var(--text-tertiary)">Date range</td>
-                  <td style="padding:4px 8px">${firstAlloc} to ${lastAlloc}</td></tr>
-            </table>
-            <p style="margin-top:12px;font-size:12px;color:var(--text-tertiary)">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;
+                 letter-spacing:0.06em;color:var(--text-tertiary);margin-bottom:6px">
+              Staff with future allocations (${futureStaff.length})
+            </div>
+            <div style="font-size:12px;line-height:1.8;color:var(--text-primary);
+                 max-height:150px;overflow-y:auto;background:var(--surface-2);
+                 padding:8px 10px;border-radius:var(--radius-sm);margin-bottom:8px">
+              ${futureStaff.map(s => escHtml(s.name)).join('<br>')}
+            </div>
+            <div style="font-size:11px;color:var(--text-tertiary)">
+              Date range: ${firstAlloc} to ${lastAlloc}.
               Staff not found in the database will be skipped.
-              Please confirm the details above are correct before importing.
-            </p>
+              You can edit the fields above before importing.
+            </div>
           `;
 
           document.getElementById('ctc-import-overlay').classList.remove('hidden');
           setResult('result-ctc-import', '', '');
+          // Trigger horizon check
+          ctcCheckHorizon();
 
         } catch(err) {
           setResult('result-ctc-import', `✗  Error reading file: ${err.message}`, 'err');
@@ -948,6 +1026,15 @@
       const btn = document.getElementById('ctc-import-confirm');
       btn.disabled = true;
       btn.textContent = 'Importing…';
+
+      // Merge editable field values into _ctcData
+      _ctcData.projNum   = document.getElementById('ctc-proj-num').value.trim();
+      _ctcData.taskNum   = document.getElementById('ctc-task-num').value.trim();
+      _ctcData.projName  = document.getElementById('ctc-proj-name').value.trim();
+      _ctcData.taskName  = document.getElementById('ctc-task-name').value.trim();
+      _ctcData.dept      = document.getElementById('ctc-dept').value.trim();
+      _ctcData.pdRaw     = document.getElementById('ctc-pd').value.trim();
+      _ctcData.pmRaw     = document.getElementById('ctc-pm').value.trim();
 
       try {
         const r = await fetch('/admin/import-ctc', {
@@ -968,6 +1055,7 @@
               msg += ` ${ambiguous.length} ambiguous (multiple matches): ${ambiguous.join(', ')}.`;
           }
           setResult('result-ctc-import', msg, 'ok');
+          window._rtcCacheStale = true;
         } else {
           setResult('result-ctc-import', `✗  ${d.error || 'Import failed'}`, 'err');
         }
@@ -979,6 +1067,6 @@
     }
 
   </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/static/vendor/xlsx.full.min.js"></script>
 </body>
 </html>

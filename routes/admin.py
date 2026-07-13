@@ -117,6 +117,8 @@ def admin_import_ctc():
 
     proj_num   = (data.get("projNum") or "00000000").strip()
     task_num   = (data.get("taskNum") or "000").strip()
+    proj_name  = (data.get("projName") or "").strip()
+    task_name  = (data.get("taskName") or "").strip()
     dept       = (data.get("dept") or "").strip()
     pd_raw     = (data.get("pdRaw") or "").strip()
     pm_raw     = (data.get("pmRaw") or "").strip()
@@ -155,9 +157,10 @@ def admin_import_ctc():
                 (project_number, task_order_number, project_name, task_name,
                  project_customer, project_director, project_manager,
                  project_status, last_imported)
-            VALUES (?, ?, ?, '', NULL, ?, ?, 'Pending', ?)
+            VALUES (?, ?, ?, ?, NULL, ?, ?, 'Pending', ?)
         """, (proj_num, unique_task,
-              f"{proj_num} / {task_num}",
+              proj_name or f"{proj_num} / {task_num}",
+              task_name or "",
               pd_clean, pm_clean, now))
         project_id = c.lastrowid
 

@@ -109,6 +109,9 @@ function buildMonthTabs() {
     btn.addEventListener("click", () => selectPeriod(label));
     container.appendChild(btn);
   });
+  if (!state.activePeriod && state.summary.periods.length) {
+    state.activePeriod = state.summary.periods[0];
+  }
   const newBtn = document.createElement("button");
   newBtn.id = "btn-create-rtc";
   newBtn.className = "btn";
@@ -684,8 +687,8 @@ function renderProjectTable() {
       </td>
       <td><span class="team-badge">${escHtml(r.department || "—")}</span></td>
       <td>
-        ${horizonBadge(r.horizon_status)}
-        ${statusBadge(r.status)}
+        <div>${horizonBadge(r.horizon_status)}</div>
+        <div style="margin-top:3px">${statusBadge(r.status)}</div>
       </td>
       <td style="text-align:right;font-family:var(--font-mono);font-size:12px">
         ${fmt.days(r.current_month_days || 0)}d
