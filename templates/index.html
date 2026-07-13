@@ -29,9 +29,6 @@
     </div>
 
     <div class="topnav__tabs">
-      <button class="topnav__tab" data-view="rtcs">
-        RTCs
-      </button>
       <button class="topnav__tab" data-view="projects">
         Projects
       </button>
@@ -53,8 +50,8 @@
        eliminates the RTCs-tab flash while /api/summary loads. -->
   <script>
     (function () {
-      var v = (location.hash || "#rtcs").slice(1);
-      if (["rtcs", "projects", "staff", "mgmt"].indexOf(v) === -1) v = "rtcs";
+      var v = (location.hash || "#projects").slice(1);
+      if (["projects", "staff", "mgmt"].indexOf(v) === -1) v = "projects";
       var btn = document.querySelector('.topnav__tab[data-view="' + v + '"]');
       if (btn) btn.classList.add("active");
     })();
@@ -171,9 +168,9 @@
       <!-- Populated by JavaScript -->
     </div>
 
-    <div class="rtc-actions-bar" id="rtc-actions-bar" style="display:none">
-      <button class="month-tab month-tab--primary" id="btn-create-rtc">
-        New RTC
+    <div class="rtc-actions-bar" id="rtc-actions-bar">
+      <button class="btn" id="btn-create-rtc" onclick="openRtcModal('new')">
+        + New RTC
       </button>
     </div>
 
@@ -224,12 +221,12 @@
           <table class="project-table">
             <thead>
               <tr>
-                <th>Number</th>
-                <th>Project / Task</th>
+                <th>Project / Task Number</th>
+                <th>Customer / Project / Task</th>
                 <th class="sortable" onclick="toggleSort('projects','department')">Department <span id="sort-projects-department"></span></th>
-                <th class="sortable" style="text-align:center" onclick="toggleSort('projects','horizon')">Horizon <span id="sort-projects-horizon"></span></th>
-                <th class="sortable" onclick="toggleSort('projects','pm')">PM <span id="sort-projects-pm"></span></th>
-                <th class="sortable" style="text-align:center;white-space:nowrap" onclick="toggleSort('projects','days')">This month <span id="sort-projects-days"></span></th>
+                <th onclick="toggleSort('projects','status')">Status <span id="sort-projects-status"></span></th>
+                <th class="sortable" style="text-align:right;white-space:nowrap" onclick="toggleSort('projects','this_month')">This month <span id="sort-projects-this_month"></span></th>
+                <th class="sortable" style="text-align:right;white-space:nowrap" onclick="toggleSort('projects','future_days')">Future days <span id="sort-projects-future_days"></span></th>
               </tr>
             </thead>
             <tbody id="project-tbody">

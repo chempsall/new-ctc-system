@@ -13,9 +13,9 @@
 const state = {
   summary:        null,    // Full summary payload from /api/summary
   activePeriod:   null,    // Currently selected month label e.g. "Apr-2026"
-  activeView: (["rtcs","staff","projects","mgmt"].includes(window.location.hash.replace("#","")))
+  activeView: (["projects","staff","mgmt"].includes(window.location.hash.replace("#","")))
               ? window.location.hash.replace("#","")
-              : "rtcs",
+              : "projects",
   filters: {
     job_function: "all",
     job_title:    "all",
@@ -194,8 +194,7 @@ const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && (ps.capac
   const fte = realStaff.reduce((sum, ps) => sum + (ps.fte?.[p] || 0), 0);
   document.getElementById("metric-staff").textContent    = realStaff.length;
   document.getElementById("metric-fte").textContent      = fte.toFixed(1);
-  document.getElementById("metric-projects").textContent = 
-    state.activeView === "rtcs" ? filteredRtcs().length : projects.length;
+  document.getElementById("metric-projects").textContent = filteredRtcs().length;
   document.getElementById("metric-over").textContent     = overCount;
   document.getElementById("metric-norec").textContent    = noRecProj;
 
@@ -237,7 +236,7 @@ function toggleSort(view, col) {
     s.dir = "asc";
   }
   renderView();
-  if (view === "rtcs") renderRtcTable();
+  if (view === "projects") renderProjectTable();
 }
 
 function sortIndicator(view, col) {
@@ -553,9 +552,6 @@ function renderView() {
   if (state.activeView === "staff") {
     renderStaffTable();
     document.getElementById("staff-panel").classList.remove("hidden");
-  } else if (state.activeView === "projects") {
-    renderProjectTable();
-    document.getElementById("projects-panel").classList.remove("hidden");
   } else if (state.activeView === "mgmt") {
     document.getElementById("detail-panel").style.display = "none";
     fetch("/api/rtcs")
@@ -567,9 +563,10 @@ function renderView() {
       .catch(() => renderMgmtSummary());
     document.getElementById("mgmt-panel").classList.remove("hidden");
   } else {
+    // Default: projects view (merged RTCs + Projects)
     document.getElementById("detail-panel").style.display = "";
-    renderRtcTable();
-    document.getElementById("rtcs-panel").classList.remove("hidden");
+    renderProjectTable();
+    document.getElementById("projects-panel").classList.remove("hidden");
   }
   renderMetrics();
 }
@@ -642,56 +639,60 @@ function renderStaffTable() {
 // Project table
 // ---------------------------------------------------------------------------
 function renderProjectTable() {
-  const tbody    = document.getElementById("project-tbody");
-  const projects = filteredProjects();
-  const p        = state.activePeriod;
+  const tbody = document.getElementById("project-tbody");
+  const rtcs  = filteredRtcs();
+  const p     = state.activePeriod;
 
-  if (projects.length === 0) {
+  if (rtcs.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6">
-      <div class="empty-state">No projects match the current filters</div>
+      <div class="empty-state">No RTCs match the current filters</div>
     </td></tr>`;
     return;
   }
 
-  tbody.innerHTML = projects.map(proj => {
-    const days       = proj.total_days[p] || 0;
-    const linked     = proj.horizon_status === "linked";
-    const isSelected = String(proj.project_id) === String(state.selectedProject);
+  const statusBadge = status => {
+    const map = {
+      current:            ["rtc-badge rtc-badge--current",   "Current"],
+      due_review:         ["rtc-badge rtc-badge--review",    "Due for review"],
+      overdue_review:     ["rtc-badge rtc-badge--overdue",   "Overdue review"],
+      awaiting_archiving: ["rtc-badge rtc-badge--archiving", "Awaiting archiving"],
+      archived:           ["rtc-badge rtc-badge--archived",  "Archived"],
+    };
+    const [cls, label] = map[status] || ["rtc-badge", status];
+    return `<span class="${cls}">${label}</span>`;
+  };
 
-    return `<tr data-id="${proj.project_id}" class="${isSelected ? "selected" : ""}">
+  tbody.innerHTML = rtcs.map(r => {
+    const isSelected = String(r.rtc_id) === String(state.selectedRtc);
+    return `<tr data-id="${r.rtc_id}" class="${isSelected ? "selected" : ""}">
       <td>
-        ${(() => {
-          const pn = proj.number || "";
-          const to = proj.task_order || "";
-          const pnOk = !proj.is_placeholder_number;
-          const toOk = !proj.is_placeholder_number;
-          if (!pnOk) return "";
-          return `<div class="proj-number">${escHtml(pn)}${toOk && to ? " " + escHtml(to) : ""}</div>`;
-        })()}
+        ${r.is_placeholder_number ? "" :
+          `<div class="proj-number">${escHtml(r.display_project_number || r.project_number || "")}</div>
+           <div class="proj-task">${escHtml(r.display_task_order || r.task_order_number || "")}</div>`}
       </td>
       <td>
-        <div class="proj-name">${escHtml(proj.name)}</div>
-        <div class="proj-task">${escHtml(proj.task_name || "")}</div>
+        ${r.project_customer ? `<div class="proj-customer">${escHtml(r.project_customer)}</div>` : ""}
+        <div class="proj-name">${escHtml(r.project_name || "No project name")}</div>
+        ${r.task_name ? `<div class="proj-task">${escHtml(r.task_name)}</div>` : ""}
       </td>
-      <td><span class="team-badge">${escHtml(proj.department || "—")}</span></td>
-      <td style="text-align:center">
-        ${horizonBadge(proj.horizon_status)}
+      <td><span class="team-badge">${escHtml(r.department || "—")}</span></td>
+      <td>
+        ${horizonBadge(r.horizon_status)}
+        ${statusBadge(r.status)}
       </td>
-      <td style="font-size:11px;color:var(--text-secondary)">
-        ${escHtml(proj.pm || "—")}
+      <td style="text-align:right;font-family:var(--font-mono);font-size:12px">
+        ${fmt.days(r.current_month_days || 0)}d
       </td>
-      <td style="text-align:center">
-        <span class="mono" style="font-size:11px">
-          ${fmt.days(days)}d
-        </span>
+      <td style="text-align:right;font-family:var(--font-mono);font-size:12px">
+        ${fmt.days(r.future_days || 0)}d
       </td>
     </tr>`;
   }).join("");
 
   tbody.querySelectorAll("tr[data-id]").forEach(row => {
-    row.addEventListener("click", () => selectProject(parseInt(row.dataset.id)));
+    row.addEventListener("click", () => selectRtc(parseInt(row.dataset.id)));
   });
-  updateSortIndicators("projects", ["department","horizon","pm","days"]);
+  updateSortIndicators("projects", ["department","horizon","status","this_month","future_days"]);
 }
 
 // ---------------------------------------------------------------------------
@@ -731,7 +732,7 @@ function filteredRtcs() {
   const base = statusFilter
     ? state.rtcs.filter(r => r.status === statusFilter)
     : state.rtcs;
-  return applySort(base, "rtcs", {
+  return applySort(base, "projects", {
     department:   r => r.department,
     pd:           r => r.project_director,
     pm:           r => r.project_manager,
@@ -739,7 +740,9 @@ function filteredRtcs() {
       current: 0, due_review: 1, overdue_review: 2,
       awaiting_archiving: 3, archived: 4
     })[r.status] ?? 9,
-    days:         r => r.future_days || 0,
+    horizon:      r => r.horizon_status,
+    this_month:   r => -(r.current_month_days || 0),
+    future_days:  r => -(r.future_days || 0),
     last_updated: r => r.last_updated_at,
   });
 }
@@ -903,14 +906,12 @@ function showRtcDetail(rtc) {
     <div><strong>Project name</strong> ${escHtml(rtc.project_name || "\u2014")}</div>
     <div><strong>Task name</strong> ${escHtml(rtc.task_name || "\u2014")}</div>
     ${rtc.project_customer ? `<div><strong>Customer</strong> ${escHtml(rtc.project_customer)}</div>` : ""}
-    <div><strong>PD</strong> ${escHtml(rtc.project_director || "\u2014")}</div>
-    <div><strong>PM</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
-    <div><strong>Created by</strong> ${escHtml(rtc.created_by || "\u2014")}</div>
-      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <div><strong>Project Director</strong> ${escHtml(rtc.project_director || "\u2014")}</div>
+    <div><strong>Project Manager</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
+    <div style="margin-top:8px"><strong>Last opened</strong> ${rtc.last_opened ? new Date(rtc.last_opened).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Never"}</div>
+    <div><strong>Last opened by</strong> ${escHtml(rtc.last_opened_by || "\u2014")}</div>
+      <div style="margin-top:12px">
         <a href="/rtc/${rtc.rtc_id}" class="btn-open-rtc">Open to edit \u2192</a>
-        <button class="btn btn--sm btn--secondary"
-                onclick="openRtcModal('duplicate')"
-                style="font-size:11px">Duplicate</button>
       </div>
     </div>`;
 
@@ -1123,9 +1124,9 @@ function selectPeriod(label) {
     const person = state.summary.staff.find(p => String(p.id) === String(state.selectedStaff));
     if (person) showStaffDetail(person);
   }
-  if (state.selectedProject) {
-    const proj = state.summary.projects.find(p => String(p.project_id) === String(state.selectedProject));
-    if (proj) showProjectDetail(proj);
+  if (state.selectedRtc) {
+    const rtc = state.rtcs.find(r => r.rtc_id === state.selectedRtc);
+    if (rtc) showRtcDetail(rtc);
   }
 }
 
@@ -1146,9 +1147,8 @@ function switchView(view) {
 
   // Show/hide filter slots per view
   const filterSlots = {
-    rtcs:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status"],
+    projects: ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
     staff:    ["filter-job-title", "filter-job-function"],
-    projects: ["filter-project-pd", "filter-project-pm", "filter-horizon"],
     mgmt:     ["filter-rtc-pd", "filter-rtc-pm", "filter-horizon"],
   };
   const hiddenSlots = {
@@ -1174,15 +1174,15 @@ function switchView(view) {
 
   // Month tabs only relevant for staff and projects views
  const monthTabs = document.getElementById("month-tabs");
-  if (monthTabs) monthTabs.style.display = (view === "rtcs" || view === "mgmt") ? "none" : "";
+  if (monthTabs) monthTabs.style.display = (view === "mgmt") ? "none" : "";
   const rtcBar = document.getElementById("rtc-actions-bar");
-  if (rtcBar) rtcBar.style.display = view === "rtcs" ? "" : "none";
+  if (rtcBar) rtcBar.style.display = view === "projects" ? "" : "none";
   const detailPanel = document.getElementById("detail-panel");
   if (detailPanel && view === "mgmt") detailPanel.classList.remove("open");
 
   // Reload data fresh on every tab switch so changes made on one tab
   // are reflected immediately on the others without needing a page refresh
-  if (view === "rtcs") {
+  if (view === "projects") {
     loadRtcs();
   } else {
     loadSummary().then(() => renderView());
@@ -1277,7 +1277,7 @@ function resetFilters() {
   if (pdSel)      pdSel.value      = "all";
   if (statusSel)  statusSel.value  = "";
 
-  if (state.activeView === "rtcs") {
+  if (["rtcs","projects"].includes(state.activeView)) {
     loadRtcs();
   } else {
     renderView();
@@ -1687,7 +1687,7 @@ document.getElementById("filter-project-pm")?.addEventListener("change", e => {
   if (searchEl) {
     searchEl.addEventListener("input", () => {
       state.filters.search = searchEl.value.trim();
-      if (state.activeView === "rtcs") loadRtcs();
+      if (["rtcs","projects"].includes(state.activeView)) loadRtcs();
       else renderView();
     });
   }
@@ -1698,15 +1698,15 @@ document.getElementById("filter-project-pm")?.addEventListener("change", e => {
   // RTC-specific filters
   document.getElementById("filter-rtc-pm")?.addEventListener("change", e => {
     state.rtcFilters.pm = e.target.value === "all" ? "" : e.target.value;
-    if (state.activeView === "rtcs") loadRtcs();
+    if (["rtcs","projects"].includes(state.activeView)) loadRtcs();
   });
   document.getElementById("filter-rtc-pd")?.addEventListener("change", e => {
     state.rtcFilters.pd = e.target.value === "all" ? "" : e.target.value;
-    if (state.activeView === "rtcs") loadRtcs();
+    if (["rtcs","projects"].includes(state.activeView)) loadRtcs();
   });
   document.getElementById("filter-rtc-status")?.addEventListener("change", e => {
     state.rtcFilters.status = e.target.value;
-    renderRtcTable();
+    renderProjectTable();
   });
 
   // RTC action buttons
