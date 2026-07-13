@@ -91,7 +91,6 @@ def initialise_database():
     #
     # job_title    = Horizon's technical grade field
     #                e.g. "Lead Professional, Mechanical Engineering"
-    # job_family   = broad category e.g. "Engineering"
     # job_function = discipline, derived from job title suffix
     #                e.g. "Mechanical Engineering"
     # department   = Horizon cost centre e.g. "UK010117"
@@ -101,7 +100,6 @@ def initialise_database():
             horizon_person_number   TEXT PRIMARY KEY,
             name                    TEXT NOT NULL,
             job_title               TEXT,
-            job_family              TEXT,
             job_function            TEXT,
             department              TEXT,
             availability            REAL NOT NULL DEFAULT 1.0,
@@ -323,9 +321,9 @@ def _seed_generic_staff(c):
     for horizon_id, name, job_title in generics:
         c.execute("""
             INSERT OR IGNORE INTO staff (
-                horizon_person_number, name, job_title, job_family,
+                horizon_person_number, name, job_title,
                 job_function, department, availability, last_imported
-            ) VALUES (?, ?, ?, 'Generic', 'Generic', '_GENERIC', 1.0, 'seeded')
+            ) VALUES (?, ?, ?, 'Generic', '_GENERIC', 1.0, 'seeded')
         """, (horizon_id, name, job_title))
 
 

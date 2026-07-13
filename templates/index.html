@@ -164,12 +164,11 @@
     </div>
 
     <!-- Month tabs — below the filter bar -->
-    <div class="month-tabs" id="month-tabs">
+    <div class="month-tabs" id="month-tabs" style="display:flex;align-items:center">
       <!-- Populated by JavaScript -->
-    </div>
-
-    <div class="rtc-actions-bar" id="rtc-actions-bar">
-      <button class="btn" id="btn-create-rtc" onclick="openRtcModal('new')">
+      <button class="btn" id="btn-create-rtc"
+              onclick="openRtcModal('new')"
+              style="margin-left:auto;background:var(--wsp-red);border-color:var(--wsp-red);color:#fff;white-space:nowrap">
         + New RTC
       </button>
     </div>

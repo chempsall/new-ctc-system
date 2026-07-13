@@ -6,7 +6,6 @@ Expected columns (case-insensitive):
     Horizon Person Number
     Name
     Job Title
-    Job Family
     Job Function
     Department
     Availability
@@ -41,7 +40,6 @@ COLUMN_MAP = {
     "horizon person number": "horizon_person_number",
     "name":                  "name",
     "job title":             "job_title",
-    "job family":            "job_family",
     "job function":          "job_function",
     "department":            "department",
     "availability":          "availability",
@@ -160,7 +158,6 @@ def run(file_path: str) -> dict:
             continue
 
         job_title    = _clean(get(row, "job_title"))
-        job_family   = _clean(get(row, "job_family"))
         job_function = _clean(get(row, "job_function"))
         department   = _clean(get(row, "department"))
         availability = _parse_availability(get(row, "availability"))
@@ -179,22 +176,22 @@ def run(file_path: str) -> dict:
         if existing:
             c.execute("""
                 UPDATE staff SET
-                    name=?, job_title=?, job_family=?, job_function=?,
+                    name=?, job_title=?, job_function=?,
                     department=?, availability=?, start_date=?,
                     end_date=?, last_imported=?
                 WHERE horizon_person_number=?
-            """, (name, job_title, job_family, job_function,
+            """, (name, job_title, job_function,
                   department, availability, start_date,
                   end_date, now, horizon_id))
             updated += 1
         else:
             c.execute("""
                 INSERT INTO staff (
-                    horizon_person_number, name, job_title, job_family,
+                    horizon_person_number, name, job_title,
                     job_function, department, availability,
                     start_date, end_date, last_imported
-                ) VALUES (?,?,?,?,?,?,?,?,?,?)
-            """, (horizon_id, name, job_title, job_family,
+                ) VALUES (?,?,?,?,?,?,?,?,?)
+            """, (horizon_id, name, job_title,
                   job_function, department, availability,
                   start_date, end_date, now))
             inserted += 1

@@ -462,7 +462,7 @@
 
     async function triggerImport(type, btn) {
       const id = "result-" + type;
-      setResult(id, "Running — this may take a moment…", "");
+      setResult(id, "Running — this may take a couple of minutes", "");
       btn.disabled = true;
       try {
         const r = await fetch(`/admin/import/${type}`, {

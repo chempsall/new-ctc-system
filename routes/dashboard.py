@@ -104,7 +104,7 @@ def api_staff():
     conn = database.get_connection()
     if department:
         rows = conn.execute("""
-            SELECT horizon_person_number, name, job_title, job_family,
+            SELECT horizon_person_number, name, job_title,
                    job_function, department
             FROM staff
             WHERE department = ? AND (end_date IS NULL OR end_date > ?)
@@ -113,7 +113,7 @@ def api_staff():
         """, (department, today)).fetchall()
     else:
         rows = conn.execute("""
-            SELECT horizon_person_number, name, job_title, job_family,
+            SELECT horizon_person_number, name, job_title,
                    job_function, department
             FROM staff
             WHERE (end_date IS NULL OR end_date > ?)

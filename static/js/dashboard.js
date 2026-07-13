@@ -109,6 +109,13 @@ function buildMonthTabs() {
     btn.addEventListener("click", () => selectPeriod(label));
     container.appendChild(btn);
   });
+  const newBtn = document.createElement("button");
+  newBtn.id = "btn-create-rtc";
+  newBtn.className = "btn";
+  newBtn.textContent = "+ New RTC";
+  newBtn.style.cssText = "margin-left:auto;background:var(--wsp-red);border-color:var(--wsp-red);color:#fff;white-space:nowrap";
+  newBtn.onclick = () => openRtcModal("new");
+  container.appendChild(newBtn);
 }
 
 function buildFilterOptions() {
@@ -1175,8 +1182,6 @@ function switchView(view) {
   // Month tabs only relevant for staff and projects views
  const monthTabs = document.getElementById("month-tabs");
   if (monthTabs) monthTabs.style.display = (view === "mgmt") ? "none" : "";
-  const rtcBar = document.getElementById("rtc-actions-bar");
-  if (rtcBar) rtcBar.style.display = view === "projects" ? "" : "none";
   const detailPanel = document.getElementById("detail-panel");
   if (detailPanel && view === "mgmt") detailPanel.classList.remove("open");
 
