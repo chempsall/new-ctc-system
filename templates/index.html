@@ -28,7 +28,7 @@
     </div>
 
     <div class="topnav__tabs">
-      <button class="topnav__tab active" data-view="rtcs">
+      <button class="topnav__tab" data-view="rtcs">
         RTCs
       </button>
       <button class="topnav__tab" data-view="projects">
@@ -47,6 +47,18 @@
       <a href="/admin" class="topnav__admin-link">Admin</a>
     </div>
   </nav>
+  <!-- Set the active tab from the URL hash synchronously, before first
+       paint. Placed immediately after the nav so the buttons exist;
+       eliminates the RTCs-tab flash while /api/summary loads. -->
+  <script>
+    (function () {
+      var v = (location.hash || "#rtcs").slice(1);
+      if (["rtcs", "projects", "staff", "mgmt"].indexOf(v) === -1) v = "rtcs";
+      var btn = document.querySelector('.topnav__tab[data-view="' + v + '"]');
+      if (btn) btn.classList.add("active");
+    })();
+  </script>
+
 
   <!-- ===================================================================
        Main content
@@ -275,6 +287,17 @@
       </div>
     </div>
 
+    <!-- ===================================================================
+         MANAGEMENT SUMMARY VIEW
+         Must live inside <main> alongside the other view panels:
+         #app is a min-height:100vh flex column and .main is flex:1, so
+         anything placed after </main> is pushed below the viewport-height
+         container (the ~300px gap bug).
+         =================================================================== -->
+    <div id="mgmt-panel" class="hidden">
+      <div id="mgmt-container"></div>
+    </div>
+
   </main>
 </div>
 
@@ -337,11 +360,6 @@
 
 
 <!-- CREATE / DUPLICATE RTC MODAL -->
-
-<!-- ── Management Summary panel ──────────────────────────────── -->
-    <div id="mgmt-panel" class="hidden">
-      <div id="mgmt-container"></div>
-    </div><!-- /mgmt-panel -->
 <div class="modal-overlay hidden" id="rtc-modal-overlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rtc-modal-title">
     <div class="modal__header">
@@ -487,11 +505,6 @@
     </div>
   </div>
 </div>
-
-    <!-- ── Management Summary panel ──────────────────────────────── -->
-    <div id="mgmt-panel" class="hidden">
-      <div id="mgmt-container"></div>
-    </div><!-- /mgmt-panel -->
 
 <!-- LINK TO HORIZON MODAL -->
 <script src="/static/js/dashboard.js"></script>

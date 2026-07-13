@@ -26,16 +26,22 @@ let TODAY_MONTH = (() => {
 // ── Initialise ───────────────────────────────────────────────────────────────
 
 // Flush dirty cells before page unload
-window.addEventListener('beforeunload', () => {
+function pendingPayload() {
+  const body = {};
   const cells = Object.values(state.dirtyCells);
-  if (!cells.length) return;
-  navigator.sendBeacon(`/api/rtcs/${RTC_ID}`, JSON.stringify({
-    allocations: cells.map(c => ({
-      horizon_person_number: c.pid,
-      period_start: c.period,
-      days: c.days
-    }))
+  if (cells.length) body.allocations = cells.map(c => ({
+    horizon_person_number: c.pid, period_start: c.period, days: c.days
   }));
+  if (_notesTimer) {
+    clearTimeout(_notesTimer); _notesTimer = null;
+    body.notes = document.getElementById('rtc-notes-input')?.value ?? '';
+  }
+  return Object.keys(body).length ? body : null;
+}
+
+window.addEventListener('pagehide', () => {
+  const body = pendingPayload();
+  if (body) navigator.sendBeacon(`/api/rtcs/${RTC_ID}`, JSON.stringify(body));
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -941,8 +947,14 @@ function wireEvents() {
   document.getElementById('btn-back')?.addEventListener('click', async e => {
     e.preventDefault();
     clearTimeout(state.saveTimer);
-    if (Object.keys(state.dirtyCells).length > 0) {
-      await flushDirtyCells();
+    const body = pendingPayload();
+    if (body) {
+      await fetch(`/api/rtcs/${RTC_ID}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        keepalive: true,
+      });
     }
     window.location.href = '/';
   });

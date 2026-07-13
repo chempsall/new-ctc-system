@@ -1138,7 +1138,7 @@ function selectPeriod(label) {
 // ---------------------------------------------------------------------------
 function switchView(view) {
   state.activeView = view;
-  window.location.hash = view;
+  history.replaceState(null, "", "#" + view);
   state.selectedStaff   = null;
   state.selectedProject = null;
   state.selectedRtc     = null;
@@ -1649,46 +1649,6 @@ function updateSortIndicators(view, cols) {
 }
 
 // ---------------------------------------------------------------------------
-// ── Notes helpers (called from RTC editing screen) ──────────────────────────
-
-function renderNotes() {
-  const input = document.getElementById("rtc-notes-input");
-  const indicator = document.getElementById("rtc-notes-indicator");
-  if (!input) return;
-  const notes = window.state?.rtc?.notes || "";
-  input.value = notes;
-  if (indicator) { indicator.textContent = notes ? "●" : ""; indicator.style.color = "var(--wsp-red)"; }
-}
-
-function toggleNotes() {
-  const body = document.getElementById("rtc-notes-body");
-  if (body) {
-    body.classList.toggle("hidden");
-    if (!body.classList.contains("hidden")) document.getElementById("rtc-notes-input")?.focus();
-  }
-}
-
-let _notesTimer = null;
-function onNotesChange() {
-  const notes = document.getElementById("rtc-notes-input")?.value || "";
-  const indicator = document.getElementById("rtc-notes-indicator");
-  if (indicator) { indicator.textContent = notes ? "●" : ""; }
-  clearTimeout(_notesTimer);
-  _notesTimer = setTimeout(async () => {
-    if (typeof setSaveStatus === "function") setSaveStatus("saving");
-    try {
-      const RTC_ID = window.RTC_ID;
-      if (!RTC_ID) return;
-      const r = await fetch(`/api/rtcs/${RTC_ID}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes }),
-      });
-      if (typeof setSaveStatus === "function") setSaveStatus(r.ok ? "saved" : "error");
-    } catch(e) { if (typeof setSaveStatus === "function") setSaveStatus("error"); }
-  }, 800);
-}
-
 // Wire up events
 // ---------------------------------------------------------------------------
 function wireEvents() {
@@ -1741,11 +1701,11 @@ document.getElementById("filter-project-pm")?.addEventListener("change", e => {
 
   // RTC-specific filters
   document.getElementById("filter-rtc-pm")?.addEventListener("change", e => {
-    state.rtcFilters.pm = e.target.value === "all" ? "" : e.target.value;;
+    state.rtcFilters.pm = e.target.value === "all" ? "" : e.target.value;
     if (state.activeView === "rtcs") loadRtcs();
   });
   document.getElementById("filter-rtc-pd")?.addEventListener("change", e => {
-    state.rtcFilters.pd = e.target.value;
+    state.rtcFilters.pd = e.target.value === "all" ? "" : e.target.value;
     if (state.activeView === "rtcs") loadRtcs();
   });
   document.getElementById("filter-rtc-status")?.addEventListener("change", e => {

@@ -68,6 +68,15 @@ def ensure_periods_through(conn, target_date):
         current = nxt
     conn.commit()
 
+def _ensure_column(c, table, column, decl):
+    """Add a column to an existing table if it does not already exist.
+    Safe to call repeatedly — idempotent.
+    """
+    cols = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+    if column not in cols:
+        c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
 def initialise_database():
     if DB_PATH is None:
         raise RuntimeError("No SQLite path configured.")
@@ -251,6 +260,11 @@ def initialise_database():
         CREATE INDEX IF NOT EXISTS idx_allocations_person
         ON allocations(horizon_person_number, period_start)
     """)
+
+    # Column migrations — safe for pre-existing databases
+    _ensure_column(c, "rtcs", "notes",       "TEXT")
+    _ensure_column(c, "rtcs", "source_file", "TEXT")
+    _ensure_column(c, "rtcs", "auto_linked", "INTEGER NOT NULL DEFAULT 0")
 
     # Bank holidays cache
     c.execute("""

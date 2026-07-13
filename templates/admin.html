@@ -827,8 +827,10 @@
           const pmRaw    = (ws['G12']?.v || '').toString().trim().replace(/\s*\([^)]+\)\s*$/, '');
 
           // Read month headers from row 15, cols J(10) to AS(45)
-          const FROM_PERIOD   = '2026-01-01';
-          const FUTURE_CUTOFF = '2026-07-01';
+          const _now = new Date();
+          const _pad = n => String(n).padStart(2, '0');
+          const FUTURE_CUTOFF = `${_now.getFullYear()}-${_pad(_now.getMonth()+1)}-01`;
+          const FROM_PERIOD   = `${_now.getFullYear() - 1}-01-01`;
           const periodCols = {};
           for (let col = 10; col <= 45; col++) {
             const addr = XLSX.utils.encode_cell({r: 14, c: col - 1});
