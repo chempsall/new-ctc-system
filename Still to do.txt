@@ -1,7 +1,5 @@
 CTCs should be editable from the Projects slider - the same way as they are from the RTC page.
 
-Is the PAR file updated every night?
-
 Can we have a HR extract for staff_list and what would it look like?
 
 Edge case - more than one PD (is the same possible for PM?)
@@ -10,13 +8,6 @@ Edge case - more than one PD (is the same possible for PM?)
 
 
 Admin login is a bit rubbish
-
-
-
-
-Quirk in "Linked to Horizon" - it will show this even if it's an opportunity <= IMPORTANT
-
-Days remaining is formatted as 1200d - it should be 1,200 d
 
 
 

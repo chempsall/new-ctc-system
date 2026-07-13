@@ -845,10 +845,14 @@ async function extendRtc() {
       renderGrid();
       setSaveStatus("saved");
     } else {
-      alert(d.error || "Could not extend RTC");
+      showPopup("Cannot extend", d.error || "Could not extend RTC", [
+        { label: "OK", action: closePopup }
+      ]);
     }
   } catch(e) {
-    alert("Could not reach the server");
+    showPopup("Cannot extend", "Could not reach the server", [
+      { label: "OK", action: closePopup }
+    ]);
   }
   btn.disabled = false;
   btn.textContent = "+ 12 months";
