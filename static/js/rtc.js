@@ -678,10 +678,6 @@ async function flushDirtyCells() {
   }
 }
 
-async function saveAllocation(pid, period, days) {
-  state.dirtyCells[`${pid}|${period}`] = { pid, period, days };
-  await flushDirtyCells();
-}
 
 // ── Save status ───────────────────────────────────────────────────────────────
 

@@ -57,12 +57,28 @@ def relink_pending_rtcs(conn=None):
         """, (proj_num, task_num)).fetchone()
 
         if match:
+            # Store old project_id for orphan cleanup
+            old_proj_row = c.execute(
+                "SELECT project_id FROM rtcs WHERE rtc_id = ?", (rtc_id,)
+            ).fetchone()
+            old_project_id = old_proj_row["project_id"] if old_proj_row else None
             c.execute("""
                 UPDATE rtcs SET project_id = ?, last_updated_at = ?,
                                auto_linked = 1
                 WHERE rtc_id = ?
             """, (match["project_id"], now, rtc_id))
             linked += 1
+            # Delete orphan Pending project row if nothing else references it
+            if old_project_id and old_project_id != match["project_id"]:
+                other_refs = c.execute(
+                    "SELECT COUNT(*) FROM rtcs WHERE project_id = ?",
+                    (old_project_id,)
+                ).fetchone()[0]
+                if other_refs == 0:
+                    c.execute(
+                        "DELETE FROM projects WHERE project_id = ? AND project_status = 'Pending'",
+                        (old_project_id,)
+                    )
 
     if linked:
         conn.commit()

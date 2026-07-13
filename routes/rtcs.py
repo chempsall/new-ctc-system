@@ -677,16 +677,33 @@ def api_extend_rtc(rtc_id):
         ORDER BY period_start LIMIT 12
     """, (last_period,)).fetchall()
 
-    # Insert zero-allocation rows for all staff for all new periods
+    # Check if this is the AL&PH RTC — pre-fill bank holidays if so
+    rtc_proj = c.execute("""
+        SELECT p.project_number FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE r.rtc_id = ?
+    """, (rtc_id,)).fetchone()
+    is_alph = rtc_proj and rtc_proj["project_number"] == "ID-06"
+
+    # Insert allocation rows for all staff for all new periods
     added = 0
     for person in staff_rows:
         pid = person["horizon_person_number"]
         for p in new_periods:
+            days = 0
+            if is_alph:
+                # Pre-fill bank holidays from cache
+                year, month, _ = p["period_start"].split("-")
+                bh_row = c.execute("""
+                    SELECT COUNT(*) FROM bank_holidays
+                    WHERE date LIKE ?
+                """, (f"{year}-{month}-%",)).fetchone()
+                days = bh_row[0] if bh_row else 0
             c.execute("""
                 INSERT OR IGNORE INTO allocations
                     (horizon_person_number, rtc_id, period_start, days, last_updated)
-                VALUES (?, ?, ?, 0, ?)
-            """, (pid, rtc_id, p["period_start"], now))
+                VALUES (?, ?, ?, ?, ?)
+            """, (pid, rtc_id, p["period_start"], days, now))
             added += c.rowcount
 
     c.execute("""

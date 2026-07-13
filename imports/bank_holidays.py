@@ -17,31 +17,27 @@ DIVISION          = "england-and-wales"
 def fetch() -> dict[str, int]:
     """
     Returns {date_iso: 1} for all England & Wales bank holidays.
-    Raises on network or parse failure — caller should catch and log.
+    Retries twice on failure. Raises if all attempts fail.
     """
-    req = urllib.request.Request(
-        BANK_HOLIDAYS_URL,
-        headers={"User-Agent": "WSP-RFT/1.0 (internal tool)"}
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-
-    events = data[DIVISION]["events"]
-    return {event["date"]: 1 for event in events}
-
-
-def fetch_for_period(period_start: str) -> int:
-    """
-    Returns the number of bank holidays in a given period (month).
-    period_start is YYYY-MM-01.
-    Returns 0 on failure.
-    """
-    try:
-        holidays = fetch()
-        year, month, _ = period_start.split("-")
-        return sum(
-            1 for d in holidays
-            if d.startswith(f"{year}-{month}-")
-        )
-    except Exception:
-        return 0
+    last_exc = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(
+                BANK_HOLIDAYS_URL,
+                headers={"User-Agent": "WSP-RFT/1.0 (internal tool)"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            # Validate payload shape before returning
+            if DIVISION not in data:
+                raise ValueError(f"Division {DIVISION!r} not in response")
+            events = data[DIVISION].get("events", [])
+            if not events:
+                raise ValueError("No events in bank holidays response")
+            return {event["date"]: 1 for event in events}
+        except Exception as e:
+            last_exc = e
+            if attempt < 2:
+                import time
+                time.sleep(2 ** attempt)  # 1s, 2s backoff
+    raise last_exc

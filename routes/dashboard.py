@@ -40,8 +40,12 @@ def api_summary():
                if isinstance(cached["payload"], str)
                else json.dumps(cached["payload"]))
 
+    etag = cached["generated_at"]
+    if request.headers.get("If-None-Match") == etag:
+        return "", 304
     response = Response(payload, mimetype="application/json")
-    response.headers["X-Generated-At"] = cached["generated_at"]
+    response.headers["X-Generated-At"] = etag
+    response.headers["ETag"] = etag
     return response
 
 

@@ -252,7 +252,10 @@ def admin_import_ctc():
         staff_added += 1
 
         for period in period_starts:
-            days = float(allocs.get(period, 0))
+            try:
+                days = float(allocs.get(period, 0) or 0)
+            except (ValueError, TypeError):
+                days = 0.0
             c.execute("""
                 INSERT OR IGNORE INTO allocations
                     (horizon_person_number, rtc_id, period_start, days, last_updated)
@@ -308,6 +311,8 @@ def admin_refresh_linked():
     updated = 0
     for row in rows:
         new_dept = row["project_organisation"] or row["department"]
+        if new_dept == row["department"]:
+            continue  # no change — skip to avoid clobbering last_updated_at
         c.execute("""
             UPDATE rtcs SET department = ?, last_updated_at = ?
             WHERE rtc_id = ?
