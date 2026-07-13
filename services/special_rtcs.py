@@ -169,7 +169,8 @@ def run_special_rtc_maintenance():
             # Bank-holiday defaults are identical for every person —
             # compute once per period, not once per (person, period).
             bh_by_period = {
-                period: (get_bank_holidays(c, period) if cfg["has_bank_holidays"] else 0)
+                period: (get_bank_holidays(c, period) + (3 if period[5:7] == "12" else 0)
+                         if cfg["has_bank_holidays"] else 0)
                 for period in period_list
             }
 

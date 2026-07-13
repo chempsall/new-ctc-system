@@ -435,7 +435,7 @@ def admin_log():
             lines = f.readlines()
         if errors_only:
             lines = [l for l in lines if " ERROR " in l or " WARNING " in l]
-        lines = [l.rstrip() for l in lines[-n:]]
+        lines = [l.rstrip() for l in lines[-n:][::-1]]
         return jsonify({"lines": lines, "total": len(lines)})
     except Exception as e:
         logger.error(f"Failed to read log: {e}")

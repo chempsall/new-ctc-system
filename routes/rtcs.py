@@ -719,6 +719,8 @@ def api_extend_rtc(rtc_id):
                     WHERE date LIKE ?
                 """, (f"{year}-{month}-%",)).fetchone()
                 days = bh_row[0] if bh_row else 0
+                if p["period_start"][5:7] == "12":
+                    days += 3
             c.execute("""
                 INSERT OR IGNORE INTO allocations
                     (horizon_person_number, rtc_id, period_start, days, last_updated)

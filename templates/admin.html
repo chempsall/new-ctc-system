@@ -599,8 +599,6 @@
             : "var(--text-primary)";
           return `<span style="color:${col}">${escHtml(line)}</span>`;
         }).join("\n");
-        // Scroll to bottom
-        lines.scrollTop = lines.scrollHeight;
       } catch(e) { lines.textContent = `Error: ${e.message}`; }
     }
 

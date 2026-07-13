@@ -44,3 +44,49 @@ Name changes — when a staff member's name changes, project_manager and project
 
 
 
+
+
+
+Get rid of the RTCs page and incorporate everything into Projects.
+
+Projects page will include:
+
+project number on one line and task number on the line underneath.
+
+project name on one line and task name on the line underneath
+
+department
+
+status with indicator lights, Horizon status on one line and review status on the line underneath
+
+project manager
+
+this month time allocation
+
+Then on the slider panel:
+
+project name
+
+task name
+
+project director
+
+project manager
+
+this period days
+
+future days
+
+last opened
+
+last updated by
+
+indicator lights
+
+staff this period list
+
+"open to edit" button
+
+"duplicate" button
+
+It should look and feel the same as the current Project slider
