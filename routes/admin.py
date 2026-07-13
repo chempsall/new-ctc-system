@@ -18,7 +18,7 @@ import summary as summary_module
 from imports import staff_list as staff_import
 from imports import par_import
 from services.identity import get_current_user, require_admin
-from services.jobs import relink_pending_rtcs
+from services.jobs import relink_pending_rtcs, process_leavers
 from services.special_rtcs import run_special_rtc_maintenance
 
 logger = logging.getLogger("resource_forecast.admin")
@@ -343,6 +343,16 @@ def admin_rebuild_summary():
     logger.info("Admin: summary cache rebuilt manually")
     return jsonify({"status": "ok",
                     "rebuilt_at": datetime.now(timezone.utc).isoformat()})
+
+
+@admin_bp.route("/admin/process-leavers", methods=["POST"])
+@require_admin
+def admin_process_leavers():
+    """Manually triggers the leaver transfer job."""
+    process_leavers()
+    summary_module.mark_dirty()
+    logger.info("Admin: leaver transfer job triggered manually")
+    return jsonify({"status": "ok"})
 
 
 @admin_bp.route("/admin/run-cleanup", methods=["POST"])

@@ -245,6 +245,19 @@
       </div>
 
       <div class="admin-action">
+        <div class="admin-action__name">Process staff leavers</div>
+        <div>
+          <div class="admin-action__desc">
+            Transfers future allocations from staff who have left to the
+            grade-equivalent generic. Zeros out leaver rows on special RTCs
+            without replacement. Runs automatically every night.
+          </div>
+          <div class="admin-action__result" id="result-leavers"></div>
+        </div>
+        <button class="btn" onclick="processLeavers(this)">Run now</button>
+      </div>
+
+      <div class="admin-action">
         <div class="admin-action__name">Initialise / refresh special RTCs</div>
         <div>
           <div class="admin-action__desc">
@@ -498,6 +511,18 @@
             : "✓  No pending RTCs found a match",
           "ok");
       } catch(e) { setResult("result-relink", `✗  ${e.message}`, "err"); }
+      btn.disabled = false;
+    }
+
+    async function processLeavers(btn) {
+      setResult("result-leavers", "Processing…", "");
+      btn.disabled = true;
+      try {
+        const r = await fetch("/admin/process-leavers", { method: "POST", headers: headers() });
+        const d = await r.json();
+        if (!r.ok) { setResult("result-leavers", `✗  ${d.error}`, "err"); btn.disabled=false; return; }
+        setResult("result-leavers", "✓  Leaver transfer complete — check application log for details", "ok");
+      } catch(e) { setResult("result-leavers", `✗  ${e.message}`, "err"); }
       btn.disabled = false;
     }
 
