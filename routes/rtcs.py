@@ -678,8 +678,15 @@ def api_extend_rtc(rtc_id):
         conn.close()
         return jsonify({"error": "No existing periods found"}), 400
 
+    # Cap: refuse to extend beyond 60 months from today
+    today       = date.today().replace(day=1)
+    max_period  = (today + relativedelta(months=60)).isoformat()
+    last_date   = date.fromisoformat(last_period)
+    if last_period >= max_period:
+        conn.close()
+        return jsonify({"error": "Cannot extend beyond 5 years from today"}), 400
+
     # Ensure periods exist 12 months beyond the current last one
-    last_date = date.fromisoformat(last_period)
     target = last_date + relativedelta(months=12)
     database.ensure_periods_through(conn, target)
 
