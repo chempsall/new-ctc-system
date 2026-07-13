@@ -207,22 +207,44 @@ def admin_import_ctc():
         name = s.get("name", "").strip()
         if not name:
             continue
-        # Look up by exact name then partial
+        
+        skip_reason = None
+
+        # Ladder 1: exact name
         staff_row = c.execute("""
             SELECT horizon_person_number FROM staff
             WHERE name = ? AND (end_date IS NULL OR end_date > ?)
         """, (name, first_alloc)).fetchone()
+
         if not staff_row:
+            # Ladder 2: case/whitespace-normalised exact
+            staff_row = c.execute("""
+                SELECT horizon_person_number FROM staff
+                WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
+                AND (end_date IS NULL OR end_date > ?)
+            """, (name, first_alloc)).fetchone()
+
+        if not staff_row:
+            # Ladder 3: surname + first initial prefix
             parts = name.split(",")
-            if parts:
-                staff_row = c.execute("""
-                    SELECT horizon_person_number FROM staff
-                    WHERE name LIKE ? AND (end_date IS NULL OR end_date > ?)
-                    LIMIT 1
-                """, (f"%{parts[0].strip()}%", first_alloc)).fetchone()
+            if len(parts) >= 2:
+                surname   = parts[0].strip()
+                first_ini = parts[1].strip()[:1]
+                if surname and first_ini:
+                    matches = c.execute("""
+                        SELECT horizon_person_number FROM staff
+                        WHERE LOWER(name) LIKE LOWER(?)
+                        AND (end_date IS NULL OR end_date > ?)
+                    """, (f"{surname}, {first_ini}%", first_alloc)).fetchall()
+                    if len(matches) == 1:
+                        staff_row = matches[0]
+                    elif len(matches) > 1:
+                        skip_reason = "ambiguous"
+
         if not staff_row:
             staff_skipped += 1
-            skipped_names.append(name)
+            skipped_names.append({"name": name,
+                                  "reason": skip_reason or "not found"})
             continue
 
         pid    = staff_row["horizon_person_number"]

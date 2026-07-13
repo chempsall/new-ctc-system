@@ -934,10 +934,16 @@
         const d = await r.json();
         closeCTCPopup();
         if (r.ok) {
-          setResult('result-ctc-import',
-            `✓  RTC created — ${d.staff_added} staff, ${d.rows_added} allocation rows. ` +
-            `${d.staff_skipped ? d.staff_skipped + ' staff not found in database.' : ''}`,
-            'ok');
+          let msg = `✓  RTC created — ${d.staff_added} staff, ${d.rows_added} allocation rows.`;
+          if (d.skipped_names && d.skipped_names.length) {
+            const notFound  = d.skipped_names.filter(s => s.reason === 'not found').map(s => s.name);
+            const ambiguous = d.skipped_names.filter(s => s.reason === 'ambiguous').map(s => s.name);
+            if (notFound.length)
+              msg += ` ${notFound.length} staff not found: ${notFound.join(', ')}.`;
+            if (ambiguous.length)
+              msg += ` ${ambiguous.length} ambiguous (multiple matches): ${ambiguous.join(', ')}.`;
+          }
+          setResult('result-ctc-import', msg, 'ok');
         } else {
           setResult('result-ctc-import', `✗  ${d.error || 'Import failed'}`, 'err');
         }
