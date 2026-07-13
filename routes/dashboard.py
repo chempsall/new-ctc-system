@@ -104,6 +104,7 @@ def api_staff():
                    job_function, department
             FROM staff
             WHERE department = ? AND (end_date IS NULL OR end_date > ?)
+            AND horizon_person_number NOT GLOB 'GENERIC-*_*'
             ORDER BY name
         """, (department, today)).fetchall()
     else:
@@ -111,7 +112,8 @@ def api_staff():
             SELECT horizon_person_number, name, job_title, job_family,
                    job_function, department
             FROM staff
-            WHERE end_date IS NULL OR end_date > ?
+            WHERE (end_date IS NULL OR end_date > ?)
+            AND horizon_person_number NOT GLOB 'GENERIC-*_*'
             ORDER BY name
         """, (today,)).fetchall()
     conn.close()

@@ -359,11 +359,12 @@ function renderMgmtSummary() {
     !dept || ps.department === dept
   );
 
-  // Filter RTCs by department
+  // Use unfiltered RTCs fetched specifically for mgmt view
+  const allRtcs = state.mgmtRtcs || state.rtcs;
   const pd      = state.rtcFilters.pd  || "";
   const pm      = state.rtcFilters.pm  || "";
   const horizon = state.filters.horizon !== "all" ? state.filters.horizon : "";
-  const rtcs = state.rtcs.filter(r =>
+  const rtcs = allRtcs.filter(r =>
     (!dept    || r.department === dept) &&
     (!pd      || r.project_director === pd) &&
     (!pm      || r.project_manager === pm) &&
@@ -557,11 +558,13 @@ function renderView() {
     document.getElementById("projects-panel").classList.remove("hidden");
   } else if (state.activeView === "mgmt") {
     document.getElementById("detail-panel").style.display = "none";
-    if (!state.rtcs.length) {
-      loadRtcs().then(renderMgmtSummary);
-    } else {
-      renderMgmtSummary();
-    }
+    fetch("/api/rtcs")
+      .then(r => r.json())
+      .then(data => {
+        state.mgmtRtcs = Array.isArray(data) ? data : (data.rtcs || []);
+        renderMgmtSummary();
+      })
+      .catch(() => renderMgmtSummary());
     document.getElementById("mgmt-panel").classList.remove("hidden");
   } else {
     document.getElementById("detail-panel").style.display = "";
