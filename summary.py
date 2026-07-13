@@ -100,7 +100,9 @@ def build() -> dict:
         SELECT * FROM staff
         WHERE (end_date IS NULL OR end_date > ?)
         AND   (start_date IS NULL OR start_date <= ?)
+        ORDER BY horizon_person_number
     """
+    
     staff_rows = conn.execute(staff_query, (first_period, last_period)).fetchall()
 
     # Availability fractions per person per period
@@ -271,9 +273,10 @@ def build() -> dict:
     """).fetchall()
 
     # Total allocated days per project per period (across all RTCs)
-    proj_days_map = {}  # project_id -> period_start -> days
+    proj_days_map = {}  # (project_id, rtc_id) -> period_start -> days
     for r in alloc_rows:
-        pd = proj_days_map.setdefault(r["project_id"], {})
+        key = (r["project_id"], r["rtc_id"])
+        pd = proj_days_map.setdefault(key, {})
         pd[r["period_start"]] = pd.get(r["period_start"], 0) + (r["days"] or 0)
 
     projects_list = []
@@ -283,11 +286,18 @@ def build() -> dict:
         task_order  = p["task_order_number"] or ""
 
         # Days per period
+        rtc_id_val = p["rtc_id"] if "rtc_id" in p.keys() else None
+        days_key   = (project_id, rtc_id_val)
         period_days = {}
+        future_days = 0.0
+        today_ps    = date.today().replace(day=1).isoformat()
         for period in periods:
             ps    = period["period_start"]
             label = period["label"]
-            period_days[label] = round(proj_days_map.get(project_id, {}).get(ps, 0), 2)
+            d = round(proj_days_map.get(days_key, {}).get(ps, 0), 2)
+            period_days[label] = d
+            if ps >= today_ps:
+                future_days += d
 
         # Horizon status based on project_status and project_type
         _ptype   = (p["project_type"] or "").strip()
@@ -325,6 +335,7 @@ def build() -> dict:
             "last_updated_at":  p["last_updated_at"] if "last_updated_at" in p.keys() else None,
             "last_imported":    p["last_imported"],
             "total_days":       period_days,
+            "future_days":      round(future_days, 2),
         })
 
     # -- Assemble final payload ----------------------------------------------

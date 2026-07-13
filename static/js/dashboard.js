@@ -504,9 +504,7 @@ function renderMgmtSummary() {
           </tr></thead>
           <tbody>
           ${projects.map(pr => {
-            const futureDays = Object.entries(pr.total_days)
-              .filter(([l]) => s.periods.indexOf(l) >= s.periods.indexOf(p))
-              .reduce((sum, [,d]) => sum + d, 0);
+            const futureDays = pr.future_days || 0;
             const linked = pr.horizon_status === "linked";
             return `<tr>
               <td><div class="proj-name">${escHtml(pr.name)}</div>
@@ -1041,13 +1039,8 @@ function showProjectDetail(proj) {
   // This period days
   const thisPeriodDays = proj.total_days[p] || 0;
 
-  // Future days — sum of periods from current period onwards only
-  const currentPeriodStart = state.summary.periods[0];
-  const currentIdx = state.summary.periods.indexOf(state.activePeriod);
-  const futureLabels = new Set(state.summary.periods.slice(currentIdx));
-  const futureDays = Object.entries(proj.total_days)
-    .filter(([label]) => futureLabels.has(label))
-    .reduce((sum, [, days]) => sum + days, 0);
+  // Future days — from server-side summary (fixed from current month)
+  const futureDays = proj.future_days || 0;
 
   document.getElementById("dp-stat-alloc").textContent = fmt.days(thisPeriodDays) + "d";
   document.getElementById("dp-stat-cap").textContent   = fmt.days(futureDays) + "d";
