@@ -85,7 +85,7 @@ def api_rtcs():
         JOIN projects p ON p.project_id = r.project_id
         WHERE 1=1
         AND (? = '1' OR r.is_archived = 0)
-    """, (selected_period, today_period, archived)).fetchall()
+    """, (current_period, current_period, archived)).fetchall()
 
     conn.close()
 
