@@ -38,7 +38,9 @@ def api_rtcs():
     """
     conn = database.get_connection()
     now  = datetime.now(timezone.utc)
-    current_period = now.date().replace(day=1).isoformat()
+    current_period  = now.date().replace(day=1).isoformat()
+    selected_period = request.args.get("period", "").strip() or current_period
+    next_period     = (now.date().replace(day=1) + relativedelta(months=1)).isoformat()
     thirty_days_ago = (now.date() - timedelta(days=30)).isoformat()
 
     dept    = request.args.get("department", "").strip()
@@ -85,7 +87,7 @@ def api_rtcs():
         JOIN projects p ON p.project_id = r.project_id
         WHERE 1=1
         AND (? = '1' OR r.is_archived = 0)
-    """, (current_period, current_period, archived)).fetchall()
+    """, (selected_period, next_period, archived)).fetchall()
 
     conn.close()
 
