@@ -36,7 +36,7 @@ const state = {
   },
   sort: {
     projects: { col: "this_month", dir: "desc" },
-    staff:    { col: null,         dir: "asc"  },
+    staff:    { col: "status",     dir: "asc"  },
   },
 };
 
@@ -115,7 +115,7 @@ function buildMonthTabs() {
   newBtn.id = "btn-create-rtc";
   newBtn.className = "btn";
   newBtn.textContent = "+ New RTC";
-  newBtn.style.cssText = "margin-left:auto;background:var(--wsp-red);border-color:var(--wsp-red);color:#fff;white-space:nowrap";
+  newBtn.style.cssText = "margin-left:auto;background:var(--wsp-red);border-color:var(--wsp-red);color:#fff;white-space:nowrap;height:100%;box-sizing:border-box;align-self:stretch";
   newBtn.onclick = () => openRtcModal("new");
   container.appendChild(newBtn);
 }
