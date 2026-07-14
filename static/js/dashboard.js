@@ -727,7 +727,7 @@ async function loadRtcs() {
     const r = await fetch(`/api/rtcs?${params}`);
     state.rtcs = await r.json();
     buildFilterOptions();
-    renderRtcTable();
+    renderProjectTable();
     renderMetrics();
   } catch(e) {
     console.error("Failed to load RTCs:", e);
@@ -768,79 +768,6 @@ const horizonBadge = hs => {
     return `<span class="${cls}"><span class="horizon--dot"></span>${label}</span>`;
   };
 
-function renderRtcTable() {
-  const tbody  = document.getElementById("rtc-tbody");
-  const rtcs   = filteredRtcs();
-
-  if (rtcs.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7">
-      <div class="empty-state">No RTCs found</div>
-    </td></tr>`;
-    return;
-  }
-
-  const fmtDate = iso => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
-  };
-
-  const statusBadge = status => {
-    const map = {
-      current:            ["rtc-badge rtc-badge--current",   "Current"],
-      due_review:         ["rtc-badge rtc-badge--review",    "Due for review"],
-      overdue_review:     ["rtc-badge rtc-badge--overdue",   "Overdue review"],
-      awaiting_archiving: ["rtc-badge rtc-badge--archiving", "Awaiting archiving"],
-      archived:           ["rtc-badge rtc-badge--archived",  "Archived"],
-    };
-    const [cls, label] = map[status] || ["rtc-badge", status];
-    return `<span class="${cls}">${label}</span>`;
-  };
-
-  tbody.innerHTML = rtcs.map(r => {
-    const isSelected = String(r.rtc_id) === String(state.selectedRtc);
-    const customer = escHtml(r.project_customer || "");
-    const projName = escHtml(r.project_name || "No project name");
-    const taskName = escHtml(r.task_name || "");
-    const dept     = escHtml(r.department || "—");
-    const pd       = escHtml(r.project_director || "—");
-    const pm       = escHtml(r.project_manager || "—");
-    const days     = r.future_days
-                     ? fmt.days(r.future_days) + "d"
-                     : "—";
-
-    return `<tr data-id="${r.rtc_id}" class="${isSelected ? "selected" : ""}">
-      <td>
-        ${customer ? `<div class="proj-customer">${customer}</div>` : ""}
-        <div class="proj-name">${projName}</div>
-        ${taskName ? `<div class="proj-task">${taskName}</div>` : ""}
-        ${(() => {
-          const pn = r.project_number || "";
-          const to = r.task_order_number || "";
-          const pnOk = !r.is_placeholder_number;
-          const toOk = !r.is_placeholder_number;
-          if (!pnOk) return "";
-          return `<div class="proj-number">${escHtml(pn)}${toOk && to ? " " + escHtml(to) : ""}</div>`;
-        })()}
-      </td>
-      <td><span class="team-badge">${dept}</span></td>
-      <td style="font-size:11px">${pd}</td>
-      <td style="font-size:11px">${pm}</td>
-      <td style="text-align:center">${statusBadge(r.status)}</td>
-      <td style="text-align:center" class="mono">${days}</td>
-      <td class="text-tertiary" style="font-size:11px">
-        ${escHtml(r.last_updated_by || "—")}<br>
-        <span style="color:var(--text-tertiary)">${fmtDate(r.last_updated_at)}</span>
-      </td>
-    </tr>`;
-  }).join("");
-
-  tbody.querySelectorAll("tr[data-id]").forEach(row => {
-    row.addEventListener("click", () => selectRtc(parseInt(row.dataset.id)));
-  });
-  updateSortIndicators("rtcs", ["department","pd","pm","status","days","last_updated"]);
-}
-
 function selectRtc(id) {
   const rtc = state.rtcs.find(r => r.rtc_id === id);
   if (!rtc) return;
@@ -849,7 +776,7 @@ function selectRtc(id) {
   state.selectedStaff   = null;
   state.selectedProject = null;
 
-  renderRtcTable();
+  renderProjectTable();
   showRtcDetail(rtc);
 }
 
@@ -920,18 +847,41 @@ function showRtcDetail(rtc) {
     <div><strong>Project Manager</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
     <div style="margin-top:8px"><strong>Last opened</strong> ${rtc.last_opened ? new Date(rtc.last_opened).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Never"}</div>
     <div><strong>Last opened by</strong> ${escHtml(rtc.last_opened_by || "\u2014")}</div>
+      <div style="margin-top:10px;font-size:10px;font-weight:600;text-transform:uppercase;
+                  letter-spacing:0.08em;color:var(--text-tertiary);margin-bottom:4px">
+        Staff this period
+      </div>
+      ${(() => {
+        const p = state.activePeriod;
+        const allocated = (state.summary.staff || [])
+          .filter(s => s.projects.some(pr => {
+            const rtcMatch = state.rtcs.find(r => r.rtc_id === rtc.rtc_id);
+            return rtcMatch && pr.project_id === rtcMatch.project_id && (pr.days[p] || 0) > 0;
+          }))
+          .map(s => ({
+            name: s.name,
+            job_title: s.job_title,
+            days: (s.projects.find(pr => {
+              const rtcMatch = state.rtcs.find(r => r.rtc_id === rtc.rtc_id);
+              return rtcMatch && pr.project_id === rtcMatch.project_id;
+            })?.days[p] || 0)
+          }))
+          .filter(s => s.days > 0)
+          .sort((a, b) => b.days - a.days);
+        if (!allocated.length) return '<div style="font-size:11px;color:var(--text-tertiary)">No allocations this period</div>';
+        return allocated.map(s => `
+          <div class="detail-project-row">
+            <span class="team-badge">${fmt.gradeShort(s.job_title)}</span>
+            <span class="detail-proj-name">${escHtml(s.name)}</span>
+            <span class="detail-proj-days">${fmt.days(s.days)}d</span>
+          </div>`).join('');
+      })()}
       <div style="margin-top:12px">
-        <a href="/rtc/${rtc.rtc_id}" class="btn-open-rtc">Open to edit \u2192</a>
+        <a href="/rtc/${rtc.rtc_id}" class="btn-open-rtc">Open to edit →</a>
       </div>
     </div>`;
 
   // Check for linkable Horizon record
-
-  // Relabel the stat headings for the RTC context
-  const labels = document.querySelectorAll(".detail-stat__label");
-  if (labels[0]) labels[0].textContent = "This month";
-  if (labels[1]) labels[1].textContent = "Future days";
-  if (labels[2]) labels[2].textContent = "Last opened";
 
   panel.classList.add("open");
 }
@@ -1677,7 +1627,8 @@ function wireEvents() {
   if (horizonSel) {
     horizonSel.addEventListener("change", () => {
       state.filters.horizon = horizonSel.value;
-      renderView();
+      if (["projects","rtcs"].includes(state.activeView)) loadRtcs();
+      else renderView();
     });
   }
 
