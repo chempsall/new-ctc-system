@@ -590,12 +590,6 @@ a:hover { text-decoration: underline; }
 .horizon--opportunity { background: var(--amber-light);      color: var(--amber-dark);      }
 .horizon--other       { background: var(--grey-100);         color: var(--grey-500);        }
 .horizon--norecord    { background: var(--status-red-light); color: var(--status-red-dark); }
-.horizon--dot {
-  width: 5px; height: 5px; border-radius: 50%;
-}
-.horizon--linked      .horizon--dot { background: var(--green); }
-.horizon--opportunity .horizon--dot { background: var(--amber); }
-.horizon--norecord    .horizon--dot { background: var(--status-red); }
 
 /* Team badge */
 .team-badge {

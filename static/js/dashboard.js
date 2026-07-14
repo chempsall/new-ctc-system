@@ -1110,6 +1110,17 @@ function switchView(view) {
   state.selectedRtc     = null;
   closeDetailPanel();
 
+  // Reset filters when switching views
+  document.querySelectorAll(".filter-bar select").forEach(sel => {
+    sel.value = sel.options[0]?.value ?? "all";
+  });
+  state.filters.horizon = "all";
+  state.rtcFilters.pd     = "";
+  state.rtcFilters.pm     = "";
+  state.rtcFilters.status = "";
+  state.filters.jobTitle    = "";
+  state.filters.jobFunction = "";
+
   document.querySelectorAll(".topnav__tab[data-view]").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === view);
   });

@@ -39,7 +39,18 @@ def api_rtcs():
     conn = database.get_connection()
     now  = datetime.now(timezone.utc)
     current_period  = now.date().replace(day=1).isoformat()
-    selected_period = request.args.get("period", "").strip() or current_period
+    period_label = request.args.get("period", "").strip()
+    if period_label:
+        try:
+            from datetime import datetime as _dt
+            selected_period = _dt.strptime(period_label, "%b-%Y").strftime("%Y-%m-01")
+        except ValueError:
+            try:
+                selected_period = _dt.strptime(period_label, "%b-%y").strftime("%Y-%m-01")
+            except ValueError:
+                selected_period = current_period
+    else:
+        selected_period = current_period
     next_period     = (now.date().replace(day=1) + relativedelta(months=1)).isoformat()
     thirty_days_ago = (now.date() - timedelta(days=30)).isoformat()
 
