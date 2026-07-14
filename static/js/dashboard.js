@@ -204,7 +204,11 @@ const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && (ps.capac
   const fte = realStaff.reduce((sum, ps) => sum + (ps.fte?.[p] || 0), 0);
   document.getElementById("metric-staff").textContent    = realStaff.length;
   document.getElementById("metric-fte").textContent      = fte.toFixed(1);
-  document.getElementById("metric-projects").textContent = filteredRtcs().length;
+  const allRtcs    = filteredRtcs();
+  const activeRtcs = allRtcs.filter(r => (r.current_month_days || 0) > 0);
+  document.getElementById("metric-projects").textContent = activeRtcs.length;
+  const totalEl = document.getElementById("metric-projects-total");
+  if (totalEl) totalEl.textContent = `${allRtcs.length} total`;
   document.getElementById("metric-over").textContent     = overCount;
   document.getElementById("metric-norec").textContent    = noRecProj;
 
@@ -722,6 +726,7 @@ async function loadRtcs() {
   if (pd)                   params.set("pd", pd);
   if (search)               params.set("search", search);
   if (includeArchived === "1") params.set("archived", "1");
+  if (state.activePeriod)   params.set("period", state.activePeriod);
 
   try {
     const r = await fetch(`/api/rtcs?${params}`);
@@ -734,14 +739,14 @@ async function loadRtcs() {
   }
 }
 
-
-
 function filteredRtcs() {
   const statusFilter = state.rtcFilters.status;
+  const horizonFilter = state.filters.horizon !== "all" ? state.filters.horizon : "";
   const p = state.activePeriod;
-  const base = statusFilter
+  let base = statusFilter
     ? state.rtcs.filter(r => r.status === statusFilter)
     : state.rtcs;
+  if (horizonFilter) base = base.filter(r => r.horizon_status === horizonFilter);
   return applySort(base, "projects", {
     department:   r => r.department,
     pd:           r => r.project_director,
@@ -1079,7 +1084,11 @@ function selectPeriod(label) {
   document.querySelectorAll(".month-tab").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.period === label);
   });
-  renderView();
+  if (state.activeView === "projects") {
+    loadRtcs();
+  } else {
+    renderView();
+  }
   if (state.selectedStaff) {
     const person = state.summary.staff.find(p => String(p.id) === String(state.selectedStaff));
     if (person) showStaffDetail(person);
@@ -1627,8 +1636,7 @@ function wireEvents() {
   if (horizonSel) {
     horizonSel.addEventListener("change", () => {
       state.filters.horizon = horizonSel.value;
-      if (["projects","rtcs"].includes(state.activeView)) loadRtcs();
-      else renderView();
+      renderProjectTable();
     });
   }
 
