@@ -574,7 +574,7 @@ function startEdit(div) {
       e.preventDefault();
       nextDiv = findAdjacentCell(div, 0, -1);
 
-    } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+    } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       nextDiv = findAdjacentCell(div, 1, 0);
 
