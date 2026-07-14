@@ -76,7 +76,7 @@ async function loadSummary() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     state.summary = data;
-    state.activePeriod = data.periods[0];
+    if (!state.activePeriod) state.activePeriod = data.periods[0];
     return true;
   } catch (e) {
     setLoadingStatus("Could not connect to server. Is it running?");
