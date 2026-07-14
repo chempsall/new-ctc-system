@@ -49,7 +49,7 @@ const fmt = {
     if (d === null || d === undefined) return "—";
     const n = parseFloat(d);
     if (isNaN(n)) return "—";
-    const str = n % 1 === 0 ? n.toString() : n.toFixed(1);
+    const str = n % 1 === 0 ? n.toString() : parseFloat(n.toFixed(2)).toString();
     return str.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   },
   initials: name => {
@@ -652,6 +652,18 @@ function renderStaffTable() {
 // ---------------------------------------------------------------------------
 // Project table
 // ---------------------------------------------------------------------------
+function statusBadge(status) {
+  const map = {
+    current:            ["rtc-badge rtc-badge--current",   "Current"],
+    due_review:         ["rtc-badge rtc-badge--review",    "Due for review"],
+    overdue_review:     ["rtc-badge rtc-badge--overdue",   "Overdue review"],
+    awaiting_archiving: ["rtc-badge rtc-badge--archiving", "Awaiting archiving"],
+    archived:           ["rtc-badge rtc-badge--archived",  "Archived"],
+  };
+  const [cls, label] = map[status] || ["rtc-badge", status];
+  return `<span class="${cls}">${label}</span>`;
+}
+
 function renderProjectTable() {
   const tbody = document.getElementById("project-tbody");
   const rtcs  = filteredRtcs();
@@ -664,17 +676,6 @@ function renderProjectTable() {
     return;
   }
 
-  const statusBadge = status => {
-    const map = {
-      current:            ["rtc-badge rtc-badge--current",   "Current"],
-      due_review:         ["rtc-badge rtc-badge--review",    "Due for review"],
-      overdue_review:     ["rtc-badge rtc-badge--overdue",   "Overdue review"],
-      awaiting_archiving: ["rtc-badge rtc-badge--archiving", "Awaiting archiving"],
-      archived:           ["rtc-badge rtc-badge--archived",  "Archived"],
-    };
-    const [cls, label] = map[status] || ["rtc-badge", status];
-    return `<span class="${cls}">${label}</span>`;
-  };
 
   tbody.innerHTML = rtcs.map(r => {
     const isSelected = String(r.rtc_id) === String(state.selectedRtc);
@@ -843,15 +844,14 @@ function showRtcDetail(rtc) {
   const projContainer = document.getElementById("dp-projects");
   projContainer.innerHTML = `
     <div style="font-size:11px;line-height:1.8;color:var(--text-secondary)">
-    <div><strong>Project number</strong> ${rtc.is_placeholder_number ? "Placeholder" : escHtml(rtc.display_project_number || rtc.project_number || "\u2014")}</div>
-    <div><strong>Task number</strong> ${rtc.is_placeholder_number ? "Placeholder" : escHtml(rtc.display_task_order || rtc.task_order_number || "\u2014")}</div>
-    <div><strong>Project name</strong> ${escHtml(rtc.project_name || "\u2014")}</div>
-    <div><strong>Task name</strong> ${escHtml(rtc.task_name || "\u2014")}</div>
-    ${rtc.project_customer ? `<div><strong>Customer</strong> ${escHtml(rtc.project_customer)}</div>` : ""}
-    <div><strong>Project Director</strong> ${escHtml(rtc.project_director || "\u2014")}</div>
-    <div><strong>Project Manager</strong> ${escHtml(rtc.project_manager || "\u2014")}</div>
-    <div style="margin-top:8px"><strong>Last opened</strong> ${rtc.last_opened ? new Date(rtc.last_opened).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Never"}</div>
-    <div><strong>Last opened by</strong> ${escHtml(rtc.last_opened_by || "\u2014")}</div>
+    <div><strong>Customer</strong>: ${escHtml(rtc.project_customer || "-")}</div>
+    <div><strong>Project name</strong>: ${escHtml(rtc.project_name || "-")}</div>
+    <div><strong>Task name</strong>: ${escHtml(rtc.task_name || "-")}</div>
+    <div><strong>Project Director</strong>: ${escHtml(rtc.project_director || "-")}</div>
+    <div><strong>Project Manager</strong>: ${escHtml(rtc.project_manager || "-")}</div>
+    <div style="margin-top:8px"><strong>Last opened by</strong>: ${escHtml(rtc.last_opened_by || "-")}</div>
+    <div style="margin-top:8px">${horizonBadge(rtc.horizon_status)}</div>
+    <div style="margin-top:3px">${statusBadge(rtc.status)}</div>
       <div style="margin-top:10px;font-size:10px;font-weight:600;text-transform:uppercase;
                   letter-spacing:0.08em;color:var(--text-tertiary);margin-bottom:4px">
         Staff this period
