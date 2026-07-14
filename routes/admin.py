@@ -122,6 +122,7 @@ def admin_import_ctc():
     dept       = (data.get("dept") or "").strip()
     pd_raw     = (data.get("pdRaw") or "").strip()
     pm_raw     = (data.get("pmRaw") or "").strip()
+    customer   = (data.get("customer") or "").strip() or None
     staff_list = data.get("staff", [])
     first_alloc = data.get("firstAlloc", datetime.now(timezone.utc).date().replace(day=1).isoformat())
     last_alloc  = data.get("lastAlloc", first_alloc)
@@ -157,11 +158,11 @@ def admin_import_ctc():
                 (project_number, task_order_number, project_name, task_name,
                  project_customer, project_director, project_manager,
                  project_status, last_imported)
-            VALUES (?, ?, ?, ?, NULL, ?, ?, 'Pending', ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?)
         """, (proj_num, unique_task,
               proj_name or f"{proj_num} / {task_num}",
               task_name or "",
-              pd_clean, pm_clean, now))
+              customer, pd_clean, pm_clean, now))
         project_id = c.lastrowid
 
     # Create RTC
