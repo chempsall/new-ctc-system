@@ -38,7 +38,9 @@ def api_rtcs():
     """
     conn = database.get_connection()
     now  = datetime.now(timezone.utc)
-    current_period = now.date().replace(day=1).isoformat()
+    today_period    = now.date().replace(day=1).isoformat()
+    requested       = request.args.get("period", "").strip()
+    selected_period = requested if requested else today_period
     thirty_days_ago = (now.date() - timedelta(days=30)).isoformat()
 
     dept    = request.args.get("department", "").strip()
