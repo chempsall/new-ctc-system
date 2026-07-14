@@ -128,7 +128,7 @@ def api_rtcs():
             status = "archived"
         elif is_special:
             status = "current"
-        elif future_days == 0:
+        elif future_days == 0 and (row["current_month_days"] or 0) == 0:
             status = "awaiting_archiving"
         else:
             # Has future allocations — check review recency
