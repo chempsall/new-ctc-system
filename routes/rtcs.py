@@ -509,6 +509,16 @@ def api_add_rtc_staff(rtc_id):
         conn.close()
         return jsonify({"error": f"RTC {rtc_id} not found"}), 404
 
+    # Refuse to add staff to special RTCs — managed by nightly job
+    special_check = c.execute("""
+        SELECT p.project_number FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE r.rtc_id = ?
+    """, (rtc_id,)).fetchone()
+    if special_check and special_check["project_number"] in ("ID-06", "ID-04", "IDUK-01"):
+        conn.close()
+        return jsonify({"error": "Staff on special RTCs are managed automatically by a nightly import"}), 400
+
     # Confirm person exists in staff
     if not c.execute(
         "SELECT 1 FROM staff WHERE horizon_person_number = ?", (pid,)
@@ -698,6 +708,16 @@ def api_extend_rtc(rtc_id):
     if last_period >= max_period:
         conn.close()
         return jsonify({"error": "Cannot extend beyond 5 years from today"}), 400
+
+    # Refuse to extend special RTCs
+    special_check = c.execute("""
+        SELECT p.project_number FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE r.rtc_id = ?
+    """, (rtc_id,)).fetchone()
+    if special_check and special_check["project_number"] in ("ID-06", "ID-04", "IDUK-01"):
+        conn.close()
+        return jsonify({"error": "Special RTCs are extended automatically once per month"}), 400
 
     # Ensure periods exist 12 months beyond the current last one
     target = last_date + relativedelta(months=12)

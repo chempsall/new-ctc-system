@@ -495,7 +495,7 @@
 
     async function triggerImport(type, btn) {
       const id = "result-" + type;
-      setResult(id, "Running — this may take a couple of minutes", "");
+      setResult(id, "Running — this will take a couple of minutes", "");
       btn.disabled = true;
       try {
         const r = await fetch(`/admin/import/${type}`, {
@@ -979,7 +979,7 @@
           const noHorizon = 'No Horizon Record Found';
           const pdClean   = pdRaw && !pdRaw.includes(noHorizon) ? pdRaw : '';
           const pmClean   = pmRaw && !pmRaw.includes(noHorizon) ? pmRaw : '';
-          const deptClean = dept && !dept.includes(noHorizon) ? dept : 'London Building Services';
+          const deptClean = dept && !dept.includes(noHorizon) ? dept : 'UK010117-UK-BSV-Services London';
 
           _ctcData = { projNum, taskNum, dept: deptClean, pdRaw: pdClean, pmRaw: pmClean,
                        staff: futureStaff, firstAlloc, lastAlloc, fileName: file.name };

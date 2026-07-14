@@ -313,7 +313,7 @@ function filteredStaff() {
     function:  s => s.job_function,
     allocated: s => s.allocated[p] || 0,
     capacity:  s => s.capacity[p] || 0,
-    status:    s => s.kpi[p],
+    status:    s => ({ over: 0, ok: 1, under: 2 })[s.kpi[p]] ?? 9,
   });
 }
 
