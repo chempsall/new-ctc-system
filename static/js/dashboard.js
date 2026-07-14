@@ -193,11 +193,10 @@ function renderMetrics() {
   const s  = state.summary;
   const p  = state.activePeriod;
   const staff    = filteredStaff();
-  const projects = filteredProjects();
 
   const overCount  = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && ps.kpi[p] === "over").length;
   const underCount = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && ps.kpi[p] === "under").length;
-  const noRecProj = projects.filter(pr => pr.horizon_status === "norecord").length;
+  const noRecProj = filteredRtcs().filter(r => r.horizon_status === "norecord").length;
 
 const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && (ps.capacity?.[p] ?? 1) > 0);
   const fte = realStaff.reduce((sum, ps) => sum + (ps.fte?.[p] || 0), 0);
@@ -1087,6 +1086,7 @@ function selectPeriod(label) {
     loadRtcs();
   } else {
     renderView();
+    renderMetrics();
   }
   if (state.selectedStaff) {
     const person = state.summary.staff.find(p => String(p.id) === String(state.selectedStaff));

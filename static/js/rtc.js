@@ -195,8 +195,14 @@ function renderHeader() {
       if (pn && to) horizonLookup(pn, to);
     };
     document.getElementById('field-proj-number')?.addEventListener('blur', () => {
-      const to = document.getElementById('field-task-order')?.value.trim();
-      if (to) triggerLookup();
+      const pn = document.getElementById('field-proj-number')?.value.trim();
+      const toEl = document.getElementById('field-task-order');
+      const to = toEl?.value.trim();
+      // Auto-fill task order with "2" for proposal project numbers
+      if (pn && /^\d{4}UK/i.test(pn) && toEl && !to) {
+        toEl.value = '2';
+      }
+      if (to || (/^\d{4}UK/i.test(pn) && !to)) triggerLookup();
     });
     document.getElementById('field-task-order')?.addEventListener('blur', triggerLookup);
 
