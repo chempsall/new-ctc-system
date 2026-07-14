@@ -35,9 +35,8 @@ const state = {
     status:   "",
   },
   sort: {
-    staff:    { col: null, dir: "asc" },
-    projects: { col: null, dir: "asc" },
-    rtcs:     { col: null, dir: "asc" },
+    projects: { col: "this_month", dir: "desc" },
+    staff:    { col: null,         dir: "asc"  },
   },
 };
 
@@ -757,13 +756,13 @@ function filteredRtcs() {
       awaiting_archiving: 3, archived: 4
     })[r.status] ?? 9,
     horizon:      r => r.horizon_status,
-    this_month:   r => -(r.current_month_days || 0),
-    future_days:  r => -(r.future_days || 0),
+    this_month:   r => (r.current_month_days || 0),
+    future_days:  r => (r.future_days || 0),
     last_updated: r => r.last_updated_at,
   });
 }
 
-const horizonBadge = hs => {
+function horizonBadge(hs) {
     const map = {
       linked:      ["horizon horizon--linked",      "Linked to Horizon"],
       opportunity: ["horizon horizon--opportunity",  "Opportunity"],
@@ -772,7 +771,7 @@ const horizonBadge = hs => {
     };
     const [cls, label] = map[hs] || ["horizon horizon--norecord", "Not linked"];
     return `<span class="${cls}"><span class="horizon--dot"></span>${label}</span>`;
-  };
+  }
 
 function selectRtc(id) {
   const rtc = state.rtcs.find(r => r.rtc_id === id);
