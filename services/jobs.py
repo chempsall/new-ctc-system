@@ -16,7 +16,7 @@ import summary as summary_module
 from imports import staff_list as staff_import
 from imports import par_import
 from services.projects import is_placeholder
-from services.special_rtcs import run_special_rtc_maintenance
+from services.special_rtcs import run_special_rtc_maintenance, SPECIAL_PROJECT_NUMBERS
 
 logger = logging.getLogger("resource_forecast.jobs")
 
@@ -39,56 +39,12 @@ GRADE_TO_GENERIC = {
     "T0": "GENERIC-UK-TECHNICIAN-IN-TRAINING",
 }
 
-SPECIAL_PROJECT_NUMBERS_LEAVER = {"ID-06", "ID-04", "IDUK-01"}
-
 
 def _grade_code(job_title: str) -> str | None:
     """Extract grade code (e.g. 'P3') from a job title string."""
     import re
     m = re.match(r"^([PT]\d)", job_title or "")
     return m.group(1) if m else None
-
-
-def _get_or_create_suffixed_generic(c, base_generic_id: str, rtc_id: int, now: str) -> str:
-    """
-    Returns the horizon_person_number of a generic slot on this RTC.
-    Uses the base generic if available, otherwise creates a suffixed copy.
-    """
-    # Check if base generic already has a row on this RTC
-    existing = c.execute("""
-        SELECT horizon_person_number FROM allocations
-        WHERE rtc_id = ? AND horizon_person_number = ?
-        LIMIT 1
-    """, (rtc_id, base_generic_id)).fetchone()
-    if existing:
-        return base_generic_id
-
-    # Check for any suffixed copy of this generic on this RTC
-    suffixed = c.execute("""
-        SELECT horizon_person_number FROM allocations
-        WHERE rtc_id = ? AND horizon_person_number LIKE ?
-        LIMIT 1
-    """, (rtc_id, f"{base_generic_id}_%")).fetchone()
-    if suffixed:
-        return suffixed["horizon_person_number"]
-
-    # Create a new suffixed generic staff row
-    suffix     = now.replace(":", "").replace("-", "").replace(".", "")[:20]
-    new_pid    = f"{base_generic_id}_{suffix}"
-    # Copy the base generic's staff record
-    base_row = c.execute("""
-        SELECT name, job_title, job_family, job_function
-        FROM staff WHERE horizon_person_number = ?
-    """, (base_generic_id,)).fetchone()
-    if base_row:
-        c.execute("""
-            INSERT OR IGNORE INTO staff
-                (horizon_person_number, name, job_title, job_family,
-                 job_function, department, availability, import_source)
-            VALUES (?, ?, ?, ?, ?, '_GENERIC', 1.0, 'seeded')
-        """, (new_pid, base_row["name"], base_row["job_title"],
-              base_row["job_family"], base_row["job_function"]))
-    return new_pid
 
 
 def process_leavers():
@@ -105,7 +61,8 @@ def process_leavers():
     conn   = database.get_connection()
     c      = conn.cursor()
     now    = datetime.now(timezone.utc).isoformat()
-    today  = _date.today().replace(day=1).isoformat()
+    today        = _date.today().replace(day=1).isoformat()
+    actual_today = _date.today().isoformat()
 
     logger = logging.getLogger("resource_forecast")
 
@@ -118,7 +75,7 @@ def process_leavers():
         AND s.end_date < ?
         AND a.period_start >= ?
         AND a.days > 0
-    """, (today, today)).fetchall()
+    """, (actual_today, today)).fetchall()
 
     if not leavers:
         conn.close()
@@ -146,19 +103,22 @@ def process_leavers():
 
         for rtc_row in rtcs:
             rtc_id     = rtc_row["rtc_id"]
-            is_special = rtc_row["project_number"] in SPECIAL_PROJECT_NUMBERS_LEAVER
+            is_special = rtc_row["project_number"] in SPECIAL_PROJECT_NUMBERS
 
             if is_special:
                 # Just zero out future rows — no replacement
                 c.execute("""
-                    UPDATE allocations SET days = 0, last_updated = ?
+                    DELETE FROM allocations
                     WHERE horizon_person_number = ? AND rtc_id = ?
                     AND period_start >= ?
-                """, (now, pid, rtc_id, today))
+                """, (pid, rtc_id, today))
                 zeroed += c.rowcount
             elif base_gid:
-                # Transfer days to generic, then zero leaver rows
-                gid = _get_or_create_suffixed_generic(c, base_gid, rtc_id, now)
+                # Transfer days to the base generic for this grade.
+                # The INSERT OR IGNORE + additive UPDATE pair below handles
+                # both cases: generic already on the RTC (days accumulate)
+                # or not yet present (row created, then incremented).
+                gid = base_gid
 
                 # Get the leaver's future periods and days
                 future_rows = c.execute("""
@@ -183,12 +143,12 @@ def process_leavers():
                     """, (days, now, gid, rtc_id, period))
                     transferred += 1
 
-                # Zero out leaver's future rows
+                # Delete leaver's future rows
                 c.execute("""
-                    UPDATE allocations SET days = 0, last_updated = ?
+                    DELETE FROM allocations
                     WHERE horizon_person_number = ? AND rtc_id = ?
                     AND period_start >= ?
-                """, (now, pid, rtc_id, today))
+                """, (pid, rtc_id, today))
                 zeroed += c.rowcount
             else:
                 # Unknown grade — just zero out, log a warning
@@ -298,6 +258,8 @@ def nightly_imports():
 
     run_special_rtc_maintenance()
 
+    process_leavers()
+
     summary_module.build()
     logger.info("Summary cache rebuilt")
 
@@ -306,5 +268,4 @@ def nightly_imports():
     database.ensure_periods_through(conn, date.today() + relativedelta(years=3))
     conn.close()
     logger.info("Reporting periods extended through 3 years ahead")
-    process_leavers()
     logger.info("Nightly import complete")

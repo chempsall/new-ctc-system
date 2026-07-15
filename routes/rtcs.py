@@ -40,15 +40,15 @@ def api_rtcs():
     now  = datetime.now(timezone.utc)
     current_period  = now.date().replace(day=1).isoformat()
     period_label = request.args.get("period", "").strip()
+    _MONTHS = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
+               "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
     if period_label:
         try:
-            from datetime import datetime as _dt
-            selected_period = _dt.strptime(period_label, "%b-%Y").strftime("%Y-%m-01")
-        except ValueError:
-            try:
-                selected_period = _dt.strptime(period_label, "%b-%y").strftime("%Y-%m-01")
-            except ValueError:
-                selected_period = current_period
+            mon, yr = period_label.split("-")
+            selected_period = date(int(yr), _MONTHS[mon], 1).isoformat()
+        except (ValueError, KeyError):
+            logger.warning(f"api_rtcs: unparseable period label {period_label!r} — using current month")
+            selected_period = current_period
     else:
         selected_period = current_period
     next_period     = (now.date().replace(day=1) + relativedelta(months=1)).isoformat()
@@ -541,10 +541,10 @@ def api_add_rtc_staff(rtc_id):
             if orig:
                 c.execute("""
                     INSERT OR IGNORE INTO staff
-                        (horizon_person_number, name, job_title, job_family,
+                        (horizon_person_number, name, job_title,
                          job_function, department, availability, last_imported)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'seeded')
-                """, (pid, orig["name"], orig["job_title"], orig["job_family"],
+                    VALUES (?, ?, ?, ?, ?, ?, 'seeded')
+                """, (pid, orig["name"], orig["job_title"],
                       orig["job_function"], orig["department"], orig["availability"]))
 
     # Get the periods already in use for this RTC
@@ -594,6 +594,15 @@ def api_remove_rtc_staff(rtc_id, person_id):
     conn = database.get_connection()
     c    = conn.cursor()
 
+    # Refuse to modify staff on special RTCs
+    _sp = c.execute("""
+        SELECT p.project_number FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id WHERE r.rtc_id = ?
+    """, (rtc_id,)).fetchone()
+    if _sp and _sp["project_number"] in SPECIAL_PROJECT_NUMBERS:
+        conn.close()
+        return jsonify({"error": "Staff on special RTCs are managed automatically"}), 400
+
     c.execute("""
         DELETE FROM allocations
         WHERE rtc_id = ? AND horizon_person_number = ?
@@ -621,6 +630,16 @@ def api_replace_rtc_staff(rtc_id, person_id):
     data = request.get_json(silent=True, force=True)
     if not data or "new_horizon_person_number" not in data:
         return jsonify({"error": "new_horizon_person_number required"}), 400
+
+    # Refuse to modify staff on special RTCs
+    _conn_tmp = database.get_connection()
+    _sp = _conn_tmp.execute("""
+        SELECT p.project_number FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id WHERE r.rtc_id = ?
+    """, (rtc_id,)).fetchone()
+    _conn_tmp.close()
+    if _sp and _sp["project_number"] in SPECIAL_PROJECT_NUMBERS:
+        return jsonify({"error": "Staff on special RTCs are managed automatically"}), 400
 
     new_pid = str(data["new_horizon_person_number"]).strip()
     user    = get_current_user()

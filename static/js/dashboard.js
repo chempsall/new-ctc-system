@@ -1113,12 +1113,13 @@ function switchView(view) {
   document.querySelectorAll(".filter-bar select").forEach(sel => {
     sel.value = sel.options[0]?.value ?? "all";
   });
-  state.filters.horizon = "all";
-  state.rtcFilters.pd     = "";
-  state.rtcFilters.pm     = "";
-  state.rtcFilters.status = "";
-  state.filters.jobTitle    = "";
-  state.filters.jobFunction = "";
+  state.filters.horizon      = "all";
+  state.filters.job_title    = "all";
+  state.filters.job_function = "all";
+  state.filters.department   = "all";
+  state.rtcFilters.pd        = "";
+  state.rtcFilters.pm        = "";
+  state.rtcFilters.status    = "";
 
   document.querySelectorAll(".topnav__tab[data-view]").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === view);
@@ -1634,11 +1635,13 @@ function wireEvents() {
   ["filter-department", "filter-job-title", "filter-job-function"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", () => {
-      // Convert kebab-case id to camelCase filter key
-      // filter-job-function -> job_function, filter-job-title -> job_title
       const key = id.replace("filter-", "").replace(/-/g, "_");
       state.filters[key] = el.value;
-      renderView();
+      if (id === "filter-department" && state.activeView === "projects") {
+        loadRtcs();
+      } else {
+        renderView();
+      }
     });
   });
 
@@ -1683,7 +1686,7 @@ document.getElementById("filter-project-pm")?.addEventListener("change", e => {
   });
   document.getElementById("filter-rtc-status")?.addEventListener("change", e => {
     state.rtcFilters.status = e.target.value;
-    renderProjectTable();
+    loadRtcs();
   });
 
   // RTC action buttons
