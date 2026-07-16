@@ -1282,6 +1282,8 @@ function updateStatusBar() {
 // Reset all filters back to defaults
 // ---------------------------------------------------------------------------
 function resetFilters() {
+  state.sort.staff    = { col: null, dir: "asc" };
+  state.sort.projects = { col: "this_month", dir: "desc" };
   state.filters.job_function = "all";
   state.filters.job_title    = "all";
   state.filters.department   = "all";
