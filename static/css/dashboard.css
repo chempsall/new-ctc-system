@@ -426,6 +426,10 @@ a:hover { text-decoration: underline; }
 .staff-table { width: 100%; border-collapse: collapse; table-layout: auto; }
 .staff-table th:nth-child(1) { min-width: 200px; } /* Name */
 .staff-person-row:hover { background: var(--surface-2); cursor: pointer; }
+.proj-person-row:hover  { background: var(--surface-2); cursor: pointer; }
+.proj-row--expanded     { background: var(--surface-2); }
+.proj-project-row td    { border-top: none !important; }
+.proj-project-row:last-child { border-bottom: 1px solid var(--border); }
 .staff-row--expanded { background: var(--surface-2); }
 .staff-project-row td { border-top: none !important; }
 .staff-project-row:last-child { border-bottom: 1px solid var(--border); }

@@ -584,6 +584,7 @@ function renderView() {
 // ---------------------------------------------------------------------------
 // Tracks which staff rows are expanded
 const _expandedStaff = new Set();
+const _expandedRtcs  = new Set();
 
 function kpiDot(kpi) {
   const col = kpi === "over"  ? "#DC2626"
@@ -726,6 +727,7 @@ function renderProjectTable() {
   const tbody = document.getElementById("project-tbody");
   const rtcs  = filteredRtcs();
   const p     = state.activePeriod;
+  const s     = state.summary;
 
   if (rtcs.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6">
@@ -734,10 +736,14 @@ function renderProjectTable() {
     return;
   }
 
+  const rows = [];
 
-  tbody.innerHTML = rtcs.map(r => {
-    const isSelected = String(r.rtc_id) === String(state.selectedRtc);
-    return `<tr data-id="${r.rtc_id}" class="${isSelected ? "selected" : ""}">
+  rtcs.forEach(r => {
+    const isExpanded = _expandedRtcs.has(r.rtc_id);
+
+    rows.push(`<tr data-id="${r.rtc_id}"
+                   class="proj-person-row${isExpanded ? " proj-row--expanded" : ""}"
+                   style="cursor:pointer">
       <td>
         ${r.is_placeholder_number ? "" :
           `<div class="proj-number">${escHtml(r.display_project_number || r.project_number || "")}</div>
@@ -759,11 +765,109 @@ function renderProjectTable() {
       <td style="text-align:right;font-family:var(--font-mono);font-size:12px">
         ${fmt.days(r.future_days || 0)}d
       </td>
-    </tr>`;
-  }).join("");
+    </tr>`);
 
-  tbody.querySelectorAll("tr[data-id]").forEach(row => {
-    row.addEventListener("click", () => selectRtc(parseInt(row.dataset.id)));
+    if (isExpanded) {
+      // Build staff list for this period from summary
+      const curIdx = Math.max(0, s.periods.indexOf(state.activePeriod));
+      const cols   = s.periods.slice(curIdx, curIdx + 6);
+      const rtcMatch = state.rtcs.find(rx => rx.rtc_id === r.rtc_id);
+
+      const staffList = (s.staff || [])
+        .map(person => {
+          const proj = (person.projects || []).find(pr =>
+            rtcMatch && pr.project_id === rtcMatch.project_id
+          );
+          const totalDays = cols.reduce((sum, col) => sum + (proj?.days[col] || 0), 0);
+          const daysByPeriod = cols.map(col => proj?.days[col] || 0);
+          return { name: person.name, job_title: person.job_title, daysByPeriod, totalDays };
+        })
+        .filter(ps => ps.totalDays > 0)
+        .sort((a, b) => {
+          const gradeSort = t => {
+            const m = (t || '').match(/^([PT])(\d+)/);
+            if (!m) return 999;
+            return (m[1] === 'P' ? 0 : 1) * 100 + (99 - parseInt(m[2]));
+          };
+          const ga = gradeSort(a.job_title);
+          const gb = gradeSort(b.job_title);
+          if (ga !== gb) return ga - gb;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+
+      const colHeaders = cols.map(col =>
+        `<th style="text-align:right;font-size:10px;color:var(--text-tertiary);
+                    white-space:nowrap;padding:0 6px;font-weight:500;width:58px">${escHtml(col)}</th>`
+      ).join("");
+
+      const staffRows = staffList.length
+        ? `<table style="font-size:11px;width:100%;border-collapse:collapse;table-layout:fixed">
+             <thead><tr>
+               <th style="text-align:left;font-size:10px;color:var(--text-tertiary);
+                          font-weight:500;padding-bottom:4px">Name</th>
+               ${colHeaders}
+             </tr></thead>
+             <tbody>
+               ${staffList.map(ps =>
+                 `<tr>
+                    <td style="color:var(--text-secondary);padding:2px 0">${escHtml(ps.name)}</td>
+                    ${ps.daysByPeriod.map(d =>
+                      `<td style="text-align:right;font-family:var(--font-mono);
+                                  padding:2px 6px;color:${d > 0 ? 'var(--text-primary)' : 'var(--text-tertiary)'}"
+                          >${d > 0 ? d.toFixed(2) + 'd' : ''}</td>`
+                    ).join("")}
+                  </tr>`
+               ).join("")}
+             </tbody>
+           </table>`
+        : `<div style="font-size:11px;color:var(--text-tertiary);font-style:italic">No allocations in this period</div>`;
+
+      const fmtDate = iso => iso
+        ? new Date(iso).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" })
+        : "Never";
+
+      rows.push(`<tr class="proj-project-row" style="background:var(--surface-2)">
+        <td colspan="6" style="padding:12px 16px">
+          <div style="display:flex;gap:32px;flex-wrap:wrap">
+            <div style="min-width:220px">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;
+                          letter-spacing:0.06em;color:var(--text-tertiary);margin-bottom:6px">Details</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text-secondary)">
+                <div><strong>Customer:</strong> ${escHtml(r.project_customer || "—")}</div>
+                <div><strong>Project Director:</strong> ${escHtml(r.project_director || "—")}</div>
+                <div><strong>Project Manager:</strong> ${escHtml(r.project_manager || "—")}</div>
+                <div><strong>Last opened:</strong> ${fmtDate(r.last_opened)}</div>
+                <div><strong>Last opened by:</strong> ${escHtml(r.last_opened_by || "—")}</div>
+              </div>
+              <div style="margin-top:10px">
+                <a href="/rtc/${r.rtc_id}" class="btn-open-rtc">Open to edit →</a>
+              </div>
+            </div>
+            <div style="min-width:200px;flex:1">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;
+                          letter-spacing:0.06em;color:var(--text-tertiary);margin-bottom:6px">
+                Six Month Look Ahead
+              </div>
+              ${staffRows}
+            </div>
+          </div>
+        </td>
+      </tr>`);
+    }
+  });
+
+  tbody.innerHTML = rows.join("");
+
+  tbody.querySelectorAll("tr.proj-person-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const id = parseInt(row.dataset.id);
+      if (_expandedRtcs.has(id)) {
+        _expandedRtcs.delete(id);
+      } else {
+        _expandedRtcs.add(id);
+      }
+      renderProjectTable();
+    });
   });
   updateSortIndicators("projects", ["department","horizon","status","this_month","future_days"]);
 }
@@ -1170,7 +1274,8 @@ function switchView(view) {
   closeDetailPanel();
 
   // Clear expanded staff rows when switching views
-  if (view !== "staff") _expandedStaff.clear();
+  if (view !== "staff")    _expandedStaff.clear();
+  if (view !== "projects") _expandedRtcs.clear();
 
   // Reset filters when switching views
   document.querySelectorAll(".filter-bar select").forEach(sel => {
@@ -1217,7 +1322,7 @@ function switchView(view) {
 
   // Month tabs only relevant for staff and projects views
  const monthTabs = document.getElementById("month-tabs");
-  if (monthTabs) monthTabs.style.display = (view === "mgmt" || view === "staff") ? "none" : "";
+  if (monthTabs) monthTabs.style.display = (view === "mgmt" || view === "staff" || view === "projects") ? "none" : "";
   const detailPanel = document.getElementById("detail-panel");
   if (detailPanel && view === "mgmt") detailPanel.classList.remove("open");
 
@@ -1284,6 +1389,8 @@ function updateStatusBar() {
 function resetFilters() {
   state.sort.staff    = { col: null, dir: "asc" };
   state.sort.projects = { col: "this_month", dir: "desc" };
+  _expandedRtcs.clear();
+  _expandedStaff.clear();
   state.filters.job_function = "all";
   state.filters.job_title    = "all";
   state.filters.department   = "all";
