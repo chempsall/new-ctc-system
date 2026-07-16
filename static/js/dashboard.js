@@ -299,20 +299,16 @@ function filteredStaff() {
       };
       return gradeSort(a.job_title || "") - gradeSort(b.job_title || "");
     }
-    // Real staff — over first, then check, then ok
-    const order = { over: 0, ok: 1, under: 2, unavailable: 3 };
-    const ka = order[a.kpi[p]] ?? 9;
-    const kb = order[b.kpi[p]] ?? 9;
-    if (ka !== kb) return ka - kb;
+    // Real staff — alphabetical
     return a.name.localeCompare(b.name);
   });
   // Apply user sort on top of default sort
+  const periodGetters = Object.fromEntries(
+    state.summary.periods.map(period => [`period_${period}`, ps => -(ps.allocated[period] || 0)])
+  );
   return applySort(baseStaff, "staff", {
-    name:      s => s.name,
-    function:  s => s.job_function,
-    allocated: s => s.allocated[p] || 0,
-    capacity:  s => s.capacity[p] || 0,
-    status:    s => ({ over: 0, ok: 1, under: 2 })[s.kpi[p]] ?? 9,
+    name:      ps => ps.name,
+    ...periodGetters,
   });
 }
 
@@ -614,7 +610,9 @@ function renderStaffTable() {
       `<th class="sortable" onclick="toggleSort('staff','name')" style="min-width:180px">
          Name / Title / Function <span id="sort-staff-name"></span>
        </th>` +
-      cols.map(p => `<th style="text-align:center;min-width:72px;white-space:nowrap">${escHtml(p)}</th>`).join("") ;
+      cols.map(p => `<th style="text-align:center;min-width:72px;white-space:nowrap;cursor:pointer"
+                         onclick="toggleSort('staff','period_${p}')">${escHtml(p)}
+                         <span id="sort-staff-period_${p.replace(/-/g,'_')}"></span></th>`).join("") ;
   }
 
   if (staff.length === 0) {
@@ -706,7 +704,7 @@ function renderStaffTable() {
     });
   });
 
-  updateSortIndicators("staff", ["name"]);
+  updateSortIndicators("staff", ["name", ...cols.map(p => `period_${p}`)]);
 }
 
 // ---------------------------------------------------------------------------
