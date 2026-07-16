@@ -586,65 +586,127 @@ function renderView() {
 // ---------------------------------------------------------------------------
 // Staff table
 // ---------------------------------------------------------------------------
+// Tracks which staff rows are expanded
+const _expandedStaff = new Set();
+
+function kpiDot(kpi) {
+  const col = kpi === "over"  ? "#DC2626"
+            : kpi === "under" ? "#15803D"
+            : "#B45309";
+  return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;
+                       background:${col};margin-left:5px;vertical-align:middle;
+                       flex-shrink:0"></span>`;
+}
+
 function renderStaffTable() {
   const tbody = document.getElementById("staff-tbody");
   const staff = filteredStaff();
-  const p     = state.activePeriod;
-  const wdays = state.summary.working_days[p] || 20;
+  const s     = state.summary;
+
+  // Build 6 consecutive periods from current month
+  const curIdx = Math.max(0, s.periods.indexOf(state.activePeriod));
+  const cols   = s.periods.slice(curIdx, curIdx + 6);
+
+  // Update column headers dynamically
+  const thead = document.querySelector(".staff-table thead tr");
+  if (thead) {
+    thead.innerHTML =
+      `<th class="sortable" onclick="toggleSort('staff','name')" style="min-width:180px">
+         Name / Title / Function <span id="sort-staff-name"></span>
+       </th>` +
+      cols.map(p => `<th style="text-align:center;min-width:72px;white-space:nowrap">${escHtml(p)}</th>`).join("") ;
+  }
 
   if (staff.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5">
+    tbody.innerHTML = `<tr><td colspan="${cols.length + 1}">
       <div class="empty-state">No staff match the current filters</div>
     </td></tr>`;
     return;
   }
 
-  tbody.innerHTML = staff.map(person => {
-    const allocated  = person.allocated[p] || 0;
-    const capacity   = person.capacity[p]  || 0;
-    const kpi        = person.kpi[p]       || "ok";
+  // Build project lookup keyed by project_id
+  const projLookup = Object.fromEntries(
+    (s.projects || []).map(pr => [pr.project_id, pr])
+  );
+
+  const rows = [];
+
+  staff.forEach(person => {
     const isGeneric  = person.id?.startsWith("GENERIC-");
-    const pct        = capacity > 0
-      ? Math.min(100, (allocated / capacity) * 100).toFixed(1)
-      : 0;
-    const isSelected = String(person.id) === String(state.selectedStaff);
+    const isExpanded = _expandedStaff.has(person.id);
 
-    return `<tr data-id="${person.id}" class="${isSelected ? "selected" : ""}">
-      <td>
-        <div class="staff-name">${escHtml(person.name)}</div>
-        <div class="staff-grade">${escHtml(person.job_title)}</div>
-      </td>
-      <td>
-        <span class="team-badge">${escHtml(person.job_function || "—")}</span>
-      </td>
-      <td>
-        ${isGeneric
-          ? `<div class="alloc-bar-wrap">
-               <span style="font-size:11px;color:var(--text-secondary);font-style:italic">${fmt.days(allocated)}d allocated</span>
-             </div>`
-          : `<div class="alloc-bar-wrap">
-               <div class="alloc-bar">
-                 <div class="alloc-bar__fill alloc-bar__fill--${kpi}"
-                      style="width:${pct}%"></div>
-               </div>
-               <span class="alloc-days" style="color:var(--text-tertiary)">${fmt.days(allocated)}d</span>
-             </div>`
-        }
-      </td>
-      <td style="text-align:center;vertical-align:top;padding-top:3px">
-        <span class="mono" style="font-size:11px;color:var(--text-tertiary)">
-          ${isGeneric ? '' : `/ ${fmt.days(capacity)}d`}
-        </span>
-      </td>
-      <td style="text-align:center"><span class="kpi kpi--${kpi}">${{over:'Over',under:'Under',ok:'OK',unavailable:'N/A',none:''}[kpi]||kpi}</span></td>
-    </tr>`;
-  }).join("");
+    // Person row
+    const dayCells = cols.map(p => {
+      const alloc = person.allocated[p] || 0;
+      const kpi   = person.kpi[p];
+      if (alloc === 0) return `<td></td>`;
+      return `<td style="text-align:center;font-family:var(--font-mono);font-size:12px;white-space:nowrap">
+        <span>${alloc.toFixed(2)}d</span>${isGeneric ? "" : kpiDot(kpi)}
+      </td>`;
+    }).join("");
 
-  // Re-attach row click listeners
-  tbody.querySelectorAll("tr[data-id]").forEach(row => {
-    row.addEventListener("click", () => selectStaff(row.dataset.id));
+    rows.push(`<tr data-id="${escHtml(person.id)}"
+                   class="staff-person-row${isExpanded ? " staff-row--expanded" : ""}"
+                   style="cursor:pointer">
+      <td>
+        <div class="staff-name" style="font-weight:600">${escHtml(person.name)}</div>
+        <div class="staff-grade">${escHtml(person.job_title || "")}</div>
+        <div class="staff-grade" style="color:var(--text-tertiary)">${escHtml(person.job_function || "")}</div>
+      </td>
+      ${dayCells}
+    </tr>`);
+
+    // Expanded project rows
+    if (isExpanded) {
+      const projRows = (person.projects || [])
+        .filter(pr => cols.some(p => (pr.days[p] || 0) > 0))
+        .sort((a, b) => {
+          const aTotal = cols.reduce((s, p) => s + (a.days[p] || 0), 0);
+          const bTotal = cols.reduce((s, p) => s + (b.days[p] || 0), 0);
+          return bTotal - aTotal;
+        });
+
+      projRows.forEach(pr => {
+        const proj = projLookup[pr.project_id];
+        const name = proj ? (proj.name || proj.task_name || `Project ${pr.project_id}`) : `Project ${pr.project_id}`;
+        const task = proj ? (proj.task_name || "") : "";
+
+        const projDayCells = cols.map(p => {
+          const d = pr.days[p] || 0;
+          if (d === 0) return `<td></td>`;
+          return `<td style="text-align:center;font-family:var(--font-mono);font-size:11px;
+                              color:var(--text-secondary);white-space:nowrap">
+            ${d.toFixed(2)}d
+          </td>`;
+        }).join("");
+
+        rows.push(`<tr class="staff-project-row" style="background:var(--surface-2)">
+          <td style="padding-left:24px">
+            <div style="font-size:11px;color:var(--text-secondary)">${escHtml(name)}</div>
+            ${task ? `<div style="font-size:10px;color:var(--text-tertiary)">${escHtml(task)}</div>` : ""}
+          </td>
+          ${projDayCells}
+        </tr>`);
+      });
+    }
   });
-  updateSortIndicators("staff", ["name","function","allocated","capacity","status"]);
+
+  tbody.innerHTML = rows.join("");
+
+  // Expand/collapse on click
+  tbody.querySelectorAll("tr.staff-person-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const id = row.dataset.id;
+      if (_expandedStaff.has(id)) {
+        _expandedStaff.delete(id);
+      } else {
+        _expandedStaff.add(id);
+      }
+      renderStaffTable();
+    });
+  });
+
+  updateSortIndicators("staff", ["name"]);
 }
 
 // ---------------------------------------------------------------------------
@@ -1109,6 +1171,9 @@ function switchView(view) {
   state.selectedRtc     = null;
   closeDetailPanel();
 
+  // Clear expanded staff rows when switching views
+  if (view !== "staff") _expandedStaff.clear();
+
   // Reset filters when switching views
   document.querySelectorAll(".filter-bar select").forEach(sel => {
     sel.value = sel.options[0]?.value ?? "all";
@@ -1154,7 +1219,7 @@ function switchView(view) {
 
   // Month tabs only relevant for staff and projects views
  const monthTabs = document.getElementById("month-tabs");
-  if (monthTabs) monthTabs.style.display = (view === "mgmt") ? "none" : "";
+  if (monthTabs) monthTabs.style.display = (view === "mgmt" || view === "staff") ? "none" : "";
   const detailPanel = document.getElementById("detail-panel");
   if (detailPanel && view === "mgmt") detailPanel.classList.remove("open");
 

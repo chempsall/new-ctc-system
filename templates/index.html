@@ -187,15 +187,13 @@
           <table class="staff-table">
             <thead>
               <tr>
-                <th class="sortable" onclick="toggleSort('staff','name')">Name <span id="sort-staff-name"></span></th>
-                <th class="sortable" onclick="toggleSort('staff','function')">Job Function <span id="sort-staff-function"></span></th>
-                <th class="sortable" onclick="toggleSort('staff','allocated')">Allocated <span id="sort-staff-allocated"></span></th>
-                <th class="sortable" style="text-align:center !important" onclick="toggleSort('staff','capacity')">Capacity <span id="sort-staff-capacity"></span></th>
-                <th class="sortable" style="text-align:center !important" onclick="toggleSort('staff','status')">Status <span id="sort-staff-status"></span></th>
+                <th>Name / Title / Function</th>
+                <th style="text-align:center" colspan="6">Months</th>
+                <th style="text-align:center">Status</th>
               </tr>
             </thead>
             <tbody id="staff-tbody">
-              <tr><td colspan="5">
+              <tr><td colspan="8">
                 <div class="empty-state">Loading...</div>
               </td></tr>
             </tbody>
