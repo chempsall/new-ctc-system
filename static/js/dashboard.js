@@ -1325,16 +1325,19 @@ function switchView(view) {
   // Show/hide filter slots per view
   const filterSlots = {
     projects: ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
-    staff:    ["filter-job-title", "filter-job-function", "filter-line-manager"],
+    staff: ["filter-job-title", "filter-job-function", "filter-line-manager", "filter-slot4-spacer"],
     mgmt:     ["filter-rtc-pd", "filter-rtc-pm", "filter-horizon"],
   };
   const hiddenSlots = {
-    staff:    ["filter-rtc-status"],
+    staff:    ["filter-slot4-spacer"],
+    projects: [],
+    mgmt:     [],
   };
   const allSlots = [
     "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
     "filter-job-title", "filter-job-function", "filter-line-manager",
     "filter-horizon", "filter-project-pd", "filter-project-pm",
+    "filter-slot4-spacer",
   ];
   allSlots.forEach(id => {
     const el = document.getElementById(id);
