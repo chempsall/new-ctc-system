@@ -20,6 +20,7 @@ const state = {
     job_function: "all",
     job_title:    "all",
     department:   "all",
+    line_manager: "all",
     horizon:      "all",   // "all" | "linked" | "norecord"
     project_pm:   "all",
     project_pd:   "all",
@@ -124,10 +125,18 @@ function buildFilterOptions() {
   const s = state.summary;
 
   // Teams — from unique values in staff
-  const staffDepts   = (s.departments || []).map(d => d.department);
-  const projectDepts = (s.projects || []).map(p => p.department).filter(Boolean);
-  const depts = [...new Set([...staffDepts, ...projectDepts])].sort();
-  populateSelect("filter-department", depts, "Department");
+  const staffDepts    = (s.departments || []).map(d => d.department);
+  const projectDepts  = (s.projects || []).map(p => p.department).filter(Boolean);
+  const allDepts      = [...new Set([...staffDepts, ...projectDepts])].sort();
+  const staffDeptsOnly = [...new Set(staffDepts)].sort();
+  const deptList = state.activeView === "staff" ? staffDeptsOnly : allDepts;
+  populateSelect("filter-department", deptList, "Department");
+
+  // Line manager filter
+  const managers = [...new Set(
+    (s.staff || []).map(p => p.line_manager).filter(Boolean)
+  )].sort();
+  populateSelect("filter-line-manager", managers, "Line Manager");
 
   const deptWidth = document.getElementById("filter-department")?.offsetWidth;
   if (deptWidth) {
@@ -261,10 +270,29 @@ function filteredStaff() {
 
   const f = state.filters;
   const p = state.activePeriod;
+  // Build cascading line manager filter
+  let lmFilter = null;
+  if (f.line_manager !== "all" && f.line_manager) {
+    const allStaff = state.summary.staff || [];
+    const reportSet = new Set();
+    const queue = [f.line_manager];
+    while (queue.length) {
+      const mgr = queue.shift();
+      allStaff.filter(ps => ps.line_manager === mgr).forEach(ps => {
+        if (!reportSet.has(ps.name)) {
+          reportSet.add(ps.name);
+          queue.push(ps.name);
+        }
+      });
+    }
+    lmFilter = reportSet;
+  }
+
   const baseStaff = state.summary.staff.filter(person => {
     if (f.department !== "all" && person.department !== f.department) return false;
     if (f.job_title !== "all" && person.job_title !== f.job_title) return false;
     if (f.job_function !== "all" && person.job_function !== f.job_function) return false;
+    if (lmFilter && !lmFilter.has(person.name)) return false;
     if (f.search) {
       const q = f.search.toLowerCase();
       if (!person.name.toLowerCase().includes(q) &&
@@ -1288,6 +1316,7 @@ function switchView(view) {
   state.filters.horizon      = "all";
   state.filters.job_title    = "all";
   state.filters.job_function = "all";
+  state.filters.line_manager = "all";
   state.filters.department   = "all";
   state.rtcFilters.pd        = "";
   state.rtcFilters.pm        = "";
@@ -1300,7 +1329,7 @@ function switchView(view) {
   // Show/hide filter slots per view
   const filterSlots = {
     projects: ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
-    staff:    ["filter-job-title", "filter-job-function"],
+    staff:    ["filter-job-title", "filter-job-function", "filter-line-manager"],
     mgmt:     ["filter-rtc-pd", "filter-rtc-pm", "filter-horizon"],
   };
   const hiddenSlots = {
@@ -1308,7 +1337,7 @@ function switchView(view) {
   };
   const allSlots = [
     "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
-    "filter-job-title", "filter-job-function",
+    "filter-job-title", "filter-job-function", "filter-line-manager",
     "filter-horizon", "filter-project-pd", "filter-project-pm",
   ];
   allSlots.forEach(id => {
@@ -1808,7 +1837,7 @@ function wireEvents() {
   });
 
   // Filters
-  ["filter-department", "filter-job-title", "filter-job-function"].forEach(id => {
+  ["filter-department", "filter-job-title", "filter-job-function", "filter-line-manager"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", () => {
       const key = id.replace("filter-", "").replace(/-/g, "_");

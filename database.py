@@ -101,6 +101,7 @@ def initialise_database():
             name                    TEXT NOT NULL,
             job_title               TEXT,
             job_function            TEXT,
+            line_manager            TEXT,
             department              TEXT,
             availability            REAL NOT NULL DEFAULT 1.0,
             start_date              TEXT,
@@ -263,6 +264,7 @@ def initialise_database():
     _ensure_column(c, "rtcs", "notes",       "TEXT")
     _ensure_column(c, "rtcs", "source_file", "TEXT")
     _ensure_column(c, "rtcs", "auto_linked", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(c, "staff", "line_manager", "TEXT")
 
     # Bank holidays cache
     c.execute("""

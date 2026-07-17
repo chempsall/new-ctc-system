@@ -220,6 +220,7 @@ def build() -> dict:
             "name":         s["name"],
             "job_title":    s["job_title"] or "",
             "job_function": s["job_function"] or "",
+            "line_manager": s["line_manager"] or "",
             "department":   s["department"] or "",
             "availability": s["availability"],
             "capacity":     capacity,

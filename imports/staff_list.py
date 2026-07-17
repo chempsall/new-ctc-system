@@ -40,6 +40,7 @@ COLUMN_MAP = {
     "horizon person number": "horizon_person_number",
     "name":                  "name",
     "job title":             "job_title",
+    "line manager":          "line_manager",
     "job function":          "job_function",
     "department":            "department",
     "availability":          "availability",
@@ -158,6 +159,7 @@ def run(file_path: str) -> dict:
             continue
 
         job_title    = _clean(get(row, "job_title"))
+        line_manager = _clean(get(row, "line_manager"))
         job_function = _clean(get(row, "job_function"))
         department   = _clean(get(row, "department"))
         availability = _parse_availability(get(row, "availability"))
@@ -178,22 +180,22 @@ def run(file_path: str) -> dict:
                 UPDATE staff SET
                     name=?, job_title=?, job_function=?,
                     department=?, availability=?, start_date=?,
-                    end_date=?, last_imported=?
+                    end_date=?, line_manager=?, last_imported=?
                 WHERE horizon_person_number=?
             """, (name, job_title, job_function,
                   department, availability, start_date,
-                  end_date, now, horizon_id))
+                  end_date, line_manager, now, horizon_id))
             updated += 1
         else:
             c.execute("""
                 INSERT INTO staff (
                     horizon_person_number, name, job_title,
                     job_function, department, availability,
-                    start_date, end_date, last_imported
-                ) VALUES (?,?,?,?,?,?,?,?,?)
+                    start_date, end_date, line_manager, last_imported
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
             """, (horizon_id, name, job_title,
                   job_function, department, availability,
-                  start_date, end_date, now))
+                  start_date, end_date, line_manager, now))
             inserted += 1
 
     conn.commit()
