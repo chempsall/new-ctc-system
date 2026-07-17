@@ -797,11 +797,15 @@ function renderProjectTable() {
 
       const colHeaders = cols.map(col =>
         `<th style="text-align:right;font-size:10px;color:var(--text-tertiary);
-                    white-space:nowrap;padding:0 6px;font-weight:500;width:58px">${escHtml(col)}</th>`
+                    white-space:nowrap;padding:0 6px;font-weight:500">${escHtml(col)}</th>`
       ).join("");
 
       const staffRows = staffList.length
-        ? `<table style="font-size:11px;width:100%;border-collapse:collapse;table-layout:fixed">
+        ? `<table style="font-size:11px;border-collapse:collapse;table-layout:fixed;width:100%">
+             <colgroup>
+               <col style="width:280px">
+               ${cols.map(() => `<col style="width:68px">`).join("")}
+             </colgroup>
              <thead><tr>
                <th style="text-align:left;font-size:10px;color:var(--text-tertiary);
                           font-weight:500;padding-bottom:4px">Name</th>
