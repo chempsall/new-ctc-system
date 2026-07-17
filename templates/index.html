@@ -75,19 +75,19 @@
         <div class="metric-card__sub">full time equivalent</div>
       </div>
       <div class="metric-card">
-        <div class="metric-card__label">Active this month</div>
+        <div class="metric-card__label">Active projects this month</div>
         <div class="metric-card__value" id="metric-projects">—</div>
         <div id="metric-projects-total" style="font-size:10px;color:var(--text-tertiary);margin-top:2px"></div>
       </div>
       <div class="metric-card" id="metric-over-card">
         <div class="metric-card__label">Over-resourced</div>
         <div class="metric-card__value" id="metric-over">—</div>
-        <div class="metric-card__sub">people this period</div>
+        <div class="metric-card__sub">people this month</div>
       </div>
       <div class="metric-card" id="metric-under-card">
         <div class="metric-card__label">Under-resourced</div>
         <div class="metric-card__value" id="metric-under">—</div>
-        <div class="metric-card__sub">people this period</div>
+        <div class="metric-card__sub">people this month</div>
       </div>
       <div class="metric-card" id="metric-norec-card">
         <div class="metric-card__label">No Horizon record</div>
@@ -165,6 +165,12 @@
         <span class="filter-bar__label-spacer"></span>
         <input type="text" id="filter-search"
                placeholder="Search..." autocomplete="off">
+        <div style="flex:1"></div>
+        <button class="btn" id="btn-create-rtc"
+                onclick="openRtcModal('new')"
+                style="display:none;background:var(--wsp-red);border-color:var(--wsp-red);color:#fff">
+          + New RTC
+        </button>
       </div>
 
     </div>
@@ -172,13 +178,6 @@
     <!-- Month tabs — below the filter bar -->
     <div class="month-tabs" id="month-tabs" style="display:flex;align-items:center">
       <!-- Populated by JavaScript -->
-    </div>
-    <div id="new-rtc-bar" style="display:none;padding:4px 16px 8px">
-      <button class="btn" id="btn-create-rtc"
-              onclick="openRtcModal('new')"
-              style="background:var(--wsp-red);border-color:var(--wsp-red);color:#fff">
-        + New RTC
-      </button>
     </div>
 
     <!-- ===================================================================

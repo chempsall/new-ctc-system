@@ -611,8 +611,8 @@ const _expandedRtcs  = new Set();
 function kpiDot(kpi) {
   const col = kpi === "over"  ? "#DC2626"
             : kpi === "under" ? "#15803D"
-            : "#B45309";
-  return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;
+            : "#D97706";
+  return `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;
                        background:${col};margin-left:5px;vertical-align:middle;
                        flex-shrink:0"></span>`;
 }
@@ -661,7 +661,7 @@ function renderStaffTable() {
       const alloc = person.allocated[p] || 0;
       const kpi   = person.kpi[p];
       if (alloc === 0) return `<td></td>`;
-      return `<td style="text-align:center;font-family:var(--font-mono);font-size:12px;white-space:nowrap">
+      return `<td style="text-align:center;font-family:var(--font-mono);font-size:12px;white-space:nowrap;vertical-align:middle">
         <span>${alloc.toFixed(2)}d</span>${isGeneric ? "" : kpiDot(kpi)}
       </td>`;
     }).join("");
@@ -1355,8 +1355,8 @@ function switchView(view) {
   // Month tabs only relevant for staff and projects views
  const monthTabs = document.getElementById("month-tabs");
   if (monthTabs) monthTabs.style.display = (view === "mgmt" || view === "staff" || view === "projects") ? "none" : "";
-  const newRtcBar = document.getElementById("new-rtc-bar");
-  if (newRtcBar) newRtcBar.style.display = view === "projects" ? "" : "none";
+  const newRtcBtn = document.getElementById("btn-create-rtc");
+  if (newRtcBtn) newRtcBtn.style.display = view === "projects" ? "" : "none";
   const detailPanel = document.getElementById("detail-panel");
   if (detailPanel && view === "mgmt") detailPanel.classList.remove("open");
 
