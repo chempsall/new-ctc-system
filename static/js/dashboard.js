@@ -1429,6 +1429,7 @@ function resetFilters() {
   state.filters.project_pm   = "all";
   state.filters.project_pd   = "all";
   state.filters.search       = "";
+  state.filters.line_manager = "all";
   state.rtcFilters.pm        = "";
   state.rtcFilters.pd        = "";
   state.rtcFilters.status    = "";
@@ -1457,6 +1458,10 @@ function resetFilters() {
   if (pmSel)      pmSel.value      = "all";
   if (pdSel)      pdSel.value      = "all";
   if (statusSel)  statusSel.value  = "";
+
+  state.filters.line_manager = "all";
+  const lmSel = document.getElementById("filter-line-manager");
+  if (lmSel) lmSel.value = "all";
 
   if (["rtcs","projects"].includes(state.activeView)) {
     loadRtcs();
