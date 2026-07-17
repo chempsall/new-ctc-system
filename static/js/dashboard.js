@@ -112,13 +112,7 @@ function buildMonthTabs() {
   if (!state.activePeriod && state.summary.periods.length) {
     state.activePeriod = state.summary.periods[0];
   }
-  const newBtn = document.createElement("button");
-  newBtn.id = "btn-create-rtc";
-  newBtn.className = "btn";
-  newBtn.textContent = "+ New RTC";
-  newBtn.style.cssText = "margin-left:auto;background:var(--wsp-red);border-color:var(--wsp-red);color:#fff;white-space:nowrap;height:100%;box-sizing:border-box;align-self:stretch";
-  newBtn.onclick = () => openRtcModal("new");
-  container.appendChild(newBtn);
+
 }
 
 function buildFilterOptions() {
@@ -1313,6 +1307,8 @@ function switchView(view) {
   document.querySelectorAll(".filter-bar select").forEach(sel => {
     sel.value = sel.options[0]?.value ?? "all";
   });
+  const lmSel = document.getElementById("filter-line-manager");
+  if (lmSel) lmSel.value = "all";
   state.filters.horizon      = "all";
   state.filters.job_title    = "all";
   state.filters.job_function = "all";
@@ -1333,7 +1329,7 @@ function switchView(view) {
     mgmt:     ["filter-rtc-pd", "filter-rtc-pm", "filter-horizon"],
   };
   const hiddenSlots = {
-    staff: ["filter-rtc-status"],
+    staff:    ["filter-rtc-status"],
   };
   const allSlots = [
     "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
@@ -1356,6 +1352,8 @@ function switchView(view) {
   // Month tabs only relevant for staff and projects views
  const monthTabs = document.getElementById("month-tabs");
   if (monthTabs) monthTabs.style.display = (view === "mgmt" || view === "staff" || view === "projects") ? "none" : "";
+  const newRtcBar = document.getElementById("new-rtc-bar");
+  if (newRtcBar) newRtcBar.style.display = view === "projects" ? "" : "none";
   const detailPanel = document.getElementById("detail-panel");
   if (detailPanel && view === "mgmt") detailPanel.classList.remove("open");
 
