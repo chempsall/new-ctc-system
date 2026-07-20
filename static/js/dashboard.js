@@ -377,202 +377,356 @@ function filteredProjects() {
 function renderMgmtSummary() {
   const container = document.getElementById("mgmt-container");
   if (!container) return;
-  const s   = state.summary;
+  const s = state.summary;
   if (!s) { container.innerHTML = '<div class="empty-state">Loading…</div>'; return; }
 
   const dept = state.filters.department !== "all" ? state.filters.department : null;
+  const pd   = state.rtcFilters.pd || "";
+  const pm   = state.rtcFilters.pm || "";
   const p    = state.activePeriod;
+  const curIdx = Math.max(0, s.periods.indexOf(p));
+  const periods6 = s.periods.slice(curIdx, curIdx + 6);
+  const nextP = periods6[1] || periods6[0];
 
-  // Filter staff by department
+  const gradeSort = t => {
+    if (!t) return 999;
+    if (t.startsWith("L")) return -1;
+    const m = t.match(/^([PT])(\d+)/);
+    if (!m) return 998;
+    return (m[1] === "P" ? 0 : 100) + (99 - parseInt(m[2]));
+  };
+
+  // Staff (no generics)
   const staff = s.staff.filter(ps =>
-    !dept || ps.department === dept
+    !ps.id.startsWith("GENERIC-") && (!dept || ps.department === dept)
   );
 
-  // Use unfiltered RTCs fetched specifically for mgmt view
+  // RTCs
   const allRtcs = state.mgmtRtcs || state.rtcs;
-  const pd      = state.rtcFilters.pd  || "";
-  const pm      = state.rtcFilters.pm  || "";
-  const horizon = state.filters.horizon !== "all" ? state.filters.horizon : "";
   const rtcs = allRtcs.filter(r =>
-    (!dept    || r.department === dept) &&
-    (!pd      || r.project_director === pd) &&
-    (!pm      || r.project_manager === pm) &&
-    (!horizon || r.horizon_status === horizon)
+    (!dept || r.department === dept) &&
+    (!pd   || r.project_director === pd) &&
+    (!pm   || r.project_manager  === pm)
   );
 
-  // Headline metrics
-  const totalStaff    = staff.filter(s => !s.id.startsWith("GENERIC-")).length;
-  const totalFte      = staff.reduce((sum, ps) => sum + (ps.fte[p] || 0), 0).toFixed(1);
-  const overCount     = staff.filter(ps => ps.kpi[p] === "over").length;
-  const underCount    = staff.filter(ps => ps.kpi[p] === "under").length;
-  const allocDays     = staff.reduce((sum, ps) => sum + (ps.allocated[p] || 0), 0);
-  const horizonDays   = staff.reduce((sum, ps) => sum + (ps.horizon_days[p] || 0), 0);
-  const noRecDays     = staff.reduce((sum, ps) => sum + (ps.no_record_days[p] || 0), 0);
-
-  // RTC status breakdown
-  const statusCounts = { current: 0, due_review: 0, overdue_review: 0,
-                         awaiting_archiving: 0, archived: 0 };
-  rtcs.forEach(r => { if (r.status in statusCounts) statusCounts[r.status]++; });
-
-  // Horizon linked vs unlinked
+  // Horizon days by category
+  const projsByDept = (s.projects || []).filter(pr => !dept || pr.department === dept);
+  const linkedDays   = projsByDept.filter(pr => pr.horizon_status === "linked")
+                         .reduce((sum, pr) => sum + (pr.future_days || 0), 0);
+  const oppDays      = projsByDept.filter(pr => pr.horizon_status === "opportunity")
+                         .reduce((sum, pr) => sum + (pr.future_days || 0), 0);
+  const unlinkedDays = projsByDept.filter(pr => pr.horizon_status === "norecord")
+                         .reduce((sum, pr) => sum + (pr.future_days || 0), 0);
   const linkedRtcs   = rtcs.filter(r => r.horizon_status === "linked");
   const oppRtcs      = rtcs.filter(r => r.horizon_status === "opportunity");
   const unlinkedRtcs = rtcs.filter(r => r.horizon_status === "norecord");
-  const linkedDays   = linkedRtcs.reduce((sum, r) => sum + (r.future_days || 0), 0);
-  const oppDays      = oppRtcs.reduce((sum, r) => sum + (r.future_days || 0), 0);
-  const unlinkedDays = unlinkedRtcs.reduce((sum, r) => sum + (r.future_days || 0), 0);
 
-  // Utilisation by month (next 6 periods)
-  const periods6 = s.periods.slice(s.periods.indexOf(p), s.periods.indexOf(p) + 6);
+  // RTC review status
+  const statusCounts = { current: 0, due_review: 0, overdue_review: 0 };
+  rtcs.forEach(r => { if (r.status in statusCounts) statusCounts[r.status]++; });
+  const totalRtcs = Object.values(statusCounts).reduce((s, v) => s + v, 0);
 
-  // Top projects by future days
-  const projects = s.projects
-    .filter(pr => !dept || pr.department === dept)
-    .filter(pr => Object.values(pr.total_days).some(d => d > 0))
-    .sort((a, b) => {
-      const fa = Object.entries(a.total_days)
-        .filter(([l]) => s.periods.indexOf(l) >= s.periods.indexOf(p))
-        .reduce((s, [,d]) => s + d, 0);
-      const fb = Object.entries(b.total_days)
-        .filter(([l]) => s.periods.indexOf(l) >= s.periods.indexOf(p))
-        .reduce((s, [,d]) => s + d, 0);
-      return fb - fa;
-    })
+  // KPI numbers
+  const overCount  = staff.filter(ps => ps.kpi[p] === "over").length;
+  const underCount = staff.filter(ps => ps.kpi[p] === "under").length;
+  const totalFte   = staff.reduce((sum, ps) => sum + (ps.fte[p] || 0), 0);
+  const feeUtil    = (() => {
+    const cap = staff.reduce((sum, ps) => sum + (ps.capacity[p] || 0), 0);
+    const fee = staff.reduce((sum, ps) => sum + (ps.horizon_days[p] || 0), 0);
+    return cap > 0 ? Math.round(fee / cap * 100) : 0;
+  })();
+  const bench = staff.reduce((sum, ps) => {
+    const avail = (ps.capacity[p] || 0) - (ps.allocated[p] || 0);
+    return sum + Math.max(0, avail);
+  }, 0);
+
+  // Top 10 projects
+  const topProjects = projsByDept
+    .filter(pr => (pr.future_days || 0) > 0)
+    .sort((a, b) => (b.future_days || 0) - (a.future_days || 0))
     .slice(0, 10);
 
-  // Staff at risk (over-allocated next 3 months)
-  const periods3 = s.periods.slice(s.periods.indexOf(p), s.periods.indexOf(p) + 3);
-  const atRisk = staff
-    .filter(ps => !ps.id.startsWith("GENERIC-"))
-    .filter(ps => periods3.some(per => ps.kpi[per] === "over"))
-    .sort((a, b) => (b.allocated[p] || 0) - (a.allocated[p] || 0))
-    .slice(0, 10);
+  // Over-allocated
+  const overThisMonth = staff.filter(ps => ps.kpi[p] === "over")
+    .sort((a, b) => (b.allocated[p] || 0) - (a.allocated[p] || 0));
+  const overNextMonth = staff.filter(ps => ps.kpi[nextP] === "over")
+    .sort((a, b) => (b.allocated[nextP] || 0) - (a.allocated[nextP] || 0));
 
-  const statusLabel = { current: "Current", due_review: "Due for review",
-    overdue_review: "Overdue review", awaiting_archiving: "Awaiting archiving",
-    archived: "Archived" };
-  const statusColour = { current: "var(--green-dark)", due_review: "var(--amber-dark)",
-    overdue_review: "var(--status-red)", awaiting_archiving: "var(--grey-500)",
-    archived: "var(--grey-400)" };
+  // Grade groups sorted L, P desc, T desc
+  const gradeMap = {};
+  staff.forEach(ps => {
+    const g = ps.job_title || "Unknown";
+    if (!gradeMap[g]) gradeMap[g] = { capacity: 0, allocated: 0, feeEarning: 0 };
+    gradeMap[g].capacity  += ps.capacity[p] || 0;
+    gradeMap[g].allocated += ps.allocated[p] || 0;
+    gradeMap[g].feeEarning += ps.horizon_days[p] || 0;
+  });
+  const grades = Object.entries(gradeMap)
+    .filter(([, g]) => g.capacity > 0)
+    .sort(([a], [b]) => gradeSort(a) - gradeSort(b));
+
+  // Annual leave expected vs actual (6 months)
+  const AL_MONTHLY = { Jan:0.8,Feb:0.9,Mar:1.1,Apr:1.5,May:1.3,Jun:1.7,
+                        Jul:2.4,Aug:3.6,Sep:2.3,Oct:1.9,Nov:1.5,Dec:6.0 };
+  const AL_ANNUAL = 25;
+  const alExpected = periods6.map(per => {
+    const mon = per.split("-")[0];
+    const bh = (s.bank_holidays || {})[per] || 0;
+    return staff.reduce((sum, ps) => {
+      const avail = ps.fte[per] || 1;
+      return sum + ((AL_ANNUAL * avail) * ((AL_MONTHLY[mon] || 1) / 12)) + bh * avail;
+    }, 0);
+  });
+  const alActual = periods6.map(per => {
+    const alProjs = projsByDept.filter(pr => pr.number === "ID-06");
+    return alProjs.reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0);
+  });
+
+  // Allocated days by horizon type over 6 months
+  const allocLinked   = periods6.map(per => projsByDept.filter(pr => pr.horizon_status === "linked").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0));
+  const allocOpp      = periods6.map(per => projsByDept.filter(pr => pr.horizon_status === "opportunity").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0));
+  const allocUnlinked = periods6.map(per => projsByDept.filter(pr => pr.horizon_status === "norecord").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0));
+
+  // Treemap sizing
+  const totalHdays = linkedDays + oppDays + unlinkedDays || 1;
+  const linkedPct  = Math.round(linkedDays / totalHdays * 100);
+  const oppPct     = Math.round(oppDays / totalHdays * 100);
+
+  const fmtD = d => Math.round(d).toLocaleString("en-GB");
+
+  const statusLabel  = { current:"Current", due_review:"Due for review", overdue_review:"Overdue review" };
+  const statusColour = { current:"#008300", due_review:"#eda100", overdue_review:"#e34948" };
+
+  const overTable = (people, per) => {
+    if (!people.length) return `<div style="font-size:12px;color:var(--text-tertiary);font-style:italic;padding:8px 0">None</div>`;
+    return `<table class="mgmt-table">
+      <thead><tr><th>Name</th><th>Grade</th><th style="text-align:right">Allocated</th><th style="text-align:right">Capacity</th></tr></thead>
+      <tbody>${people.map(ps => `<tr>
+        <td>${escHtml(ps.name)}</td>
+        <td style="font-size:11px;color:var(--text-tertiary)">${escHtml(fmt.gradeShort(ps.job_title))}</td>
+        <td style="text-align:right;font-family:var(--font-mono);font-size:12px;color:#e34948">${fmtD(ps.allocated[per] || 0)}d</td>
+        <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(ps.capacity[per] || 0)}d</td>
+      </tr>`).join("")}</tbody></table>`;
+  };
 
   container.innerHTML = `
     <div class="mgmt-grid">
 
-      <!-- Headline metrics -->
+      <!-- KPI row -->
       <div class="mgmt-card mgmt-card--wide">
-        <div class="mgmt-card__title">This month at a glance</div>
-        <div class="mgmt-metrics">
-          <div class="mgmt-metric">
-            <div class="mgmt-metric__value">${totalStaff}</div>
-            <div class="mgmt-metric__label">Staff</div>
-          </div>
-          <div class="mgmt-metric">
-            <div class="mgmt-metric__value">${totalFte}</div>
-            <div class="mgmt-metric__label">FTE</div>
-          </div>
-          <div class="mgmt-metric">
-            <div class="mgmt-metric__value">${fmt.days(allocDays)}d</div>
-            <div class="mgmt-metric__label">Allocated</div>
-          </div>
-          <div class="mgmt-metric" style="color:var(--status-red)">
-            <div class="mgmt-metric__value">${overCount}</div>
-            <div class="mgmt-metric__label">Over-allocated</div>
-          </div>
-          <div class="mgmt-metric" style="color:var(--green-dark)">
-            <div class="mgmt-metric__value">${underCount}</div>
-            <div class="mgmt-metric__label">Under-resourced</div>
-          </div>
+        <div class="mgmt-card__title">This month at a glance — ${escHtml(p)}</div>
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+          ${[
+            { val: staff.length,            label: "Staff",                  col: "" },
+            { val: totalFte.toFixed(1),     label: "FTE",                   col: "" },
+            { val: overCount,               label: "Over-allocated",         col: "#e34948" },
+            { val: underCount,              label: "Under-resourced",        col: "#008300" },
+            { val: feeUtil + "%",           label: "Fee-earning utilisation",col: "#2a78d6" },
+            { val: fmtD(bench) + "d",       label: "Bench available",        col: "" },
+          ].map(k => `<div style="background:var(--surface-1);border-radius:8px;padding:10px 12px">
+            <div style="font-size:22px;font-weight:500;line-height:1;color:${k.col || "var(--text-primary)"}">
+              ${escHtml(String(k.val))}
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:3px">${escHtml(k.label)}</div>
+          </div>`).join("")}
         </div>
       </div>
 
-      <!-- Horizon linked vs unlinked -->
+      <!-- Horizon treemap -->
       <div class="mgmt-card">
-        <div class="mgmt-card__title">Horizon link status (future days)</div>
-        <div class="mgmt-horizon-row">
-          <div class="mgmt-horizon-item mgmt-horizon-item--linked">
-            <div class="mgmt-horizon-item__count">${linkedRtcs.length}</div>
-            <div class="mgmt-horizon-item__label">Fee earning</div>
-            <div class="mgmt-horizon-item__days">${fmt.days(linkedDays)}d</div>
+        <div class="mgmt-card__title">Horizon link status — future days</div>
+        <div style="position:relative;height:130px">
+          <div style="position:absolute;left:0;top:0;width:${linkedPct}%;height:100%;
+                      background:#eaf3de;border:2px solid var(--surface-2);border-radius:4px;
+                      display:flex;flex-direction:column;justify-content:center;align-items:center">
+            <div style="font-size:11px;font-weight:500;color:#3b6d11">Fee earning</div>
+            <div style="font-size:18px;font-weight:500;color:#3b6d11">${fmtD(linkedDays)}d</div>
+            <div style="font-size:10px;color:#639922">${linkedRtcs.length} RTCs</div>
           </div>
-          <div class="mgmt-horizon-item mgmt-horizon-item--opportunity">
-            <div class="mgmt-horizon-item__count">${oppRtcs.length}</div>
-            <div class="mgmt-horizon-item__label">Opportunity</div>
-            <div class="mgmt-horizon-item__days">${fmt.days(oppDays)}d</div>
+          <div style="position:absolute;left:${linkedPct}%;top:0;width:${oppPct}%;height:55%;
+                      background:#faeeda;border:2px solid var(--surface-2);border-radius:4px;
+                      display:flex;flex-direction:column;justify-content:center;align-items:center">
+            <div style="font-size:10px;font-weight:500;color:#854f0b">Opportunity</div>
+            <div style="font-size:14px;font-weight:500;color:#854f0b">${fmtD(oppDays)}d</div>
+            <div style="font-size:10px;color:#ba7517">${oppRtcs.length} RTCs</div>
           </div>
-          <div class="mgmt-horizon-item mgmt-horizon-item--unlinked">
-            <div class="mgmt-horizon-item__count">${unlinkedRtcs.length}</div>
-            <div class="mgmt-horizon-item__label">Not linked</div>
-            <div class="mgmt-horizon-item__days">${fmt.days(unlinkedDays)}d at risk</div>
+          <div style="position:absolute;left:${linkedPct}%;top:55%;width:${oppPct}%;height:45%;
+                      background:#fcebeb;border:2px solid var(--surface-2);border-radius:4px;
+                      display:flex;flex-direction:column;justify-content:center;align-items:center">
+            <div style="font-size:10px;font-weight:500;color:#a32d2d">Not linked</div>
+            <div style="font-size:12px;font-weight:500;color:#a32d2d">${fmtD(unlinkedDays)}d at risk</div>
+            <div style="font-size:10px;color:#a32d2d">${unlinkedRtcs.length} RTCs</div>
           </div>
         </div>
       </div>
 
-      <!-- RTC health -->
+      <!-- RTC review status -->
       <div class="mgmt-card">
         <div class="mgmt-card__title">RTC review status</div>
-        ${Object.entries(statusCounts)
-          .filter(([k]) => k !== "archived")
-          .map(([k, v]) => `
-          <div class="mgmt-status-row">
-            <div class="mgmt-status-row__label" style="color:${statusColour[k]}">${statusLabel[k]}</div>
-            <div class="mgmt-status-row__bar-wrap">
-              <div class="mgmt-status-row__bar" style="width:${rtcs.length ? Math.round(v/rtcs.length*100) : 0}%;background:${statusColour[k]}"></div>
+        ${Object.entries(statusCounts).map(([k, v]) => `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <div style="font-size:11px;color:${statusColour[k]};width:120px;flex-shrink:0">${statusLabel[k]}</div>
+            <div style="flex:1;height:8px;border-radius:4px;background:var(--surface-1);overflow:hidden">
+              <div style="width:${totalRtcs ? Math.round(v/totalRtcs*100) : 0}%;height:100%;border-radius:4px;background:${statusColour[k]}"></div>
             </div>
-            <div class="mgmt-status-row__count">${v}</div>
+            <div style="font-size:11px;color:var(--text-secondary);width:24px;text-align:right">${v}</div>
           </div>`).join("")}
       </div>
 
-      <!-- Top projects -->
+      <!-- Allocated days chart — full width -->
       <div class="mgmt-card mgmt-card--wide">
-        <div class="mgmt-card__title">Top projects by days remaining</div>
+        <div class="mgmt-card__title">Allocated days — next 6 months</div>
+        <div style="display:flex;align-items:flex-start;gap:16px">
+          <div style="flex:1;position:relative;height:140px">
+            <canvas id="mgmt-alloc-chart" role="img" aria-label="Stacked bar chart of allocated days by horizon status over 6 months">Allocated days by horizon status.</canvas>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;flex-shrink:0">
+            ${[
+              { col:"#2a78d6", label:"Fee earning" },
+              { col:"#eda100", label:"Opportunity" },
+              { col:"#e34948", label:"Not linked" },
+            ].map(it => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.col}"></span>${escHtml(it.label)}
+            </div>`).join("")}
+          </div>
+        </div>
+      </div>
+
+      <!-- Annual leave -->
+      <div class="mgmt-card">
+        <div class="mgmt-card__title">Annual leave & public holidays</div>
+        <div style="display:flex;align-items:flex-start;gap:16px">
+          <div style="flex:1;position:relative;height:140px">
+            <canvas id="mgmt-al-chart" role="img" aria-label="Expected vs actual annual leave and public holidays over 6 months">Annual leave expected vs actual.</canvas>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;flex-shrink:0">
+            ${[
+              { col:"#b4b2a9", label:"Expected" },
+              { col:"#2a78d6", label:"Actual" },
+            ].map(it => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.col}"></span>${escHtml(it.label)}
+            </div>`).join("")}
+          </div>
+        </div>
+      </div>
+
+      <!-- Utilisation by grade -->
+      <div class="mgmt-card">
+        <div class="mgmt-card__title">Utilisation by grade — fee earning</div>
         <table class="mgmt-table">
-          <thead><tr>
-            <th>Project</th><th>Department</th>
-            <th style="text-align:right">This month</th>
-            <th style="text-align:right">Future days</th>
-            <th>Horizon</th>
-          </tr></thead>
-          <tbody>
-          ${projects.map(pr => {
-            const futureDays = pr.future_days || 0;
-            const linked = pr.horizon_status === "linked";
+          <thead><tr><th>Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Fee earning</th><th style="text-align:right">Util.</th></tr></thead>
+          <tbody>${grades.map(([grade, g]) => {
+            const pct = g.capacity > 0 ? Math.round(g.feeEarning / g.capacity * 100) : 0;
+            const col = pct >= 80 ? "#008300" : pct >= 50 ? "#eda100" : "#e34948";
             return `<tr>
-              <td><div class="proj-name">${escHtml(pr.name)}</div>
-                  <div class="proj-task" style="font-size:10px;color:var(--text-tertiary)">${escHtml(pr.task_name || "")}</div></td>
-              <td><span class="team-badge">${escHtml(pr.department || "—")}</span></td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt.days(pr.total_days[p] || 0)}d</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt.days(futureDays)}d</td>
-              <td>${horizonBadge(pr.horizon_status)}</td>
+              <td style="font-size:11px">${escHtml(grade)}</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.capacity)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.feeEarning)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:${col};font-weight:500">${pct}%</td>
             </tr>`;
-          }).join("")}
-          </tbody>
+          }).join("")}</tbody>
         </table>
       </div>
 
-      <!-- Staff at risk -->
-      ${atRisk.length ? `
+      <!-- Bench strength by grade -->
       <div class="mgmt-card">
-        <div class="mgmt-card__title">Staff over-allocated (next 3 months)</div>
+        <div class="mgmt-card__title">Bench strength by grade</div>
         <table class="mgmt-table">
-          <thead><tr><th>Name</th><th>Grade</th>
-            ${periods3.map(per => `<th style="text-align:center">${per}</th>`).join("")}
-          </tr></thead>
-          <tbody>
-          ${atRisk.map(ps => `<tr>
-            <td>${escHtml(ps.name)}</td>
-            <td style="font-size:11px;color:var(--text-tertiary)">${escHtml(fmt.gradeShort(ps.job_title))}</td>
-            ${periods3.map(per => {
-              const kpi = ps.kpi[per] || "ok";
-              const col = kpi === "over" ? "var(--status-red)" : kpi === "under" ? "var(--green-dark)" : "";
-              return `<td style="text-align:center;font-family:var(--font-mono);font-size:11px;color:${col}">${fmt.days(ps.allocated[per] || 0)}d</td>`;
-            }).join("")}
-          </tr>`).join("")}
-          </tbody>
+          <thead><tr><th>Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Allocated</th><th style="text-align:right">Available</th></tr></thead>
+          <tbody>${grades.map(([grade, g]) => {
+            const avail = Math.max(0, g.capacity - g.allocated);
+            return `<tr>
+              <td style="font-size:11px">${escHtml(grade)}</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.capacity)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.allocated)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300;font-weight:500">${fmtD(avail)}d</td>
+            </tr>`;
+          }).join("")}</tbody>
         </table>
-      </div>` : ""}
+      </div>
+
+      <!-- Over-allocated this month -->
+      <div class="mgmt-card">
+        <div class="mgmt-card__title">Over-allocated this month (${escHtml(p)})</div>
+        ${overTable(overThisMonth, p)}
+      </div>
+
+      <!-- Over-allocated next month -->
+      <div class="mgmt-card">
+        <div class="mgmt-card__title">Over-allocated next month (${escHtml(nextP)})</div>
+        ${overTable(overNextMonth, nextP)}
+      </div>
+
+      <!-- Top 10 projects — full width -->
+      <div class="mgmt-card mgmt-card--wide">
+        <div class="mgmt-card__title">Top 10 projects by days remaining</div>
+        <table class="mgmt-table">
+          <thead><tr><th>Project / task</th><th>Department</th><th style="text-align:right">This month</th><th style="text-align:right">Future days</th><th>Status</th></tr></thead>
+          <tbody>${topProjects.map(pr => `<tr>
+            <td>
+              <div class="proj-name">${escHtml(pr.name)}</div>
+              <div style="font-size:10px;color:var(--text-tertiary)">${escHtml(pr.task_name || "")}</div>
+            </td>
+            <td><span class="team-badge">${escHtml(pr.department || "—")}</span></td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(pr.total_days[p] || 0)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(pr.future_days || 0)}d</td>
+            <td>${horizonBadge(pr.horizon_status)}</td>
+          </tr>`).join("")}</tbody>
+        </table>
+      </div>
 
     </div>
   `;
+
+  // Render Chart.js charts after DOM is set
+  requestAnimationFrame(() => {
+    const labels = periods6;
+
+    const allocCtx = document.getElementById("mgmt-alloc-chart");
+    if (allocCtx) {
+      new Chart(allocCtx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "Fee earning", data: allocLinked,   backgroundColor: "#2a78d6", stack: "a" },
+            { label: "Opportunity", data: allocOpp,      backgroundColor: "#eda100", stack: "a" },
+            { label: "Not linked",  data: allocUnlinked, backgroundColor: "#e34948", stack: "a" },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+            y: { stacked: true, grid: { color: "#e1e0d9" }, ticks: { font: { size: 10 }, callback: v => Math.round(v).toLocaleString("en-GB") } }
+          }
+        }
+      });
+    }
+
+    const alCtx = document.getElementById("mgmt-al-chart");
+    if (alCtx) {
+      new Chart(alCtx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "Expected", data: alExpected.map(v => Math.round(v)), backgroundColor: "#b4b2a9" },
+            { label: "Actual",   data: alActual.map(v => Math.round(v)),   backgroundColor: "#2a78d6" },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+            y: { grid: { color: "#e1e0d9" }, ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+    }
+  });
 }
 
 function renderView() {
