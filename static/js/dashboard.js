@@ -119,7 +119,7 @@ function buildFilterOptions() {
   const s = state.summary;
 
   // Teams — from unique values in staff
-  const staffDepts    = (s.departments || []).map(d => d.department);
+  const staffDepts    = [...new Set((s.staff || []).map(p => p.department).filter(Boolean))];
   const projectDepts  = (s.projects || []).map(p => p.department).filter(Boolean);
   const allDepts      = [...new Set([...staffDepts, ...projectDepts])].sort();
   const staffDeptsOnly = [...new Set(staffDepts)].sort();
@@ -533,7 +533,7 @@ function renderMgmtSummary() {
           </div>
           <div style="display:flex;flex-direction:column;justify-content:space-around;flex-shrink:0">
             <div style="display:flex;align-items:center;gap:6px">
-              <div style="width:10px;height:10px;border-radius:2px;background:#eaf3de;border:1px solid #639922;flex-shrink:0"></div>
+              <div style="width:10px;height:10px;border-radius:2px;background:#2a78d6
               <div style="font-size:10px;color:var(--text-secondary)">Fee earning<br><span style="font-weight:500;color:var(--text-primary)">${fmtD(linkedDays)}d</span></div>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
