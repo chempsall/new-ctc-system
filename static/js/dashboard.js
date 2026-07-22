@@ -474,7 +474,7 @@ function renderMgmtSummary() {
     const bh = (s.bank_holidays || {})[per] || 0;
     return staff.reduce((sum, ps) => {
       const avail = ps.fte[per] || 1;
-      return sum + ((AL_ANNUAL * avail) * ((AL_MONTHLY[mon] || 1) / 12)) + bh * avail;
+      return sum + (AL_MONTHLY[mon] || 0) * avail + bh * avail;
     }, 0);
   });
   const alActual = periods6.map(per => {
@@ -513,14 +513,10 @@ function renderMgmtSummary() {
     <div class="mgmt-grid">
 
       <!-- KPI row -->
-      <div class="mgmt-card mgmt-card--wide">
+      <div class="mgmt-card">
         <div class="mgmt-card__title">This month at a glance — ${escHtml(p)}</div>
-        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;max-width:400px">
           ${[
-            { val: staff.length,            label: "Staff",                  col: "" },
-            { val: totalFte.toFixed(1),     label: "FTE",                   col: "" },
-            { val: overCount,               label: "Over-allocated",         col: "#e34948" },
-            { val: underCount,              label: "Under-resourced",        col: "#008300" },
             { val: feeUtil + "%",           label: "Fee-earning utilisation",col: "#2a78d6" },
             { val: fmtD(bench) + "d",       label: "Bench available",        col: "" },
           ].map(k => `<div style="background:var(--surface-1);border-radius:8px;padding:10px 12px">
@@ -537,26 +533,11 @@ function renderMgmtSummary() {
         <div class="mgmt-card__title">Horizon link status — future days</div>
         <div style="position:relative;height:130px">
           <div style="position:absolute;left:0;top:0;width:${linkedPct}%;height:100%;
-                      background:#eaf3de;border:2px solid var(--surface-2);border-radius:4px;
-                      display:flex;flex-direction:column;justify-content:center;align-items:center">
-            <div style="font-size:11px;font-weight:500;color:#3b6d11">Fee earning</div>
-            <div style="font-size:18px;font-weight:500;color:#3b6d11">${fmtD(linkedDays)}d</div>
-            <div style="font-size:10px;color:#639922">${linkedRtcs.length} RTCs</div>
-          </div>
+                      background:#eaf3de;border:2px solid var(--surface-2);border-radius:4px"></div>
           <div style="position:absolute;left:${linkedPct}%;top:0;width:${oppPct}%;height:55%;
-                      background:#faeeda;border:2px solid var(--surface-2);border-radius:4px;
-                      display:flex;flex-direction:column;justify-content:center;align-items:center">
-            <div style="font-size:10px;font-weight:500;color:#854f0b">Opportunity</div>
-            <div style="font-size:14px;font-weight:500;color:#854f0b">${fmtD(oppDays)}d</div>
-            <div style="font-size:10px;color:#ba7517">${oppRtcs.length} RTCs</div>
-          </div>
+                      background:#faeeda;border:2px solid var(--surface-2);border-radius:4px"></div>
           <div style="position:absolute;left:${linkedPct}%;top:55%;width:${oppPct}%;height:45%;
-                      background:#fcebeb;border:2px solid var(--surface-2);border-radius:4px;
-                      display:flex;flex-direction:column;justify-content:center;align-items:center">
-            <div style="font-size:10px;font-weight:500;color:#a32d2d">Not linked</div>
-            <div style="font-size:12px;font-weight:500;color:#a32d2d">${fmtD(unlinkedDays)}d at risk</div>
-            <div style="font-size:10px;color:#a32d2d">${unlinkedRtcs.length} RTCs</div>
-          </div>
+                      background:#fcebeb;border:2px solid var(--surface-2);border-radius:4px"></div>
         </div>
       </div>
 
