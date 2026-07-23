@@ -119,7 +119,7 @@ function buildFilterOptions() {
   const s = state.summary;
 
   // Teams — from unique values in staff
-  const staffDepts    = [...new Set((s.staff || []).map(p => p.department).filter(Boolean))];
+  const staffDepts    = [...new Set((s.staff || []).map(p => p.department).filter(d => d && d !== "_GENERIC"))];
   const projectDepts  = (s.projects || []).map(p => p.department).filter(Boolean);
   const allDepts      = [...new Set([...staffDepts, ...projectDepts])].sort();
   const staffDeptsOnly = [...new Set(staffDepts)].sort();
@@ -435,8 +435,9 @@ function renderMgmtSummary() {
   const bench = staff.reduce((sum, ps) => sum + Math.max(0, (ps.capacity[p] || 0) - (ps.allocated[p] || 0)), 0);
 
   // Top 10 projects
+  const SPECIAL_NUMS = new Set(["ID-06", "ID-04", "IDUK-01"]);
   const topProjects = projsByDept
-    .filter(pr => (pr.future_days || 0) > 0)
+    .filter(pr => (pr.future_days || 0) > 0 && !SPECIAL_NUMS.has(pr.number))
     .sort((a, b) => (b.future_days || 0) - (a.future_days || 0))
     .slice(0, 10);
 
@@ -491,10 +492,10 @@ function renderMgmtSummary() {
   };
 
   container.innerHTML = `
-    <div class="mgmt-grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="mgmt-grid" style="grid-template-columns:repeat(6,1fr)">
 
       <!-- ROW 1: Month at a glance | RTC review status | Treemap (3 equal columns) -->
-      <div class="mgmt-card" style="grid-column:1">
+      <div class="mgmt-card" style="grid-column:span 2">
         <div class="mgmt-card__title">Month at a glance — ${escHtml(p)}</div>
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
           <div style="display:flex;justify-content:space-between;align-items:baseline">
@@ -509,7 +510,7 @@ function renderMgmtSummary() {
         </div>
       </div>
 
-      <div class="mgmt-card" style="grid-column:2">
+      <div class="mgmt-card" style="grid-column:span 2">
         <div class="mgmt-card__title">RTC review status</div>
         <div style="margin-top:4px">
           ${Object.entries(statusCounts).map(([k, v]) => `
@@ -523,33 +524,33 @@ function renderMgmtSummary() {
         </div>
       </div>
 
-      <div class="mgmt-card" style="grid-column:3">
+      <div class="mgmt-card" style="grid-column:span 2">
         <div class="mgmt-card__title">Horizon link status — future days</div>
         <div style="display:flex;gap:12px;align-items:stretch;height:110px">
           <div style="position:relative;flex:1">
-            <div style="position:absolute;left:0;top:0;width:${linkedPct}%;height:100%;background:#eaf3de;border:2px solid var(--surface-2);border-radius:4px"></div>
-            <div style="position:absolute;left:${linkedPct}%;top:0;width:${100-linkedPct}%;height:${oppHPct}%;background:#faeeda;border:2px solid var(--surface-2);border-radius:4px"></div>
-            <div style="position:absolute;left:${linkedPct}%;top:${oppHPct}%;width:${100-linkedPct}%;height:${100-oppHPct}%;background:#fcebeb;border:2px solid var(--surface-2);border-radius:4px"></div>
+            <div title="Fee earning: ${fmtD(linkedDays)}d" style="position:absolute;left:0;top:0;width:${linkedPct}%;height:100%;background:#2a78d6;border:2px solid var(--surface-2);border-radius:4px"></div>
+            <div title="Opportunity: ${fmtD(oppDays)}d" style="position:absolute;left:${linkedPct}%;top:0;width:${100-linkedPct}%;height:${oppHPct}%;background:#eda100;border:2px solid var(--surface-2);border-radius:4px"></div>
+            <div title="Not linked: ${fmtD(unlinkedDays)}d" style="position:absolute;left:${linkedPct}%;top:${oppHPct}%;width:${100-linkedPct}%;height:${100-oppHPct}%;background:#e34948;border:2px solid var(--surface-2);border-radius:4px"></div>
           </div>
-          <div style="display:flex;flex-direction:column;justify-content:space-around;flex-shrink:0">
+          <div style="display:flex;flex-direction:column;justify-content:space-around;flex-shrink:0;gap:8px">
             <div style="display:flex;align-items:center;gap:6px">
-              <div style="width:10px;height:10px;border-radius:2px;background:#2a78d6
-              <div style="font-size:10px;color:var(--text-secondary)">Fee earning<br><span style="font-weight:500;color:var(--text-primary)">${fmtD(linkedDays)}d</span></div>
+              <div style="width:10px;height:10px;border-radius:2px;background:#2a78d6;flex-shrink:0"></div>
+              <div style="font-size:11px;color:var(--text-secondary)">Fee earning</div>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
               <div style="width:10px;height:10px;border-radius:2px;background:#eda100;flex-shrink:0"></div>
-              <div style="font-size:10px;color:var(--text-secondary)">Opportunity<br><span style="font-weight:500;color:var(--text-primary)">${fmtD(oppDays)}d</span></div>
+              <div style="font-size:11px;color:var(--text-secondary)">Opportunity</div>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
               <div style="width:10px;height:10px;border-radius:2px;background:#e34948;flex-shrink:0"></div>
-              <div style="font-size:10px;color:var(--text-secondary)">Not linked<br><span style="font-weight:500;color:var(--text-primary)">${fmtD(unlinkedDays)}d</span></div>
+              <div style="font-size:11px;color:var(--text-secondary)">Not linked</div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- ROW 2: Allocated days — full width -->
-      <div class="mgmt-card" style="grid-column:1/-1">
+      <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Allocated days — next 6 months</div>
         <div style="display:flex;align-items:flex-start;gap:16px">
           <div style="flex:1;position:relative;height:150px">
@@ -565,7 +566,7 @@ function renderMgmtSummary() {
       </div>
 
       <!-- ROW 3: Annual leave — full width -->
-      <div class="mgmt-card" style="grid-column:1/-1">
+      <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Annual leave & public holidays — next 6 months</div>
         <div style="display:flex;align-items:flex-start;gap:16px">
           <div style="flex:1;position:relative;height:150px">
@@ -581,7 +582,7 @@ function renderMgmtSummary() {
       </div>
 
       <!-- ROW 4: Utilisation | Bench strength -->
-      <div class="mgmt-card">
+      <div class="mgmt-card" style="grid-column:span 3">
         <div class="mgmt-card__title">Utilisation by grade — fee earning</div>
         <table class="mgmt-table" style="table-layout:fixed;width:100%">
           <thead><tr><th style="white-space:nowrap">Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Fee earning</th><th style="text-align:right">Util.</th></tr></thead>
@@ -598,7 +599,7 @@ function renderMgmtSummary() {
         </table>
       </div>
 
-      <div class="mgmt-card">
+      <div class="mgmt-card" style="grid-column:span 3">
         <div class="mgmt-card__title">Bench strength by grade</div>
         <table class="mgmt-table" style="table-layout:fixed;width:100%">
           <thead><tr><th style="white-space:nowrap">Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Allocated</th><th style="text-align:right">Available</th></tr></thead>
@@ -615,7 +616,7 @@ function renderMgmtSummary() {
       </div>
 
       <!-- ROW 5: Top 10 projects — full width -->
-      <div class="mgmt-card" style="grid-column:1/-1">
+      <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Top 10 projects by days remaining</div>
         <table class="mgmt-table">
           <thead><tr><th>Project / task</th><th>Department</th><th style="text-align:right">This month</th><th style="text-align:right">Future days</th><th>Status</th></tr></thead>
@@ -633,12 +634,12 @@ function renderMgmtSummary() {
       </div>
 
       <!-- ROW 6: Over-allocated this month | next month -->
-      <div class="mgmt-card">
+      <div class="mgmt-card" style="grid-column:span 3">
         <div class="mgmt-card__title">Over-allocated this month (${escHtml(p)})</div>
         ${overTable(overThisMonth, p)}
       </div>
 
-      <div class="mgmt-card">
+      <div class="mgmt-card" style="grid-column:span 3">
         <div class="mgmt-card__title">Over-allocated next month (${escHtml(nextP)})</div>
         ${overTable(overNextMonth, nextP)}
       </div>
@@ -691,6 +692,7 @@ function renderView() {
   panels.forEach(id => document.getElementById(id)?.classList.add("hidden"));
 
   if (state.activeView === "staff") {
+    buildFilterOptions();
     renderStaffTable();
     document.getElementById("staff-panel").classList.remove("hidden");
   } else if (state.activeView === "mgmt") {
@@ -1437,7 +1439,7 @@ function switchView(view) {
   const filterSlots = {
     projects: ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
     staff: ["filter-job-title", "filter-job-function", "filter-line-manager", "filter-slot4-spacer"],
-    mgmt:     ["filter-rtc-pd", "filter-rtc-pm", "filter-horizon"],
+    mgmt:     [],
   };
   const hiddenSlots = {
     staff:    ["filter-slot4-spacer"],
@@ -2001,10 +2003,12 @@ document.getElementById("filter-project-pm")?.addEventListener("change", e => {
   document.getElementById("filter-rtc-pm")?.addEventListener("change", e => {
     state.rtcFilters.pm = e.target.value === "all" ? "" : e.target.value;
     if (["rtcs","projects"].includes(state.activeView)) loadRtcs();
+    else if (state.activeView === "mgmt") renderMgmtSummary();
   });
   document.getElementById("filter-rtc-pd")?.addEventListener("change", e => {
     state.rtcFilters.pd = e.target.value === "all" ? "" : e.target.value;
     if (["rtcs","projects"].includes(state.activeView)) loadRtcs();
+    else if (state.activeView === "mgmt") renderMgmtSummary();
   });
   document.getElementById("filter-rtc-status")?.addEventListener("change", e => {
     state.rtcFilters.status = e.target.value;
