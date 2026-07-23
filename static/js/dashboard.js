@@ -417,9 +417,6 @@ function renderMgmtSummary() {
   const totalHdays   = linkedDays + oppDays + unlinkedDays || 1;
 
   // Treemap — proportional widths (fee earning takes left portion, opportunity/unlinked share right)
-  const linkedPct   = Math.round(linkedDays / totalHdays * 100);
-  const rightTotal  = oppDays + unlinkedDays || 1;
-  const oppHPct     = Math.round(oppDays / rightTotal * 100);    // % of right column height
 
   // RTC review status
   const statusCounts = { current: 0, due_review: 0, overdue_review: 0 };
@@ -526,26 +523,8 @@ function renderMgmtSummary() {
 
       <div class="mgmt-card" style="grid-column:span 2">
         <div class="mgmt-card__title">Horizon link status — future days</div>
-        <div style="display:flex;gap:12px;align-items:stretch;height:110px">
-          <div style="position:relative;flex:1">
-            <div title="Fee earning: ${fmtD(linkedDays)}d" style="position:absolute;left:0;top:0;width:${linkedPct}%;height:100%;background:#2a78d6;border:2px solid var(--surface-2);border-radius:4px"></div>
-            <div title="Opportunity: ${fmtD(oppDays)}d" style="position:absolute;left:${linkedPct}%;top:0;width:${100-linkedPct}%;height:${oppHPct}%;background:#eda100;border:2px solid var(--surface-2);border-radius:4px"></div>
-            <div title="Not linked: ${fmtD(unlinkedDays)}d" style="position:absolute;left:${linkedPct}%;top:${oppHPct}%;width:${100-linkedPct}%;height:${100-oppHPct}%;background:#e34948;border:2px solid var(--surface-2);border-radius:4px"></div>
-          </div>
-          <div style="display:flex;flex-direction:column;justify-content:space-around;flex-shrink:0;gap:8px">
-            <div style="display:flex;align-items:center;gap:6px">
-              <div style="width:10px;height:10px;border-radius:2px;background:#2a78d6;flex-shrink:0"></div>
-              <div style="font-size:11px;color:var(--text-secondary)">Fee earning</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px">
-              <div style="width:10px;height:10px;border-radius:2px;background:#eda100;flex-shrink:0"></div>
-              <div style="font-size:11px;color:var(--text-secondary)">Opportunity</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px">
-              <div style="width:10px;height:10px;border-radius:2px;background:#e34948;flex-shrink:0"></div>
-              <div style="font-size:11px;color:var(--text-secondary)">Not linked</div>
-            </div>
-          </div>
+        <div style="position:relative;height:130px">
+          <canvas id="mgmt-treemap-chart" role="img" aria-label="Treemap of horizon link status by future days">Horizon link status treemap.</canvas>
         </div>
       </div>
 
@@ -649,6 +628,52 @@ function renderMgmtSummary() {
 
   // Charts
   requestAnimationFrame(() => {
+    const treemapCtx = document.getElementById("mgmt-treemap-chart");
+    if (treemapCtx) {
+      new Chart(treemapCtx, {
+        type: "treemap",
+        data: {
+          datasets: [{
+            label: "Horizon status",
+            tree: [
+              { label: "Fee earning",  value: linkedDays,   color: "#2a78d6" },
+              { label: "Opportunity",  value: oppDays,      color: "#eda100" },
+              { label: "Not linked",   value: unlinkedDays, color: "#e34948" },
+            ].filter(d => d.value > 0),
+            key: "value",
+            backgroundColor: ctx => {
+              const raw = ctx.raw;
+              return raw && raw._data ? raw._data.color : "#ccc";
+            },
+            borderWidth: 2,
+            borderColor: "white",
+            spacing: 2,
+            labels: {
+              display: true,
+              formatter: ctx => {
+                const d = ctx.raw._data;
+                return d ? [d.label, Math.round(d.value).toLocaleString("en-GB") + "d"] : "";
+              },
+              color: "white",
+              font: [{ size: 11, weight: "500" }, { size: 10 }],
+            },
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: ctx => ctx[0]?.raw._data?.label || "",
+                label: ctx => Math.round(ctx.raw._data?.value || 0).toLocaleString("en-GB") + " days",
+              }
+            }
+          }
+        }
+      });
+    }
     const allocCtx = document.getElementById("mgmt-alloc-chart");
     if (allocCtx) {
       new Chart(allocCtx, {
