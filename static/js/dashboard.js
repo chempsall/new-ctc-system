@@ -480,11 +480,11 @@ function renderMgmtSummary() {
 
   const overTable = (people, per) => {
     if (!people.length) return `<div style="font-size:12px;color:var(--text-tertiary);font-style:italic;padding:8px 0">None</div>`;
-    return `<table class="mgmt-table">
-      <thead><tr><th>Name</th><th>Grade</th><th style="text-align:right">Allocated</th><th style="text-align:right">Capacity</th></tr></thead>
+    return `<table class="mgmt-table" style="table-layout:fixed;width:100%">
+      <thead><tr><th style="white-space:nowrap">Name</th><th style="white-space:nowrap">Grade</th><th style="text-align:right">Allocated</th><th style="text-align:right">Capacity</th></tr></thead>
       <tbody>${people.map(ps => `<tr>
-        <td>${escHtml(ps.name)}</td>
-        <td style="font-size:11px;color:var(--text-tertiary)">${escHtml(fmt.gradeShort(ps.job_title))}</td>
+        <td style="white-space:nowrap">${escHtml(ps.name)}</td>
+        <td style="font-size:11px;color:var(--text-tertiary);white-space:nowrap">${escHtml(fmt.gradeShort(ps.job_title))}</td>
         <td style="text-align:right;font-family:var(--font-mono);font-size:12px;color:#e34948">${fmtD(ps.allocated[per] || 0)}d</td>
         <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(ps.capacity[per] || 0)}d</td>
       </tr>`).join("")}</tbody></table>`;
@@ -537,11 +537,11 @@ function renderMgmtSummary() {
               <div style="font-size:10px;color:var(--text-secondary)">Fee earning<br><span style="font-weight:500;color:var(--text-primary)">${fmtD(linkedDays)}d</span></div>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
-              <div style="width:10px;height:10px;border-radius:2px;background:#faeeda;border:1px solid #ba7517;flex-shrink:0"></div>
+              <div style="width:10px;height:10px;border-radius:2px;background:#eda100;flex-shrink:0"></div>
               <div style="font-size:10px;color:var(--text-secondary)">Opportunity<br><span style="font-weight:500;color:var(--text-primary)">${fmtD(oppDays)}d</span></div>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
-              <div style="width:10px;height:10px;border-radius:2px;background:#fcebeb;border:1px solid #a32d2d;flex-shrink:0"></div>
+              <div style="width:10px;height:10px;border-radius:2px;background:#e34948;flex-shrink:0"></div>
               <div style="font-size:10px;color:var(--text-secondary)">Not linked<br><span style="font-weight:500;color:var(--text-primary)">${fmtD(unlinkedDays)}d</span></div>
             </div>
           </div>
@@ -583,13 +583,13 @@ function renderMgmtSummary() {
       <!-- ROW 4: Utilisation | Bench strength -->
       <div class="mgmt-card">
         <div class="mgmt-card__title">Utilisation by grade — fee earning</div>
-        <table class="mgmt-table">
-          <thead><tr><th>Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Fee earning</th><th style="text-align:right">Util.</th></tr></thead>
+        <table class="mgmt-table" style="table-layout:fixed;width:100%">
+          <thead><tr><th style="white-space:nowrap">Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Fee earning</th><th style="text-align:right">Util.</th></tr></thead>
           <tbody>${grades.map(([grade, g]) => {
             const pct = g.capacity > 0 ? Math.round(g.feeEarning / g.capacity * 100) : 0;
             const col = pct >= 80 ? "#008300" : pct >= 50 ? "#eda100" : "#e34948";
             return `<tr>
-              <td style="font-size:11px">${escHtml(grade)}</td>
+              <td style="font-size:11px;white-space:nowrap">${escHtml(grade)}</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.capacity)}d</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.feeEarning)}d</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:${col};font-weight:500">${pct}%</td>
@@ -600,12 +600,12 @@ function renderMgmtSummary() {
 
       <div class="mgmt-card">
         <div class="mgmt-card__title">Bench strength by grade</div>
-        <table class="mgmt-table">
-          <thead><tr><th>Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Allocated</th><th style="text-align:right">Available</th></tr></thead>
+        <table class="mgmt-table" style="table-layout:fixed;width:100%">
+          <thead><tr><th style="white-space:nowrap">Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Allocated</th><th style="text-align:right">Available</th></tr></thead>
           <tbody>${grades.map(([grade, g]) => {
             const avail = Math.max(0, g.capacity - g.allocated);
             return `<tr>
-              <td style="font-size:11px">${escHtml(grade)}</td>
+              <td style="font-size:11px;white-space:nowrap">${escHtml(grade)}</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.capacity)}d</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.allocated)}d</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300;font-weight:500">${fmtD(avail)}d</td>
