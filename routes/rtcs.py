@@ -71,6 +71,8 @@ def api_rtcs():
             r.last_updated_at,
             r.last_opened_by,
             r.last_opened,
+            r.last_edited_by,
+            r.last_edited_at,
             r.is_archived,
             p.project_id,
             p.project_number,
@@ -402,6 +404,11 @@ def api_update_rtc(rtc_id):
     for field in ["start_date", "department", "notes"]:
         if field in data:
             updates[field] = data[field]
+    # Record last editor when meaningful fields change
+    meaningful = {"start_date", "department", "notes", "project_number", "task_order_number"}
+    if any(f in data for f in meaningful):
+        updates["last_edited_by"] = user
+        updates["last_edited_at"] = now
 
     if "project_number" in data and "task_order_number" in data:
         project_id = get_or_create_project(c, data, now)
@@ -473,11 +480,12 @@ def api_update_rtc(rtc_id):
         """, (pid, rtc_id, period, days, now))
         alloc_count += 1
 
-    # Update last_updated_by on the RTC itself
+    # Update last_updated_by and last_edited_by on the RTC itself
     c.execute("""
-        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
+        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?,
+                        last_edited_by = ?, last_edited_at = ?
         WHERE rtc_id = ?
-    """, (user, now, rtc_id))
+    """, (user, now, user, now, rtc_id))
 
     conn.commit()
     conn.close()

@@ -935,10 +935,13 @@ function renderProjectTable() {
           );
           const totalDays = cols.reduce((sum, col) => sum + (proj?.days[col] || 0), 0);
           const daysByPeriod = cols.map(col => proj?.days[col] || 0);
-          return { name: person.name, job_title: person.job_title, daysByPeriod, totalDays };
+          const isGeneric = person.id?.startsWith("GENERIC-");
+          return { name: person.name, job_title: person.job_title, daysByPeriod, totalDays, isGeneric };
         })
         .filter(ps => ps.totalDays > 0)
         .sort((a, b) => {
+          if (a.isGeneric && !b.isGeneric) return 1;
+          if (!a.isGeneric && b.isGeneric) return -1;
           const gradeSort = t => {
             const m = (t || '').match(/^([PT])(\d+)/);
             if (!m) return 999;
@@ -996,7 +999,7 @@ function renderProjectTable() {
                 <div><strong>Project Director:</strong> ${escHtml(r.project_director || "—")}</div>
                 <div><strong>Project Manager:</strong> ${escHtml(r.project_manager || "—")}</div>
                 <div><strong>Last opened:</strong> ${fmtDate(r.last_opened)}</div>
-                <div><strong>Last opened by:</strong> ${escHtml(r.last_opened_by || "—")}</div>
+                <div><strong>Last edited by:</strong> ${escHtml(r.last_edited_by || "—")}</div>
               </div>
               <div style="margin-top:10px">
                 <a href="/rtc/${r.rtc_id}" class="btn-open-rtc">Open to edit →</a>
@@ -1170,7 +1173,7 @@ function showRtcDetail(rtc) {
     <div><strong>Task name</strong>: ${escHtml(rtc.task_name || "-")}</div>
     <div><strong>Project Director</strong>: ${escHtml(rtc.project_director || "-")}</div>
     <div><strong>Project Manager</strong>: ${escHtml(rtc.project_manager || "-")}</div>
-    <div style="margin-top:8px"><strong>Last opened by</strong>: ${escHtml(rtc.last_opened_by || "-")}</div>
+    <div style="margin-top:8px"><strong>Last edited by</strong>: ${escHtml(rtc.last_edited_by || "-")}</div>
     <div style="margin-top:8px">${horizonBadge(rtc.horizon_status)}</div>
     <div style="margin-top:3px">${statusBadge(rtc.status)}</div>
       <div style="margin-top:10px;font-size:10px;font-weight:600;text-transform:uppercase;
@@ -1498,7 +1501,10 @@ function switchView(view) {
   if (view === "projects") {
     loadRtcs();
   } else {
-    loadSummary().then(() => renderView());
+    loadSummary().then(() => {
+      buildFilterOptions();
+      renderView();
+    });
     return;
   }
 
