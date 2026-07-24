@@ -1467,7 +1467,7 @@ function switchView(view) {
   const hiddenSlots = {
     staff:    ["filter-slot4-spacer"],
     projects: [],
-    mgmt:     [],
+    mgmt:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
   };
   const allSlots = [
     "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
@@ -1477,30 +1477,33 @@ function switchView(view) {
   ];
   allSlots.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = "none";
-  });
-// Add/remove invisible flex spacers on mgmt so dept dropdown matches other pages
-  const mgmtSpacer = document.getElementById("filter-mgmt-placeholder");
-  if (!mgmtSpacer && view === "mgmt") {
-    const row = document.querySelector(".filter-bar__row--dropdowns");
-    if (row) {
-      for (let i = 0; i < 4; i++) {
-        const d = document.createElement("div");
-        d.className = "filter-mgmt-placeholder";
-        d.style.cssText = "flex:1;min-width:0;height:0;pointer-events:none";
-        row.appendChild(d);
-      }
+    if (el) {
+      el.style.display = "none";
+      el.style.height = "";
+      el.style.padding = "";
+      el.style.border = "";
+      el.style.minHeight = "";
     }
-  } else if (view !== "mgmt") {
-    document.querySelectorAll(".filter-mgmt-placeholder").forEach(el => el.remove());
-  }
+  });
   (filterSlots[view] || []).forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.style.display = ""; el.style.visibility = "visible"; }
+    if (el) {
+      el.style.display = "";
+      el.style.visibility = "visible";
+      el.style.height = "";
+      el.style.padding = "";
+      el.style.border = "";
+      el.style.minHeight = "";
+    }
   });
+  const isMgmt = view === "mgmt";
   (hiddenSlots[view] || []).forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.style.display = ""; el.style.visibility = "hidden"; }
+    if (el) {
+      el.style.display = "";
+      el.style.visibility = "hidden";
+      if (isMgmt) { el.style.opacity = "0"; el.style.pointerEvents = "none"; }
+    }
   });
 
   // Month tabs only relevant for staff and projects views
@@ -1510,6 +1513,8 @@ function switchView(view) {
   if (newRtcBtn) newRtcBtn.style.display = view === "projects" ? "" : "none";
   const detailPanel = document.getElementById("detail-panel");
   if (detailPanel && view === "mgmt") detailPanel.classList.remove("open");
+  const searchRow = document.querySelector(".filter-bar__row--search");
+  if (searchRow) searchRow.style.display = view === "mgmt" ? "none" : "";
 
   // Reload data fresh on every tab switch so changes made on one tab
   // are reflected immediately on the others without needing a page refresh
