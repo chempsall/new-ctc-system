@@ -1458,8 +1458,6 @@ function switchView(view) {
     btn.classList.toggle("active", btn.dataset.view === view);
   });
 
-  document.querySelector(".filter-bar")?.classList.toggle("filter-bar--mgmt", view === "mgmt");
-
   // Show/hide filter slots per view
   const filterSlots = {
     projects: ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
@@ -1481,6 +1479,21 @@ function switchView(view) {
     const el = document.getElementById(id);
     if (el) el.style.display = "none";
   });
+// Add/remove invisible flex spacers on mgmt so dept dropdown matches other pages
+  const mgmtSpacer = document.getElementById("filter-mgmt-placeholder");
+  if (!mgmtSpacer && view === "mgmt") {
+    const row = document.querySelector(".filter-bar__row--dropdowns");
+    if (row) {
+      for (let i = 0; i < 4; i++) {
+        const d = document.createElement("div");
+        d.className = "filter-mgmt-placeholder";
+        d.style.cssText = "flex:1;min-width:0;height:0;pointer-events:none";
+        row.appendChild(d);
+      }
+    }
+  } else if (view !== "mgmt") {
+    document.querySelectorAll(".filter-mgmt-placeholder").forEach(el => el.remove());
+  }
   (filterSlots[view] || []).forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.style.display = ""; el.style.visibility = "visible"; }
