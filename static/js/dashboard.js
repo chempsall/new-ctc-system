@@ -522,9 +522,18 @@ function renderMgmtSummary() {
       </div>
 
       <div class="mgmt-card" style="grid-column:span 2">
-        <div class="mgmt-card__title">Horizon link status — future days</div>
-        <div style="position:relative;height:130px">
-          <canvas id="mgmt-treemap-chart" role="img" aria-label="Treemap of horizon link status by future days">Horizon link status treemap.</canvas>
+        <div class="mgmt-card__title">Horizon link status — allocated days beyond this month</div>
+        <div style="position:relative;height:80px;margin-bottom:8px">
+          <canvas id="mgmt-horizon-bar" role="img" aria-label="Horizontal stacked bar showing future days by horizon status">Future days by horizon status.</canvas>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          ${[{col:"#2a78d6",label:"Fee earning",val:fmtD(linkedDays)+"d"},
+             {col:"#eda100",label:"Opportunity",val:fmtD(oppDays)+"d"},
+             {col:"#e34948",label:"Not linked",val:fmtD(unlinkedDays)+"d"}]
+            .map(it => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.col};flex-shrink:0"></span>
+              ${escHtml(it.label)}: <strong style="color:var(--text-primary);margin-left:2px">${it.val}</strong>
+            </div>`).join("")}
         </div>
       </div>
 
@@ -628,48 +637,33 @@ function renderMgmtSummary() {
 
   // Charts
   requestAnimationFrame(() => {
-    const treemapCtx = document.getElementById("mgmt-treemap-chart");
-    if (treemapCtx) {
-      new Chart(treemapCtx, {
-        type: "treemap",
+    const horizonBarCtx = document.getElementById("mgmt-horizon-bar");
+    if (horizonBarCtx) {
+      new Chart(horizonBarCtx, {
+        type: "bar",
         data: {
-          datasets: [{
-            label: "Horizon status",
-            tree: [
-              { label: "Fee earning",  value: linkedDays,   color: "#2a78d6" },
-              { label: "Opportunity",  value: oppDays,      color: "#eda100" },
-              { label: "Not linked",   value: unlinkedDays, color: "#e34948" },
-            ].filter(d => d.value > 0),
-            key: "value",
-            backgroundColor: ctx => {
-              const raw = ctx.raw;
-              return raw && raw._data ? raw._data.color : "#ccc";
-            },
-            borderWidth: 2,
-            borderColor: "white",
-            spacing: 2,
-            labels: {
-              display: true,
-              formatter: ctx => {
-                const d = ctx.raw._data;
-                return d ? [d.label, Math.round(d.value).toLocaleString("en-GB") + "d"] : "";
-              },
-              color: "white",
-              font: [{ size: 11, weight: "500" }, { size: 10 }],
-            },
-          }]
+          labels: [""],
+          datasets: [
+            { label: "Fee earning",  data: [linkedDays],   backgroundColor: "#2a78d6", stack: "h" },
+            { label: "Opportunity",  data: [oppDays],      backgroundColor: "#eda100", stack: "h" },
+            { label: "Not linked",   data: [unlinkedDays], backgroundColor: "#e34948", stack: "h" },
+          ]
         },
         options: {
+          indexAxis: "y",
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
             tooltip: {
               callbacks: {
-                title: ctx => ctx[0]?.raw._data?.label || "",
-                label: ctx => Math.round(ctx.raw._data?.value || 0).toLocaleString("en-GB") + " days",
+                label: ctx => `${ctx.dataset.label}: ${Math.round(ctx.raw).toLocaleString("en-GB")}d`,
               }
             }
+          },
+          scales: {
+            x: { stacked: true, display: false },
+            y: { stacked: true, display: false },
           }
         }
       });
@@ -722,6 +716,7 @@ function renderView() {
     document.getElementById("staff-panel").classList.remove("hidden");
   } else if (state.activeView === "mgmt") {
     document.getElementById("detail-panel").style.display = "none";
+    buildFilterOptions();
     fetch("/api/rtcs")
       .then(r => r.json())
       .then(data => {
