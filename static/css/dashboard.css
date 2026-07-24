@@ -249,6 +249,9 @@ a:hover { text-decoration: underline; }
   flex: 1;
   min-width: 0;
 }
+.filter-bar--mgmt #filter-department {
+  max-width: 220px;
+}
 .filter-bar select:hover,
 .filter-bar input[type="text"]:hover { border-color: var(--border-strong); }
 .filter-bar select:focus,

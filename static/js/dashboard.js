@@ -1458,6 +1458,8 @@ function switchView(view) {
     btn.classList.toggle("active", btn.dataset.view === view);
   });
 
+  document.querySelector(".filter-bar")?.classList.toggle("filter-bar--mgmt", view === "mgmt");
+
   // Show/hide filter slots per view
   const filterSlots = {
     projects: ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
