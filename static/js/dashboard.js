@@ -1479,10 +1479,8 @@ function switchView(view) {
     const el = document.getElementById(id);
     if (el) {
       el.style.display = "none";
-      el.style.height = "";
-      el.style.padding = "";
-      el.style.border = "";
-      el.style.minHeight = "";
+      el.style.opacity = "";
+      el.style.pointerEvents = "";
     }
   });
   (filterSlots[view] || []).forEach(id => {
@@ -1490,10 +1488,8 @@ function switchView(view) {
     if (el) {
       el.style.display = "";
       el.style.visibility = "visible";
-      el.style.height = "";
-      el.style.padding = "";
-      el.style.border = "";
-      el.style.minHeight = "";
+      el.style.opacity = "";
+      el.style.pointerEvents = "";
     }
   });
   const isMgmt = view === "mgmt";
@@ -1501,8 +1497,8 @@ function switchView(view) {
     const el = document.getElementById(id);
     if (el) {
       el.style.display = "";
-      el.style.visibility = "hidden";
-      if (isMgmt) { el.style.opacity = "0"; el.style.pointerEvents = "none"; }
+      el.style.opacity = "0";
+      el.style.pointerEvents = "none";
     }
   });
 
