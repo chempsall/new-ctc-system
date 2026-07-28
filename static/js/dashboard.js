@@ -386,10 +386,14 @@ function renderDeptSummary() {
   const projsByDept = (s.projects || []).filter(pr => !dept || pr.department === dept);
 
   // ── Headline numbers ─────────────────────────────────────────────────
-  const capacity   = staff.reduce((sum, ps) => sum + (ps.capacity[p]      || 0), 0);
-  const feeEarning = staff.reduce((sum, ps) => sum + (ps.horizon_days[p]  || 0), 0);
+  const capacity   = staff.reduce((sum, ps) => sum + (ps.capacity[p]        || 0), 0);
+  const feeEarning = staff.reduce((sum, ps) => sum + (ps.horizon_days[p]    || 0), 0);
+  const opp        = staff.reduce((sum, ps) => sum + (ps.opp_days?.[p]      || 0), 0);
+  const alPh       = staff.reduce((sum, ps) => sum + (ps.al_ph_days?.[p]    || 0), 0);
+  const training   = staff.reduce((sum, ps) => sum + (ps.training_days?.[p] || 0), 0);
+  const dayRel     = staff.reduce((sum, ps) => sum + (ps.day_rel_days?.[p]  || 0), 0);
   const internal   = staff.reduce((sum, ps) => sum + (ps.internal_days?.[p] || 0), 0);
-  const unalloc    = Math.max(0, capacity - feeEarning - internal);
+  const unalloc    = Math.max(0, capacity - feeEarning - opp - internal);
   const feePct     = capacity > 0 ? Math.round(feeEarning / capacity * 100) : 0;
   const intPct     = capacity > 0 ? Math.round(internal   / capacity * 100) : 0;
   const unallocPct = capacity > 0 ? Math.round(unalloc    / capacity * 100) : 0;
@@ -425,7 +429,7 @@ function renderDeptSummary() {
     return Math.round(staff.reduce((sum, ps) => sum + (AL_MONTHLY[mon]||0)*(ps.fte[per]||0) + bh*(ps.fte[per]||0), 0));
   });
   const alActual = periods6.map(per =>
-    Math.round(projsByDept.filter(pr=>pr.number==="ID-06").reduce((sum,pr)=>sum+(pr.total_days[per]||0),0))
+    Math.round(staff.reduce((sum, ps) => sum + (ps.al_ph_days?.[per] || 0), 0))
   );
 
   // ── Grade breakdown ───────────────────────────────────────────────────
@@ -856,7 +860,18 @@ function renderTeamSummary() {
         </div>
       </div>
 
-      <!-- ROW 2: Grade breakdown — full width -->
+      <!-- ROW 2: People grid -->
+      <div class="mgmt-card" style="grid-column:span 6">
+        <div class="mgmt-card__title">Team members — ${escHtml(lm)}</div>
+        <table class="staff-table" id="team-staff-table" style="width:100%">
+          <thead><tr id="team-staff-thead">
+            <th style="min-width:200px">Name / Title / Function</th>
+          </tr></thead>
+          <tbody id="team-staff-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- ROW 3: Grade breakdown — full width -->
       <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Grade breakdown — ${escHtml(p)}</div>
         <table class="mgmt-table" style="margin-top:8px">
@@ -896,7 +911,7 @@ function renderTeamSummary() {
         </table>
       </div>
 
-      <!-- ROW 3: Over-allocated — two side by side -->
+      <!-- ROW 4: Over-allocated — two side by side -->
       <div class="mgmt-card" style="grid-column:span 3">
         <div class="mgmt-card__title">Over-allocated this month (${escHtml(p)})</div>
         ${overTable(overThis, p)}
@@ -906,7 +921,7 @@ function renderTeamSummary() {
         ${overTable(overNext, nextP)}
       </div>
 
-      <!-- ROW 3: Annual leave -->
+      <!-- ROW 5: Annual leave -->
       <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Annual leave & public holidays — next 6 months</div>
         <div style="display:flex;align-items:flex-start;gap:16px;margin-top:8px">
