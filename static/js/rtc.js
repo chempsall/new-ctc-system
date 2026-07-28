@@ -746,10 +746,11 @@ function closeReplacePopup() {
 }
 
 async function replaceStaff(newPid) {
+  const pidToReplace = _replacingPid;
   closeReplacePopup();
   try {
     const r = await fetch(
-      `/api/rtcs/${RTC_ID}/staff/${encodeURIComponent(_replacingPid || '')}/replace`,
+      `/api/rtcs/${RTC_ID}/staff/${encodeURIComponent(pidToReplace || '')}/replace`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
