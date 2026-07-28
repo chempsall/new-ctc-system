@@ -124,29 +124,44 @@ def build() -> dict:
     # of "Active" from the PAR import — i.e. it exists in Horizon.
     alloc_rows = conn.execute("""
         SELECT a.horizon_person_number, r.project_id, a.period_start, a.days,
-               p.project_status, r.department, r.rtc_id
+               p.project_status, p.project_type, p.project_number, r.department, r.rtc_id
         FROM allocations a
         JOIN rtcs r     ON r.rtc_id = a.rtc_id
         JOIN projects p ON p.project_id = r.project_id
         WHERE a.period_start IN ({})
     """.format(",".join("?" * len(period_starts))), period_starts).fetchall()
 
+    SPECIAL_NUMS     = {"ID-06", "ID-04", "IDUK-01"}
     person_alloc     = {}  # person_id -> period_start -> total days
-    person_horizon   = {}  # person_id -> period_start -> days on PAR-linked projects
+    person_active    = {}  # person_id -> period_start -> days on Active projects (for no_rec)
+    person_direct    = {}  # person_id -> period_start -> days on UK Direct + Active (true fee-earning)
+    person_internal  = {}  # person_id -> period_start -> days on special RTCs
     person_proj_days = {}  # person_id -> project_id -> period_start -> days
 
     for r in alloc_rows:
-        pid  = r["horizon_person_number"]
-        ps   = r["period_start"]
-        days = r["days"] or 0
+        pid   = r["horizon_person_number"]
+        ps    = r["period_start"]
+        days  = r["days"] or 0
+        pstat = (r["project_status"] or "").lower()
+        ptype = (r["project_type"] or "").strip()
+        pnum  = (r["project_number"] or "").strip()
 
         person_alloc.setdefault(pid, {})
         person_alloc[pid][ps] = person_alloc[pid].get(ps, 0) + days
 
-        # "Linked" means the project came from PAR with Active status
-        if r["project_status"] and r["project_status"].lower() == "active":
-            person_horizon.setdefault(pid, {})
-            person_horizon[pid][ps] = person_horizon[pid].get(ps, 0) + days
+        if pstat == "active":
+            person_active.setdefault(pid, {})
+            person_active[pid][ps] = person_active[pid].get(ps, 0) + days
+
+        if pstat == "active" and ptype == "UK Direct" and pnum not in SPECIAL_NUMS:
+            person_direct.setdefault(pid, {})
+            person_direct[pid][ps] = person_direct[pid].get(ps, 0) + days
+
+        if pnum in SPECIAL_NUMS:
+            person_internal.setdefault(pid, {})
+            person_internal[ps] = person_internal.get(ps, 0)  # placeholder
+            person_internal.setdefault(pid, {})
+            person_internal[pid][ps] = person_internal[pid].get(ps, 0) + days
 
         person_proj_days.setdefault(pid, {}).setdefault(r["project_id"], {})
         person_proj_days[pid][r["project_id"]][ps] = days
@@ -156,12 +171,13 @@ def build() -> dict:
     for s in staff_rows:
         pid = s["horizon_person_number"]
 
-        capacity     = {}
-        allocated    = {}
-        horizon_days = {}
-        no_rec_days  = {}
-        fte          = {}
-        kpi          = {}
+        capacity      = {}
+        allocated     = {}
+        horizon_days  = {}
+        no_rec_days   = {}
+        internal_days = {}
+        fte           = {}
+        kpi           = {}
 
         for p in periods:
             ps    = p["period_start"]
@@ -178,14 +194,17 @@ def build() -> dict:
                 )
                 cap = round(wdays * frac * proportion, 2)
 
-            alloc   = round(person_alloc.get(pid, {}).get(ps, 0), 2)
-            h_days  = round(person_horizon.get(pid, {}).get(ps, 0), 2)
-            nr_days = round(alloc - h_days, 2)
+            alloc      = round(person_alloc.get(pid, {}).get(ps, 0), 2)
+            h_days     = round(person_direct.get(pid, {}).get(ps, 0), 2)
+            active_days= round(person_active.get(pid, {}).get(ps, 0), 2)
+            int_days   = round(person_internal.get(pid, {}).get(ps, 0), 2)
+            nr_days    = round(alloc - active_days, 2)
 
-            capacity[label]     = cap
-            allocated[label]    = alloc
-            horizon_days[label] = h_days
-            no_rec_days[label]  = nr_days
+            capacity[label]      = cap
+            allocated[label]     = alloc
+            horizon_days[label]  = h_days
+            no_rec_days[label]   = nr_days
+            internal_days[label] = int_days
             fte[label]          = 0.0 if pid.startswith("GENERIC-") else _period_fte(
                 s["start_date"], s["end_date"],
                 ps, p["period_end"],
@@ -225,7 +244,8 @@ def build() -> dict:
             "availability": s["availability"],
             "capacity":     capacity,
             "allocated":    allocated,
-            "horizon_days": horizon_days,
+            "horizon_days":   horizon_days,
+            "internal_days":  internal_days,
             "no_record_days": no_rec_days,
             "fte":            fte,
             "kpi":            kpi,
@@ -248,6 +268,7 @@ def build() -> dict:
                     base["allocated"][period]     = base["allocated"].get(period, 0) + person["allocated"].get(period, 0)
                     base["fte"][period]            = base["fte"].get(period, 0) + person["fte"].get(period, 0)
                     base["horizon_days"][period]   = base["horizon_days"].get(period, 0) + person["horizon_days"].get(period, 0)
+                    base["internal_days"][period]  = base["internal_days"].get(period, 0) + person["internal_days"].get(period, 0)
                     base["no_record_days"][period] = base["no_record_days"].get(period, 0) + person["no_record_days"].get(period, 0)
                 for p in person["projects"]:
                     existing = next((x for x in base["projects"] if x["project_id"] == p["project_id"]), None)
@@ -347,6 +368,10 @@ def build() -> dict:
     summary = {
         "generated_at":  generated_at,
         "periods":       [p["label"] for p in periods],
+        "bank_holidays": {p["label"]: sum(
+            1 for bh in conn.execute("SELECT date FROM bank_holidays").fetchall()
+            if bh["date"].startswith(p["period_start"][:7])
+        ) for p in periods},
         "working_days":  working_days,
         "staff":         staff_list,
         "projects":      projects_list,

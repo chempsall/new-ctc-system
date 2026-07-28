@@ -360,9 +360,10 @@ function renderMgmtSummary() {
   const linkedDays   = projsByDept.filter(pr => pr.horizon_status === "linked").reduce((sum, pr) => sum + (pr.future_days || 0), 0);
   const oppDays      = projsByDept.filter(pr => pr.horizon_status === "opportunity").reduce((sum, pr) => sum + (pr.future_days || 0), 0);
   const unlinkedDays = projsByDept.filter(pr => pr.horizon_status === "norecord").reduce((sum, pr) => sum + (pr.future_days || 0), 0);
-  const linkedRtcs   = rtcs.filter(r => r.horizon_status === "linked");
+  const linkedRtcs   = rtcs.filter(r => r.horizon_status === "linked" && !SPECIAL_NUMS.has(r.project_number));
   const oppRtcs      = rtcs.filter(r => r.horizon_status === "opportunity");
   const unlinkedRtcs = rtcs.filter(r => r.horizon_status === "norecord");
+  const internalDays = projsByDept.filter(pr => SPECIAL_NUMS.has(pr.number)).reduce((sum, pr) => sum + (pr.future_days || 0), 0);
   const totalHdays   = linkedDays + oppDays + unlinkedDays || 1;
 
   // Treemap — proportional widths (fee earning takes left portion, opportunity/unlinked share right)
@@ -376,12 +377,12 @@ function renderMgmtSummary() {
   const feeUtil = (() => {
     const cap = staff.reduce((sum, ps) => sum + (ps.capacity[p] || 0), 0);
     const fee = staff.reduce((sum, ps) => sum + (ps.horizon_days[p] || 0), 0);
+    // horizon_days now correctly excludes special RTCs (true UK Direct fee-earning only)
     return cap > 0 ? Math.round(fee / cap * 100) : 0;
   })();
   const bench = staff.reduce((sum, ps) => sum + Math.max(0, (ps.capacity[p] || 0) - (ps.allocated[p] || 0)), 0);
 
   // Top 10 projects
-  const SPECIAL_NUMS = new Set(["ID-06", "ID-04", "IDUK-01"]);
   const topProjects = projsByDept
     .filter(pr => (pr.future_days || 0) > 0 && !SPECIAL_NUMS.has(pr.number))
     .sort((a, b) => (b.future_days || 0) - (a.future_days || 0))
@@ -395,10 +396,11 @@ function renderMgmtSummary() {
   const gradeMap = {};
   staff.forEach(ps => {
     const g = ps.job_title || "Unknown";
-    if (!gradeMap[g]) gradeMap[g] = { capacity: 0, allocated: 0, feeEarning: 0 };
+    if (!gradeMap[g]) gradeMap[g] = { capacity: 0, allocated: 0, feeEarning: 0, internal: 0 };
     gradeMap[g].capacity   += ps.capacity[p] || 0;
     gradeMap[g].allocated  += ps.allocated[p] || 0;
     gradeMap[g].feeEarning += ps.horizon_days[p] || 0;
+    gradeMap[g].internal   += ps.internal_days?.[p] || 0;
   });
   const grades = Object.entries(gradeMap)
     .filter(([, g]) => g.capacity > 0)
@@ -408,17 +410,22 @@ function renderMgmtSummary() {
   const AL_MONTHLY = { Jan:0.8,Feb:0.9,Mar:1.1,Apr:1.5,May:1.3,Jun:1.7,Jul:2.4,Aug:3.6,Sep:2.3,Oct:1.9,Nov:1.5,Dec:6.0 };
   const alExpected = periods6.map(per => {
     const mon = per.split("-")[0];
-    const bh = (s.bank_holidays || {})[per] || 0;
-    return Math.round(staff.reduce((sum, ps) => sum + (AL_MONTHLY[mon] || 0) * (ps.fte[per] || 1) + bh * (ps.fte[per] || 1), 0));
+    const bh  = (s.bank_holidays || {})[per] || 0;
+    return Math.round(staff.reduce((sum, ps) => {
+      const fte = ps.fte[per] || 0;
+      return sum + (AL_MONTHLY[mon] || 0) * fte + bh * fte;
+    }, 0));
   });
   const alActual = periods6.map(per => {
     return Math.round(projsByDept.filter(pr => pr.number === "ID-06").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0));
   });
 
   // Allocated by horizon over 6 months
-  const allocLinked   = periods6.map(per => Math.round(projsByDept.filter(pr => pr.horizon_status === "linked").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
+  const SPECIAL_NUMS = new Set(["ID-06", "ID-04", "IDUK-01"]);
+  const allocLinked   = periods6.map(per => Math.round(projsByDept.filter(pr => pr.horizon_status === "linked" && !SPECIAL_NUMS.has(pr.number)).reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
   const allocOpp      = periods6.map(per => Math.round(projsByDept.filter(pr => pr.horizon_status === "opportunity").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
   const allocUnlinked = periods6.map(per => Math.round(projsByDept.filter(pr => pr.horizon_status === "norecord").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
+  const allocInternal = periods6.map(per => Math.round(projsByDept.filter(pr => SPECIAL_NUMS.has(pr.number)).reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
 
   const fmtD = d => Math.round(d).toLocaleString("en-GB");
 
@@ -478,7 +485,8 @@ function renderMgmtSummary() {
         <div style="display:flex;gap:16px;flex-wrap:wrap">
           ${[{col:"#2a78d6",label:"Fee earning",val:fmtD(linkedDays)+"d"},
              {col:"#eda100",label:"Opportunity",val:fmtD(oppDays)+"d"},
-             {col:"#e34948",label:"Not linked",val:fmtD(unlinkedDays)+"d"}]
+             {col:"#e34948",label:"Not linked",val:fmtD(unlinkedDays)+"d"},
+             {col:"#6b7280",label:"Internal",val:fmtD(internalDays)+"d"}]
             .map(it => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
               <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.col};flex-shrink:0"></span>
               ${escHtml(it.label)}: <strong style="color:var(--text-primary);margin-left:2px">${it.val}</strong>
@@ -494,7 +502,7 @@ function renderMgmtSummary() {
             <canvas id="mgmt-alloc-chart" role="img" aria-label="Stacked bar chart of allocated days by horizon status over 6 months">Allocated days by horizon status.</canvas>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;flex-shrink:0">
-            ${[{col:"#2a78d6",label:"Fee earning"},{col:"#eda100",label:"Opportunity"},{col:"#e34948",label:"Not linked"}]
+            ${[{col:"#2a78d6",label:"Fee earning"},{col:"#eda100",label:"Opportunity"},{col:"#e34948",label:"Not linked"},{col:"#6b7280",label:"Internal"}]
               .map(it => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
                 <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.col}"></span>${escHtml(it.label)}
               </div>`).join("")}
@@ -522,15 +530,18 @@ function renderMgmtSummary() {
       <div class="mgmt-card" style="grid-column:span 3">
         <div class="mgmt-card__title">Utilisation by grade — fee earning</div>
         <table class="mgmt-table" style="table-layout:fixed;width:100%">
-          <thead><tr><th style="white-space:nowrap">Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Fee earning</th><th style="text-align:right">Util.</th></tr></thead>
+          <thead><tr><th style="white-space:nowrap">Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Fee earning</th><th style="text-align:right">Internal</th><th style="text-align:right">Available</th></tr></thead>
           <tbody>${grades.map(([grade, g]) => {
-            const pct = g.capacity > 0 ? Math.round(g.feeEarning / g.capacity * 100) : 0;
-            const col = pct >= 80 ? "#008300" : pct >= 50 ? "#eda100" : "#e34948";
+            const feePct  = g.capacity > 0 ? Math.round(g.feeEarning / g.capacity * 100) : 0;
+            const intPct  = g.capacity > 0 ? Math.round(g.internal   / g.capacity * 100) : 0;
+            const unalloc = Math.max(0, g.capacity - g.feeEarning - g.internal);
+            const col = feePct >= 80 ? "#008300" : feePct >= 50 ? "#eda100" : "#e34948";
             return `<tr>
               <td style="font-size:11px;white-space:nowrap">${escHtml(grade)}</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.capacity)}d</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.feeEarning)}d</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:${col};font-weight:500">${pct}%</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#2a78d6;font-weight:500">${feePct}%</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${intPct}%</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300;font-weight:500">${fmtD(unalloc)}d</td>
             </tr>`;
           }).join("")}</tbody>
         </table>
@@ -596,6 +607,7 @@ function renderMgmtSummary() {
             { label: "Fee earning",  data: [linkedDays],   backgroundColor: "#2a78d6", stack: "h" },
             { label: "Opportunity",  data: [oppDays],      backgroundColor: "#eda100", stack: "h" },
             { label: "Not linked",   data: [unlinkedDays], backgroundColor: "#e34948", stack: "h" },
+            { label: "Internal",     data: [internalDays], backgroundColor: "#6b7280", stack: "h" },
           ]
         },
         options: {
@@ -622,9 +634,10 @@ function renderMgmtSummary() {
       _mgmtCharts.push(new Chart(allocCtx, {
         type: "bar",
         data: { labels: periods6, datasets: [
-          { label:"Fee earning", data:allocLinked,   backgroundColor:"#2a78d6", stack:"a" },
-          { label:"Opportunity", data:allocOpp,      backgroundColor:"#eda100", stack:"a" },
-          { label:"Not linked",  data:allocUnlinked, backgroundColor:"#e34948", stack:"a" },
+          { label:"Fee earning", data:allocLinked,    backgroundColor:"#2a78d6", stack:"a" },
+          { label:"Opportunity", data:allocOpp,       backgroundColor:"#eda100", stack:"a" },
+          { label:"Not linked",  data:allocUnlinked,  backgroundColor:"#e34948", stack:"a" },
+          { label:"Internal",    data:allocInternal,  backgroundColor:"#6b7280", stack:"a" },
         ]},
         options: { responsive:true, maintainAspectRatio:false,
           plugins:{ legend:{ display:false } },
