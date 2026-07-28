@@ -22,8 +22,6 @@ const state = {
     department:   "all",
     line_manager: "all",
     horizon:      "all",   // "all" | "linked" | "norecord"
-    project_pm:   "all",
-    project_pd:   "all",
     search:       "",
   },
   selectedStaff:    null,  // horizon_person_number of selected row
@@ -90,29 +88,14 @@ async function loadSummary() {
 // Initialise UI
 // ---------------------------------------------------------------------------
 function init() {
-  buildMonthTabs();
+  if (!state.activePeriod && state.summary.periods.length) {
+    state.activePeriod = state.summary.periods[0];
+  }
   buildFilterOptions();
   renderMetrics();
   wireEvents();
   updateStatusBar();
   switchView(state.activeView);
-}
-
-function buildMonthTabs() {
-  const container = document.getElementById("month-tabs");
-  container.innerHTML = "";
-  state.summary.periods.forEach((label, i) => {
-    const btn = document.createElement("button");
-    btn.className = "month-tab" + (i === 0 ? " active" : "");
-    btn.textContent = label;
-    btn.dataset.period = label;
-    btn.addEventListener("click", () => selectPeriod(label));
-    container.appendChild(btn);
-  });
-  if (!state.activePeriod && state.summary.periods.length) {
-    state.activePeriod = state.summary.periods[0];
-  }
-
 }
 
 function buildFilterOptions() {
@@ -166,11 +149,8 @@ function buildFilterOptions() {
   const pms = [...new Set((s.projects||[]).map(p => p.pm).filter(Boolean))].sort();
   populateSelect("filter-rtc-pm", pms, "Project Manager");
 
-  populateSelect("filter-project-pm", pms, "Project Manager");
-
   const pds = [...new Set((s.projects||[]).map(p => p.director).filter(Boolean))].sort();
   populateSelect("filter-rtc-pd", pds, "Project Director");
-  populateSelect("filter-project-pd", pds, "Project Director");
 }
 
 function populateSelect(id, values, allLabel) {
@@ -334,47 +314,16 @@ function filteredStaff() {
   });
 }
 
-function filteredProjects() {
-  const f = state.filters;
-  const p = state.activePeriod;
-  const base = state.summary.projects.filter(proj => {
-    if (f.department !== "all" && proj.department !== f.department) return false;
-    if (f.horizon !== "all" && proj.horizon_status !== f.horizon) return false;
-    if (f.project_pm !== "all" && proj.pm !== f.project_pm) return false;
-    if (f.project_pd !== "all" && proj.director !== f.project_pd) return false;
-    // Exclude projects with no allocation in the current period
-    if ((proj.total_days[p] || 0) === 0) return false;
-    if (f.search) {
-      const q = f.search.toLowerCase();
-      if (!proj.name.toLowerCase().includes(q) &&
-          !(proj.number || "").toLowerCase().includes(q) &&
-          !(proj.pm || "").toLowerCase().includes(q)) return false;
-    }
-    // Only show projects with allocation in this period (or all if no filter)
-    return true;
-  }).sort((a, b) => {
-    // No-record first, then by days descending
-    if (a.horizon_status !== b.horizon_status) {
-      return a.horizon_status === "linked" ? 1 : -1;
-    }
-    const da = a.total_days[p] || 0;
-    const db = b.total_days[p] || 0;
-    return db - da;
-  });
-  return applySort(base, "projects", {
-    department: proj => proj.department,
-    horizon:    proj => proj.horizon_status,
-    pm:         proj => proj.pm,
-    days:       proj => proj.total_days[p] || 0,
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Render main view
 // ---------------------------------------------------------------------------
 // ── Management Summary ──────────────────────────────────────────────────────
 
+let _mgmtCharts = [];
+
 function renderMgmtSummary() {
+  _mgmtCharts.forEach(ch => { try { ch.destroy(); } catch (e) {} });
+  _mgmtCharts = [];
   const container = document.getElementById("mgmt-container");
   if (!container) return;
   const s = state.summary;
@@ -639,7 +588,7 @@ function renderMgmtSummary() {
   requestAnimationFrame(() => {
     const horizonBarCtx = document.getElementById("mgmt-horizon-bar");
     if (horizonBarCtx) {
-      new Chart(horizonBarCtx, {
+      _mgmtCharts.push(new Chart(horizonBarCtx, {
         type: "bar",
         data: {
           labels: [""],
@@ -666,11 +615,11 @@ function renderMgmtSummary() {
             y: { stacked: true, display: false },
           }
         }
-      });
+      }));
     }
     const allocCtx = document.getElementById("mgmt-alloc-chart");
     if (allocCtx) {
-      new Chart(allocCtx, {
+      _mgmtCharts.push(new Chart(allocCtx, {
         type: "bar",
         data: { labels: periods6, datasets: [
           { label:"Fee earning", data:allocLinked,   backgroundColor:"#2a78d6", stack:"a" },
@@ -684,11 +633,11 @@ function renderMgmtSummary() {
             y:{ stacked:true, grid:{ color:"#e1e0d9" }, ticks:{ font:{ size:10 }, callback: v => Math.round(v).toLocaleString("en-GB") } }
           }
         }
-      });
+      }));
     }
     const alCtx = document.getElementById("mgmt-al-chart");
     if (alCtx) {
-      new Chart(alCtx, {
+      _mgmtCharts.push(new Chart(alCtx, {
         type: "bar",
         data: { labels: periods6, datasets: [
           { label:"Expected", data:alExpected, backgroundColor:"#b4b2a9" },
@@ -701,7 +650,7 @@ function renderMgmtSummary() {
             y:{ grid:{ color:"#e1e0d9" }, ticks:{ font:{ size:10 } } }
           }
         }
-      });
+      }));
     }
   });
 }
@@ -715,7 +664,6 @@ function renderView() {
     renderStaffTable();
     document.getElementById("staff-panel").classList.remove("hidden");
   } else if (state.activeView === "mgmt") {
-    document.getElementById("detail-panel").style.display = "none";
     buildFilterOptions();
     fetch("/api/rtcs")
       .then(r => r.json())
@@ -727,7 +675,6 @@ function renderView() {
     document.getElementById("mgmt-panel").classList.remove("hidden");
   } else {
     // Default: projects view (merged RTCs + Projects)
-    document.getElementById("detail-panel").style.display = "";
     renderProjectTable();
     document.getElementById("projects-panel").classList.remove("hidden");
   }
@@ -768,7 +715,7 @@ function renderStaffTable() {
        </th>` +
       cols.map(p => `<th style="text-align:center;min-width:72px;white-space:nowrap;cursor:pointer"
                          onclick="toggleSort('staff','period_${p}')">${escHtml(p)}
-                         <span id="sort-staff-period_${p.replace(/-/g,'_')}"></span></th>`).join("") ;
+                         <span id="sort-staff-period_${p}"></span></th>`).join("") ;
   }
 
   if (staff.length === 0) {
@@ -881,7 +828,6 @@ function statusBadge(status) {
 function renderProjectTable() {
   const tbody = document.getElementById("project-tbody");
   const rtcs  = filteredRtcs();
-  const p     = state.activePeriod;
   const s     = state.summary;
 
   if (rtcs.length === 0) {
@@ -1098,342 +1044,12 @@ function horizonBadge(hs) {
     return `<span class="${cls}"><span class="horizon--dot"></span>${label}</span>`;
   }
 
-function selectRtc(id) {
-  const rtc = state.rtcs.find(r => r.rtc_id === id);
-  if (!rtc) return;
-
-  state.selectedRtc     = id;
-  state.selectedStaff   = null;
-  state.selectedProject = null;
-
-  renderProjectTable();
-  showRtcDetail(rtc);
-}
-
-function showRtcDetail(rtc) {
-  const panel = document.getElementById("detail-panel");
-
-  const avatarMap = {
-    current:            "✓",
-    due_review:         "!",
-    overdue_review:     "!",
-    awaiting_archiving: "⌛",
-    archived:           "✗",
-  };
-  document.getElementById("dp-avatar").textContent = avatarMap[rtc.status] || "!";
-
-  const avatarColourMap = {
-    current:            "var(--green-dark)",
-    due_review:         "var(--amber-dark)",
-    overdue_review:     "var(--status-red)",
-    awaiting_archiving: "var(--text-tertiary)",
-    archived:           "var(--text-tertiary)",
-  };
-  document.getElementById("dp-avatar").style.color = avatarColourMap[rtc.status] || "";
-
-  document.getElementById("dp-name").textContent =
-    rtc.project_name || "No project name";
-  document.getElementById("dp-role").textContent =
-    [rtc.task_name, rtc.department].filter(Boolean).join(" · ");
-
-  // Stats: show current month days, future days, and last opened
-  document.getElementById("dp-stat-alloc").textContent =
-    fmt.days(rtc.current_month_days || 0) + "d";
-  document.getElementById("dp-stat-cap").textContent =
-    fmt.days(rtc.future_days || 0) + "d";
-  document.getElementById("dp-stat-remain").textContent =
-    rtc.last_opened ? new Date(rtc.last_opened).toLocaleDateString("en-GB", {
-      day: "numeric", month: "short"
-    }) : "Never";
-  document.getElementById("dp-stat-remain").style.color = "";
-  const lblsR = document.querySelectorAll(".detail-stat__label");
-  if (lblsR[0]) lblsR[0].textContent = "This month";
-  if (lblsR[1]) lblsR[1].textContent = "Future days";
-  if (lblsR[2]) lblsR[2].textContent = "Last opened";
-
-  // Hide KPI badge and no-record warning (not applicable for RTCs)
-  const kpiEl = document.getElementById("dp-kpi");
-  if (kpiEl) { kpiEl.className = "kpi kpi--ok"; kpiEl.textContent = ""; }
-  document.getElementById("dp-norec-warn")?.classList.add("hidden");
-
-
-  // Format start date as "July 2026" not "2026-07-01"
-  const startFmt = rtc.start_date
-    ? new Date(rtc.start_date + "T12:00:00").toLocaleDateString("en-GB", {
-        month: "long", year: "numeric"
-      })
-    : "\u2014";
-
-  // Project details
-  const projContainer = document.getElementById("dp-projects");
-  projContainer.innerHTML = `
-    <div style="font-size:11px;line-height:1.8;color:var(--text-secondary)">
-    <div><strong>Customer</strong>: ${escHtml(rtc.project_customer || "-")}</div>
-    <div><strong>Project name</strong>: ${escHtml(rtc.project_name || "-")}</div>
-    <div><strong>Task name</strong>: ${escHtml(rtc.task_name || "-")}</div>
-    <div><strong>Project Director</strong>: ${escHtml(rtc.project_director || "-")}</div>
-    <div><strong>Project Manager</strong>: ${escHtml(rtc.project_manager || "-")}</div>
-    <div style="margin-top:8px"><strong>Last edited by</strong>: ${escHtml(rtc.last_edited_by || "-")}</div>
-    <div style="margin-top:8px">${horizonBadge(rtc.horizon_status)}</div>
-    <div style="margin-top:3px">${statusBadge(rtc.status)}</div>
-      <div style="margin-top:10px;font-size:10px;font-weight:600;text-transform:uppercase;
-                  letter-spacing:0.08em;color:var(--text-tertiary);margin-bottom:4px">
-        Staff this period
-      </div>
-      ${(() => {
-        const p = state.activePeriod;
-        const allocated = (state.summary.staff || [])
-          .filter(s => s.projects.some(pr => {
-            const rtcMatch = state.rtcs.find(r => r.rtc_id === rtc.rtc_id);
-            return rtcMatch && pr.project_id === rtcMatch.project_id && (pr.days[p] || 0) > 0;
-          }))
-          .map(s => ({
-            name: s.name,
-            job_title: s.job_title,
-            days: (s.projects.find(pr => {
-              const rtcMatch = state.rtcs.find(r => r.rtc_id === rtc.rtc_id);
-              return rtcMatch && pr.project_id === rtcMatch.project_id;
-            })?.days[p] || 0)
-          }))
-          .filter(s => s.days > 0)
-          .sort((a, b) => b.days - a.days);
-        if (!allocated.length) return '<div style="font-size:11px;color:var(--text-tertiary)">No allocations this period</div>';
-        return allocated.map(s => `
-          <div class="detail-project-row">
-            <span class="team-badge">${fmt.gradeShort(s.job_title)}</span>
-            <span class="detail-proj-name">${escHtml(s.name)}</span>
-            <span class="detail-proj-days">${fmt.days(s.days)}d</span>
-          </div>`).join('');
-      })()}
-      <div style="margin-top:12px">
-        <a href="/rtc/${rtc.rtc_id}" class="btn-open-rtc">Open to edit →</a>
-      </div>
-    </div>`;
-
-  // Check for linkable Horizon record
-
-  panel.classList.add("open");
-}
-
-// ---------------------------------------------------------------------------
-// Detail panel — staff
-function selectStaff(id) {
-  const person = state.summary.staff.find(p => String(p.id) === String(id));
-  if (!person) return;
-
-  state.selectedStaff   = id;
-  state.selectedProject = null;
-  renderView();
-  showStaffDetail(person);
-}
-
-function showStaffDetail(person) {
-  const panel = document.getElementById("detail-panel");
-  const p     = state.activePeriod;
-  const alloc = person.allocated[p]    || 0;
-  const cap   = person.capacity[p]     || 0;
-  const hdays = person.horizon_days[p] || 0;
-  const ndays = person.no_record_days[p] || 0;
-  const kpi   = person.kpi[p]          || "ok";
-
-  document.getElementById("dp-avatar").textContent  = fmt.initials(person.name);
-  document.getElementById("dp-name").textContent    = person.name;
-  document.getElementById("dp-role").textContent    =
-    `${person.job_title} · ${person.job_function || ""}`;
-
-  document.getElementById("dp-stat-alloc").textContent    = fmt.days(alloc) + "d";
-  document.getElementById("dp-stat-cap").textContent      = fmt.days(cap) + "d";
-  document.getElementById("dp-stat-remain").textContent   = fmt.days(cap - alloc) + "d";
-  // Set stat labels for People view
-  const lbls = document.querySelectorAll(".detail-stat__label");
-  if (lbls[0]) lbls[0].textContent = "Allocated";
-  if (lbls[1]) lbls[1].textContent = "Capacity";
-  if (lbls[2]) lbls[2].textContent = "Remaining";
-  // Hide RTC-specific elements
-  // Hide RTC/project-specific elements
-  document.getElementById("dp-norec-warn")?.classList.add("hidden");
-  const staffKpiEl = document.getElementById("dp-kpi");
-  if (staffKpiEl) { staffKpiEl.className = ""; staffKpiEl.innerHTML = ""; }
-  document.getElementById("dp-stat-remain").style.color   =
-    (cap - alloc) < 0 ? "var(--red)" : "var(--green-dark)";
-
-  // KPI badge
-  document.getElementById("dp-kpi").className = `kpi kpi--${kpi}`;
-  document.getElementById("dp-kpi").textContent = kpi;
-
-  // Projects breakdown
-  const projContainer = document.getElementById("dp-projects");
-  const projectLookup = Object.fromEntries(
-    state.summary.projects.map(pr => [pr.project_id, pr])
-  );
-
-  const rows = person.projects
-    .filter(pr => (pr.days[p] || 0) > 0)
-    .sort((a, b) => (b.days[p] || 0) - (a.days[p] || 0));
-
-  // Count unlinked projects for this person this period
-  const unlinkedCount = rows.filter(pr => {
-    const proj = projectLookup[pr.project_id];
-    return proj && proj.horizon_status === "norecord";
-  }).length;
-
-  const warnEl = document.getElementById("dp-norec-warn");
-  if (unlinkedCount > 0) {
-    warnEl.classList.remove("hidden");
-    document.getElementById("dp-norec-days").textContent =
-      `${unlinkedCount} of these project${unlinkedCount !== 1 ? "s are" : " is"} not linked to Horizon and will not generate revenue`;
-  } else {
-    warnEl.classList.add("hidden");
-  }
-
-  if (rows.length === 0) {
-    projContainer.innerHTML =
-      `<div class="empty-state" style="padding:16px">No allocations this period</div>`;
-  } else {
-    projContainer.innerHTML = rows.map(pr => {
-      const proj   = projectLookup[pr.project_id];
-      const name   = proj ? proj.name : `Project ${pr.project_id}`;
-      const days   = pr.days[p] || 0;
-      return `<div class="detail-project-row">
-        <span class="detail-proj-name" title="${escHtml(name)}">${escHtml(name)}</span>
-        <span class="detail-proj-days">${fmt.days(days)}d</span>
-      </div>`;
-    }).join("");
-  }
-
-  panel.classList.add("open");
-}
-
-// ---------------------------------------------------------------------------
-// Detail panel — project
-// ---------------------------------------------------------------------------
-function selectProject(id) {
-  const proj = state.summary.projects.find(p => String(p.project_id) === String(id));
-  if (!proj) return;
-
-  state.selectedProject = id;
-  state.selectedStaff   = null;
-  renderView();
-  showProjectDetail(proj);
-}
-
-function showProjectDetail(proj) {
-  const panel  = document.getElementById("detail-panel");
-  const p      = state.activePeriod;
-  const linked = proj.horizon_status === "linked";
-
-  // Avatar — show horizon status icon instead of project number characters
-  document.getElementById("dp-avatar").textContent = linked ? "✓" : "!";
-
-  document.getElementById("dp-name").textContent = proj.name;
-  document.getElementById("dp-role").textContent =
-    [proj.task_name, proj.department].filter(Boolean).join(" · ");
-
-  // This period days
-  const thisPeriodDays = proj.total_days[p] || 0;
-
-  // Future days — from server-side summary (fixed from current month)
-  const futureDays = proj.future_days || 0;
-
-  document.getElementById("dp-stat-alloc").textContent = fmt.days(thisPeriodDays) + "d";
-  document.getElementById("dp-stat-cap").textContent   = fmt.days(futureDays) + "d";
-  document.getElementById("dp-stat-remain").textContent = proj.pm || "—";
-  document.getElementById("dp-stat-remain").style.color = "";
-
-  const hs = proj.horizon_status || (linked ? "linked" : "norecord");
-  const hsMap = {
-    linked: ["linked", "Linked to Horizon"],
-    opportunity: ["opportunity", "Opportunity"],
-    other: ["other", "Other record"],
-    norecord: ["norecord", "Not linked to Horizon"],
-  };
-  const [hsCls, hsLabel] = hsMap[hs] || ["norecord", "Not linked"];
-  document.getElementById("dp-kpi").className = `horizon horizon--${hsCls}`;
-  document.getElementById("dp-kpi").innerHTML =
-    `<span class="horizon--dot"></span>${hsLabel}`;
-
-  // No-record warning
-  const warnEl = document.getElementById("dp-norec-warn");
-  if (!linked) {
-    warnEl.classList.remove("hidden");
-    document.getElementById("dp-norec-days").textContent =
-      "This project has no Horizon record. Time allocated to it will not generate revenue.";
-  } else {
-    warnEl.classList.add("hidden");
-  }
-
-  // Stat labels
-  const labels = document.querySelectorAll(".detail-stat__label");
-  if (labels[0]) labels[0].textContent = "This period";
-  if (labels[1]) labels[1].textContent = "Future days";
-  if (labels[2]) labels[2].textContent = "Project Manager";
-
-  // Staff allocated this period
-  const projContainer = document.getElementById("dp-projects");
-  const allocated = state.summary.staff
-    .filter(s => s.projects.some(pr => pr.project_id === proj.project_id &&
-                                       (pr.days[p] || 0) > 0))
-    .map(s => ({
-      name: s.name,
-      job_title: s.job_title,
-      days: (s.projects.find(pr => pr.project_id === proj.project_id)?.days[p] || 0)
-    }))
-    .sort((a, b) => b.days - a.days);
-
-  if (allocated.length > 0) {
-    projContainer.innerHTML = `
-      <div style="margin-top:12px;font-size:10px;font-weight:600;
-                  text-transform:uppercase;letter-spacing:0.08em;
-                  color:var(--text-tertiary);margin-bottom:6px">
-        Staff this period
-      </div>
-      ${allocated.map(s => `
-        <div class="detail-project-row">
-          <span class="team-badge">${fmt.gradeShort(s.job_title)}</span>
-          <span class="detail-proj-name">${escHtml(s.name)}</span>
-          <span class="detail-proj-days">${fmt.days(s.days)}d</span>
-        </div>`).join("")}`;
-  } else {
-    projContainer.innerHTML = "";
-  }
-
-  panel.classList.add("open");
-}
-
-// ---------------------------------------------------------------------------
-// Period selection
-// ---------------------------------------------------------------------------
-function selectPeriod(label) {
-  state.activePeriod = label;
-  document.querySelectorAll(".month-tab").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.period === label);
-  });
-  if (state.activeView === "projects") {
-    loadRtcs();
-  } else {
-    renderView();
-    renderMetrics();
-  }
-  if (state.selectedStaff) {
-    const person = state.summary.staff.find(p => String(p.id) === String(state.selectedStaff));
-    if (person) showStaffDetail(person);
-  }
-  if (state.selectedRtc) {
-    const rtc = state.rtcs.find(r => r.rtc_id === state.selectedRtc);
-    if (rtc) showRtcDetail(rtc);
-  }
-}
-
 // ---------------------------------------------------------------------------
 // View switching
 // ---------------------------------------------------------------------------
 function switchView(view) {
   state.activeView = view;
   history.replaceState(null, "", "#" + view);
-  state.selectedStaff   = null;
-  state.selectedProject = null;
-  state.selectedRtc     = null;
-  closeDetailPanel();
 
   // Clear expanded staff rows when switching views
   if (view !== "staff")    _expandedStaff.clear();
@@ -1472,7 +1088,7 @@ function switchView(view) {
   const allSlots = [
     "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
     "filter-job-title", "filter-job-function", "filter-line-manager",
-    "filter-horizon", "filter-project-pd", "filter-project-pm",
+    "filter-horizon",
     "filter-slot4-spacer",
   ];
   allSlots.forEach(id => {
@@ -1502,15 +1118,14 @@ function switchView(view) {
     }
   });
 
-  // Month tabs only relevant for staff and projects views
- const monthTabs = document.getElementById("month-tabs");
-  if (monthTabs) monthTabs.style.display = (view === "mgmt" || view === "staff" || view === "projects") ? "none" : "";
+  const monthTabs = document.getElementById("month-tabs");
+  if (monthTabs) monthTabs.style.display = "none";
   const newRtcBtn = document.getElementById("btn-create-rtc");
   if (newRtcBtn) newRtcBtn.style.display = view === "projects" ? "" : "none";
-  const detailPanel = document.getElementById("detail-panel");
-  if (detailPanel && view === "mgmt") detailPanel.classList.remove("open");
+  // visibility (not display) so the filter bar keeps identical height on
+  // all three views — a display:none row collapsed the Summary bar by 34px
   const searchRow = document.querySelector(".filter-bar__row--search");
-  if (searchRow) searchRow.style.display = view === "mgmt" ? "none" : "";
+  if (searchRow) searchRow.style.visibility = view === "mgmt" ? "hidden" : "visible";
 
   // Reload data fresh on every tab switch so changes made on one tab
   // are reflected immediately on the others without needing a page refresh
@@ -1524,18 +1139,6 @@ function switchView(view) {
     return;
   }
 
-  renderView();
-}
-
-// ---------------------------------------------------------------------------
-// Close detail panel
-// ---------------------------------------------------------------------------
-function closeDetailPanel() {
-  const panel = document.getElementById("detail-panel");
-  panel.classList.remove("open");
-  panel.style.display = state.activeView === "mgmt" ? "none" : "";
-  state.selectedStaff   = null;
-  state.selectedProject = null;
   renderView();
 }
 
@@ -1584,8 +1187,6 @@ function resetFilters() {
   state.filters.job_title    = "all";
   state.filters.department   = "all";
   state.filters.horizon      = "all";
-  state.filters.project_pm   = "all";
-  state.filters.project_pd   = "all";
   state.filters.search       = "";
   state.filters.line_manager = "all";
   state.rtcFilters.pm        = "";
@@ -1605,13 +1206,6 @@ function resetFilters() {
   if (titleSel)   titleSel.value   = "all";
   if (funcSel)    funcSel.value    = "all";
   if (horizonSel) horizonSel.value = "all";
-  
-  const projectPmSel = document.getElementById("filter-project-pm");
-  if (projectPmSel) projectPmSel.value = "all";
-
-  const projectPdSel = document.getElementById("filter-project-pd");
-  if (projectPdSel) projectPdSel.value = "all";
-
   if (searchEl)   searchEl.value   = "";
   if (pmSel)      pmSel.value      = "all";
   if (pdSel)      pdSel.value      = "all";
@@ -1632,7 +1226,7 @@ function resetFilters() {
 // Create / Duplicate RTC modal
 // ---------------------------------------------------------------------------
 
-let _rtcModalMode  = "create";
+
 let _rtcPickerYear  = new Date().getFullYear();
 let _rtcPickerMonth = null;
 
@@ -1640,11 +1234,11 @@ const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun",
                     "Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function openRtcModal(mode) {
-  _rtcModalMode = mode;
+
   document.getElementById("rtc-modal-title").textContent =
-    mode === "duplicate" ? "Duplicate RTC" : "New RTC";
+    "New RTC";
   document.getElementById("rtc-modal-submit").textContent =
-    mode === "duplicate" ? "Duplicate RTC" : "Create RTC";
+    "Create RTC";
   document.getElementById("rtc-modal-submit").disabled = false;
 
   document.getElementById("rtc-proj-number").value = "";
@@ -1946,10 +1540,7 @@ async function submitRtcModal() {
   };
 
   try {
-    const url = _rtcModalMode === "duplicate"
-                ? `/api/rtcs/${state.selectedRtc}/duplicate`
-                : "/api/rtcs";
-    const r   = await fetch(url, {
+    const r   = await fetch("/api/rtcs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(body),
@@ -1959,17 +1550,17 @@ async function submitRtcModal() {
       errorEl.textContent = d.error || "Server error \u2014 please try again.";
       errorEl.classList.remove("hidden");
       submitBtn.disabled = false;
-      submitBtn.textContent = _rtcModalMode === "duplicate" ? "Duplicate RTC" : "Create RTC";
+      submitBtn.textContent = "Create RTC";
       return;
     }
     closeRtcModal();
+    if (d.rtc_id) { window.location.href = "/rtc/" + d.rtc_id; return; }
     await loadRtcs();
-    if (d.rtc_id) selectRtc(d.rtc_id);
   } catch(e) {
     errorEl.textContent = "Could not reach the server. Please try again.";
     errorEl.classList.remove("hidden");
     submitBtn.disabled = false;
-    submitBtn.textContent = _rtcModalMode === "duplicate" ? "Duplicate RTC" : "Create RTC";
+    submitBtn.textContent = "Create RTC";
   }
 }
 
@@ -2018,16 +1609,6 @@ function wireEvents() {
       renderProjectTable();
     });
   }
-
-document.getElementById("filter-project-pm")?.addEventListener("change", e => {
-    state.filters.project_pm = e.target.value;
-    renderView();
-  });
-
-  document.getElementById("filter-project-pd")?.addEventListener("change", e => {
-    state.filters.project_pd = e.target.value;
-    renderView();
-  });
 
   const searchEl = document.getElementById("filter-search");
   if (searchEl) {
@@ -2099,34 +1680,6 @@ document.getElementById("filter-project-pm")?.addEventListener("change", e => {
   });
   document.getElementById("rtc-year-next")?.addEventListener("click", () => {
     _rtcPickerYear++; renderMonthPicker();
-  });
-
-
-  // Close detail panel
-  document.getElementById("dp-close")?.addEventListener("click", closeDetailPanel);
-
-  // Click outside detail panel to close.
-  // The row click listener (selectStaff/selectProject) calls renderView(),
-  // which rebuilds tbody.innerHTML and opens the panel — all synchronously,
-  // before this listener runs. By the time this runs, e.target may be a
-  // detached node from the OLD table HTML, so .closest() against it always
-  // fails even though the click genuinely landed on a row. Checking
-  // composedPath() at dispatch time avoids this, since it captures the
-  // event path before any DOM mutation happens.
-  document.addEventListener("click", e => {
-    const panel = document.getElementById("detail-panel");
-    if (!panel.classList.contains("open")) return;
-    if (panel.contains(e.target)) return;
-
-    const clickedRow = e.composedPath().some(node =>
-      node.nodeType === 1 &&
-      node.tagName === "TR" &&
-      node.dataset &&
-      node.dataset.id !== undefined
-    );
-    if (clickedRow) return;
-
-    closeDetailPanel();
   });
 }
 
