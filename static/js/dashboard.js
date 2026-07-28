@@ -322,19 +322,25 @@ function filteredStaff() {
 let _mgmtCharts = [];
 
 function renderMgmtSummary() {
-  _mgmtCharts.forEach(ch => { try { ch.destroy(); } catch (e) {} });
-  _mgmtCharts = [];
   const container = document.getElementById("mgmt-container");
   if (!container) return;
   const s = state.summary;
   if (!s) { container.innerHTML = '<div class="empty-state">Loading…</div>'; return; }
 
+  // Destroy previous Chart.js instances
+  if (_mgmtCharts && _mgmtCharts.length) {
+    _mgmtCharts.forEach(c => { try { c.destroy(); } catch(e) {} });
+  }
+  _mgmtCharts = [];
+
   const dept = state.filters.department !== "all" ? state.filters.department : null;
+  const lm   = state.filters.line_manager !== "all" ? state.filters.line_manager : null;
   const pd   = state.rtcFilters.pd || "";
   const pm   = state.rtcFilters.pm || "";
   const p    = state.activePeriod;
   const curIdx = Math.max(0, s.periods.indexOf(p));
   const periods6 = s.periods.slice(curIdx, curIdx + 6);
+  const periodStarts6 = (s.period_starts || []).slice(curIdx, curIdx + 6);
   const nextP = periods6[1] || periods6[0];
 
   const gradeSort = t => {
@@ -342,12 +348,35 @@ function renderMgmtSummary() {
     if (t.startsWith("L")) return -1;
     const m = t.match(/^([PT])(\d+)/);
     if (!m) return 998;
-    return (m[1] === "P" ? 0 : 100) + (99 - parseInt(m[2]));
+    return (m[1] === "P" ? 0 : 1) * 100 + (99 - parseInt(m[2]));
   };
 
-  const staff = s.staff.filter(ps =>
-    !ps.id.startsWith("GENERIC-") && (!dept || ps.department === dept)
+  // Build cascading line manager filter
+  let lmFilter = null;
+  if (lm) {
+    const allStaff = s.staff || [];
+    const reportSet = new Set();
+    const queue = [lm];
+    while (queue.length) {
+      const mgr = queue.shift();
+      allStaff.filter(ps => ps.line_manager === mgr).forEach(ps => {
+        if (!reportSet.has(ps.name)) {
+          reportSet.add(ps.name);
+          queue.push(ps.name);
+        }
+      });
+    }
+    lmFilter = reportSet;
+  }
+
+  // Staff filtered by department AND line manager (no generics)
+  const staff = (s.staff || []).filter(ps =>
+    !ps.id.startsWith("GENERIC-") &&
+    (!dept || ps.department === dept) &&
+    (!lmFilter || lmFilter.has(ps.name))
   );
+
+  // RTCs filtered by department and PD/PM only (not line manager)
   const allRtcs = state.mgmtRtcs || state.rtcs;
   const rtcs = allRtcs.filter(r =>
     (!dept || r.department === dept) &&
@@ -356,314 +385,320 @@ function renderMgmtSummary() {
   );
   const projsByDept = (s.projects || []).filter(pr => !dept || pr.department === dept);
 
-  // Horizon days
-  const linkedDays   = projsByDept.filter(pr => pr.horizon_status === "linked").reduce((sum, pr) => sum + (pr.future_days || 0), 0);
-  const oppDays      = projsByDept.filter(pr => pr.horizon_status === "opportunity").reduce((sum, pr) => sum + (pr.future_days || 0), 0);
-  const SPECIAL_NUMS = new Set(["ID-06", "ID-04", "IDUK-01"]);
-  const unlinkedDays = projsByDept.filter(pr => pr.horizon_status === "norecord").reduce((sum, pr) => sum + (pr.future_days || 0), 0);
-  const linkedRtcs   = rtcs.filter(r => r.horizon_status === "linked" && !SPECIAL_NUMS.has(r.project_number));
-  const oppRtcs      = rtcs.filter(r => r.horizon_status === "opportunity");
-  const unlinkedRtcs = rtcs.filter(r => r.horizon_status === "norecord");
-  const internalDays = projsByDept.filter(pr => SPECIAL_NUMS.has(pr.number)).reduce((sum, pr) => sum + (pr.future_days || 0), 0);
-  const totalHdays   = linkedDays + oppDays + unlinkedDays || 1;
+  // ── Headline numbers ─────────────────────────────────────────────────
+  const capacity   = staff.reduce((sum, ps) => sum + (ps.capacity[p]      || 0), 0);
+  const feeEarning = staff.reduce((sum, ps) => sum + (ps.horizon_days[p]  || 0), 0);
+  const internal   = staff.reduce((sum, ps) => sum + (ps.internal_days?.[p] || 0), 0);
+  const unalloc    = Math.max(0, capacity - feeEarning - internal);
+  const feePct     = capacity > 0 ? Math.round(feeEarning / capacity * 100) : 0;
+  const intPct     = capacity > 0 ? Math.round(internal   / capacity * 100) : 0;
+  const unallocPct = capacity > 0 ? Math.round(unalloc    / capacity * 100) : 0;
 
-  // Treemap — proportional widths (fee earning takes left portion, opportunity/unlinked share right)
-
-  // RTC review status
+  // ── RTC status ───────────────────────────────────────────────────────
   const statusCounts = { current: 0, due_review: 0, overdue_review: 0 };
   rtcs.forEach(r => { if (r.status in statusCounts) statusCounts[r.status]++; });
   const totalRtcs = Object.values(statusCounts).reduce((s, v) => s + v, 0);
-
-  // KPI
-  const feeUtil = (() => {
-    const cap = staff.reduce((sum, ps) => sum + (ps.capacity[p] || 0), 0);
-    const fee = staff.reduce((sum, ps) => sum + (ps.horizon_days[p] || 0), 0);
-    // horizon_days now correctly excludes special RTCs (true UK Direct fee-earning only)
-    return cap > 0 ? Math.round(fee / cap * 100) : 0;
-  })();
-  const bench = staff.reduce((sum, ps) => sum + Math.max(0, (ps.capacity[p] || 0) - (ps.allocated[p] || 0)), 0);
-
-  // Top 10 projects
-  const topProjects = projsByDept
-    .filter(pr => (pr.future_days || 0) > 0 && !SPECIAL_NUMS.has(pr.number))
-    .sort((a, b) => (b.future_days || 0) - (a.future_days || 0))
-    .slice(0, 10);
-
-  // Over-allocated
-  const overThisMonth = staff.filter(ps => ps.kpi[p] === "over").sort((a, b) => (b.allocated[p] || 0) - (a.allocated[p] || 0));
-  const overNextMonth = staff.filter(ps => ps.kpi[nextP] === "over").sort((a, b) => (b.allocated[nextP] || 0) - (a.allocated[nextP] || 0));
-
-  // Grade groups
-  const gradeMap = {};
-  staff.forEach(ps => {
-    const g = ps.job_title || "Unknown";
-    if (!gradeMap[g]) gradeMap[g] = { capacity: 0, allocated: 0, feeEarning: 0, internal: 0 };
-    gradeMap[g].capacity   += ps.capacity[p] || 0;
-    gradeMap[g].allocated  += ps.allocated[p] || 0;
-    gradeMap[g].feeEarning += ps.horizon_days[p] || 0;
-    gradeMap[g].internal   += ps.internal_days?.[p] || 0;
-  });
-  const grades = Object.entries(gradeMap)
-    .filter(([, g]) => g.capacity > 0)
-    .sort(([a], [b]) => gradeSort(a) - gradeSort(b));
-
-  // Annual leave
-  const AL_MONTHLY = { Jan:0.8,Feb:0.9,Mar:1.1,Apr:1.5,May:1.3,Jun:1.7,Jul:2.4,Aug:3.6,Sep:2.3,Oct:1.9,Nov:1.5,Dec:6.0 };
-  const alExpected = periods6.map(per => {
-    const mon = per.split("-")[0];
-    const bh  = (s.bank_holidays || {})[per] || 0;
-    return Math.round(staff.reduce((sum, ps) => {
-      const fte = ps.fte[per] || 0;
-      return sum + (AL_MONTHLY[mon] || 0) * fte + bh * fte;
-    }, 0));
-  });
-  const alActual = periods6.map(per => {
-    return Math.round(projsByDept.filter(pr => pr.number === "ID-06").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0));
-  });
-
-  // Allocated by horizon over 6 months
-  const allocLinked   = periods6.map(per => Math.round(projsByDept.filter(pr => pr.horizon_status === "linked" && !SPECIAL_NUMS.has(pr.number)).reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
-  const allocOpp      = periods6.map(per => Math.round(projsByDept.filter(pr => pr.horizon_status === "opportunity").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
-  const allocUnlinked = periods6.map(per => Math.round(projsByDept.filter(pr => pr.horizon_status === "norecord").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
-  const allocInternal = periods6.map(per => Math.round(projsByDept.filter(pr => SPECIAL_NUMS.has(pr.number)).reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
-
-  const fmtD = d => Math.round(d).toLocaleString("en-GB");
-
   const statusLabel  = { current:"Current", due_review:"Due for review", overdue_review:"Overdue review" };
   const statusColour = { current:"#008300", due_review:"#eda100", overdue_review:"#e34948" };
 
+  // ── Horizon future days ──────────────────────────────────────────────
+  const SPECIAL = new Set(["ID-06","ID-04","IDUK-01"]);
+  const linkedDays   = projsByDept.filter(pr => pr.horizon_status==="linked"      && !SPECIAL.has(pr.number)).reduce((sum,pr)=>sum+(pr.future_days||0),0);
+  const oppDays      = projsByDept.filter(pr => pr.horizon_status==="opportunity"                             ).reduce((sum,pr)=>sum+(pr.future_days||0),0);
+  const unlinkedDays = projsByDept.filter(pr => pr.horizon_status==="norecord"                               ).reduce((sum,pr)=>sum+(pr.future_days||0),0);
+  const internalDays = projsByDept.filter(pr => SPECIAL.has(pr.number)                                       ).reduce((sum,pr)=>sum+(pr.future_days||0),0);
+  const linkedRtcs   = rtcs.filter(r => r.horizon_status==="linked");
+  const oppRtcs      = rtcs.filter(r => r.horizon_status==="opportunity");
+  const unlinkedRtcs = rtcs.filter(r => r.horizon_status==="norecord");
+
+  // ── Allocated days by horizon over 6 months ──────────────────────────
+  const allocLinked   = periods6.map(per => Math.round(projsByDept.filter(pr=>pr.horizon_status==="linked"      && !SPECIAL.has(pr.number)).reduce((sum,pr)=>sum+(pr.total_days[per]||0),0)));
+  const allocOpp      = periods6.map(per => Math.round(projsByDept.filter(pr=>pr.horizon_status==="opportunity"                            ).reduce((sum,pr)=>sum+(pr.total_days[per]||0),0)));
+  const allocUnlinked = periods6.map(per => Math.round(projsByDept.filter(pr=>pr.horizon_status==="norecord"                              ).reduce((sum,pr)=>sum+(pr.total_days[per]||0),0)));
+  const allocInternal = periods6.map(per => Math.round(projsByDept.filter(pr=>SPECIAL.has(pr.number)                                       ).reduce((sum,pr)=>sum+(pr.total_days[per]||0),0)));
+
+  // ── Annual leave expected vs actual ──────────────────────────────────
+  const AL_MONTHLY = {Jan:0.8,Feb:0.9,Mar:1.1,Apr:1.5,May:1.3,Jun:1.7,Jul:2.4,Aug:3.6,Sep:2.3,Oct:1.9,Nov:1.5,Dec:6.0};
+  const alExpected = periods6.map(per => {
+    const mon = per.split("-")[0];
+    const bh  = (s.bank_holidays || {})[per] || 0;
+    return Math.round(staff.reduce((sum, ps) => sum + (AL_MONTHLY[mon]||0)*(ps.fte[per]||0) + bh*(ps.fte[per]||0), 0));
+  });
+  const alActual = periods6.map(per =>
+    Math.round(projsByDept.filter(pr=>pr.number==="ID-06").reduce((sum,pr)=>sum+(pr.total_days[per]||0),0))
+  );
+
+  // ── Grade breakdown ───────────────────────────────────────────────────
+  const gradeMap = {};
+  staff.forEach(ps => {
+    const g = ps.job_title || "Unknown";
+    if (!gradeMap[g]) gradeMap[g] = { capacity:0, feeEarning:0, internal:0 };
+    gradeMap[g].capacity   += ps.capacity[p]        || 0;
+    gradeMap[g].feeEarning += ps.horizon_days[p]    || 0;
+    gradeMap[g].internal   += ps.internal_days?.[p] || 0;
+  });
+  const grades = Object.entries(gradeMap)
+    .filter(([,g]) => g.capacity > 0)
+    .sort(([a],[b]) => gradeSort(a) - gradeSort(b));
+
+  // ── Over-allocated ───────────────────────────────────────────────────
+  const overThis = staff.filter(ps=>ps.kpi[p]===   "over").sort((a,b)=>(b.allocated[p]   ||0)-(a.allocated[p]   ||0));
+  const overNext = staff.filter(ps=>ps.kpi[nextP]==="over").sort((a,b)=>(b.allocated[nextP]||0)-(a.allocated[nextP]||0));
+
+  // ── Top 10 projects ──────────────────────────────────────────────────
+  const topProjects = projsByDept
+    .filter(pr=>(pr.future_days||0)>0 && !SPECIAL.has(pr.number))
+    .sort((a,b)=>(b.future_days||0)-(a.future_days||0))
+    .slice(0,10);
+
+  // ── Helpers ───────────────────────────────────────────────────────────
+  const fmtD = d => Math.round(d).toLocaleString("en-GB");
+
   const overTable = (people, per) => {
-    if (!people.length) return `<div style="font-size:12px;color:var(--text-tertiary);font-style:italic;padding:8px 0">None</div>`;
-    return `<table class="mgmt-table" style="table-layout:fixed;width:100%">
-      <thead><tr><th style="white-space:nowrap">Name</th><th style="white-space:nowrap">Grade</th><th style="text-align:right">Allocated</th><th style="text-align:right">Capacity</th></tr></thead>
-      <tbody>${people.map(ps => `<tr>
+    if (!people.length) return `<div style="font-size:12px;color:var(--text-tertiary);font-style:italic;padding:4px 0">None</div>`;
+    return `<table class="mgmt-table">
+      <thead><tr>
+        <th>Name</th><th>Grade</th>
+        <th style="text-align:right">Allocated</th>
+        <th style="text-align:right">Capacity</th>
+      </tr></thead>
+      <tbody>${people.map(ps=>`<tr>
         <td style="white-space:nowrap">${escHtml(ps.name)}</td>
         <td style="font-size:11px;color:var(--text-tertiary);white-space:nowrap">${escHtml(fmt.gradeShort(ps.job_title))}</td>
-        <td style="text-align:right;font-family:var(--font-mono);font-size:12px;color:#e34948">${fmtD(ps.allocated[per] || 0)}d</td>
-        <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(ps.capacity[per] || 0)}d</td>
+        <td style="text-align:right;font-family:var(--font-mono);font-size:12px;color:#e34948">${fmtD(ps.allocated[per]||0)}d</td>
+        <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(ps.capacity[per]||0)}d</td>
       </tr>`).join("")}</tbody></table>`;
   };
 
+  const noteHtml = `<div style="font-size:10px;font-style:italic;color:var(--text-tertiary);margin-top:4px">All RTCs in department${lm ? " — not filtered by line manager" : ""}</div>`;
+
+  const lmNote = lm ? `<div style="font-size:10px;font-style:italic;color:var(--text-tertiary);margin-top:2px">Filtered: ${escHtml(lm)}'s team</div>` : "";
+
+  // ── Render ────────────────────────────────────────────────────────────
   container.innerHTML = `
     <div class="mgmt-grid" style="grid-template-columns:repeat(6,1fr)">
 
-      <!-- ROW 1: Month at a glance | RTC review status | Treemap (3 equal columns) -->
-      <div class="mgmt-card" style="grid-column:span 2">
-        <div class="mgmt-card__title">Month at a glance — ${escHtml(p)}</div>
-        <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
-          <div style="display:flex;justify-content:space-between;align-items:baseline">
-            <div style="font-size:12px;color:var(--text-secondary)">Fee-earning utilisation</div>
-            <div style="font-size:20px;font-weight:500;color:#2a78d6">${feeUtil}%</div>
+      <!-- ROW 1: Headline numbers — full width -->
+      <div class="mgmt-card" style="grid-column:span 6">
+        <div class="mgmt-card__title">Team capacity — ${escHtml(p)}${lmNote}</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:8px">
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Capacity</div>
+            <div style="font-size:28px;font-weight:500">${fmtD(capacity)}d</div>
           </div>
-          <div style="height:0.5px;background:var(--border)"></div>
-          <div style="display:flex;justify-content:space-between;align-items:baseline">
-            <div style="font-size:12px;color:var(--text-secondary)">Bench available</div>
-            <div style="font-size:20px;font-weight:500">${fmtD(bench)}d</div>
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #2a78d6">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Fee earning</div>
+            <div style="font-size:28px;font-weight:500;color:#2a78d6">${fmtD(feeEarning)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${feePct}% of capacity</div>
+          </div>
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #6b7280">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Internal</div>
+            <div style="font-size:28px;font-weight:500;color:#6b7280">${fmtD(internal)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${intPct}% of capacity</div>
+          </div>
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #008300">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Unallocated</div>
+            <div style="font-size:28px;font-weight:500;color:#008300">${fmtD(unalloc)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${unallocPct}% of capacity</div>
           </div>
         </div>
       </div>
 
-      <div class="mgmt-card" style="grid-column:span 2">
+      <!-- ROW 2: RTC review | Horizon status -->
+      <div class="mgmt-card" style="grid-column:span 3">
         <div class="mgmt-card__title">RTC review status</div>
-        <div style="margin-top:4px">
-          ${Object.entries(statusCounts).map(([k, v]) => `
+        ${noteHtml}
+        <div style="margin-top:10px">
+          ${Object.entries(statusCounts).map(([k,v])=>`
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
             <div style="font-size:11px;color:${statusColour[k]};width:110px;flex-shrink:0">${statusLabel[k]}</div>
             <div style="flex:1;height:8px;border-radius:4px;background:var(--surface-1);overflow:hidden">
-              <div style="width:${totalRtcs ? Math.round(v/totalRtcs*100) : 0}%;height:100%;border-radius:4px;background:${statusColour[k]}"></div>
+              <div style="width:${totalRtcs?Math.round(v/totalRtcs*100):0}%;height:100%;border-radius:4px;background:${statusColour[k]}"></div>
             </div>
             <div style="font-size:11px;color:var(--text-secondary);width:24px;text-align:right">${v}</div>
           </div>`).join("")}
         </div>
       </div>
 
-      <div class="mgmt-card" style="grid-column:span 2">
-        <div class="mgmt-card__title">Horizon link status — allocated days beyond this month</div>
-        <div style="position:relative;height:80px;margin-bottom:8px">
-          <canvas id="mgmt-horizon-bar" role="img" aria-label="Horizontal stacked bar showing future days by horizon status">Future days by horizon status.</canvas>
+      <div class="mgmt-card" style="grid-column:span 3">
+        <div class="mgmt-card__title">Horizon link status — future days</div>
+        ${noteHtml}
+        <div style="position:relative;height:60px;margin:10px 0 8px">
+          <canvas id="mgmt-horizon-bar" role="img" aria-label="Horizon status bar">Horizon link status.</canvas>
         </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
           ${[{col:"#2a78d6",label:"Fee earning",val:fmtD(linkedDays)+"d"},
              {col:"#eda100",label:"Opportunity",val:fmtD(oppDays)+"d"},
              {col:"#e34948",label:"Not linked",val:fmtD(unlinkedDays)+"d"},
              {col:"#6b7280",label:"Internal",val:fmtD(internalDays)+"d"}]
-            .map(it => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
-              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.col};flex-shrink:0"></span>
+            .map(it=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary)">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${it.col};flex-shrink:0"></span>
               ${escHtml(it.label)}: <strong style="color:var(--text-primary);margin-left:2px">${it.val}</strong>
             </div>`).join("")}
         </div>
       </div>
 
-      <!-- ROW 2: Allocated days — full width -->
+      <!-- ROW 3: Allocated days — full width -->
       <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Allocated days — next 6 months</div>
-        <div style="display:flex;align-items:flex-start;gap:16px">
+        ${noteHtml}
+        <div style="display:flex;align-items:flex-start;gap:16px;margin-top:8px">
           <div style="flex:1;position:relative;height:150px">
-            <canvas id="mgmt-alloc-chart" role="img" aria-label="Stacked bar chart of allocated days by horizon status over 6 months">Allocated days by horizon status.</canvas>
+            <canvas id="mgmt-alloc-chart" role="img" aria-label="Allocated days by horizon status">Allocated days.</canvas>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;flex-shrink:0">
-            ${[{col:"#2a78d6",label:"Fee earning"},{col:"#eda100",label:"Opportunity"},{col:"#e34948",label:"Not linked"},{col:"#6b7280",label:"Internal"}]
-              .map(it => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
+            ${[{col:"#2a78d6",label:"Fee earning"},{col:"#eda100",label:"Opportunity"},
+               {col:"#e34948",label:"Not linked"},{col:"#6b7280",label:"Internal"}]
+              .map(it=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
                 <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.col}"></span>${escHtml(it.label)}
               </div>`).join("")}
           </div>
         </div>
       </div>
 
-      <!-- ROW 3: Annual leave — full width -->
+      <!-- ROW 4: Annual leave — full width -->
       <div class="mgmt-card" style="grid-column:span 6">
-        <div class="mgmt-card__title">Annual leave & public holidays — next 6 months</div>
-        <div style="display:flex;align-items:flex-start;gap:16px">
+        <div class="mgmt-card__title">Annual leave & public holidays — next 6 months${lm?" ("+escHtml(lm)+"'s team)":""}</div>
+        <div style="display:flex;align-items:flex-start;gap:16px;margin-top:8px">
           <div style="flex:1;position:relative;height:150px">
-            <canvas id="mgmt-al-chart" role="img" aria-label="Expected vs actual annual leave and public holidays over 6 months">Annual leave expected vs actual.</canvas>
+            <canvas id="mgmt-al-chart" role="img" aria-label="Annual leave expected vs actual">Annual leave.</canvas>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;flex-shrink:0">
             ${[{col:"#b4b2a9",label:"Expected"},{col:"#2a78d6",label:"Actual"}]
-              .map(it => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
+              .map(it=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
                 <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.col}"></span>${escHtml(it.label)}
               </div>`).join("")}
           </div>
         </div>
       </div>
 
-      <!-- ROW 4: Utilisation | Bench strength -->
+      <!-- ROW 5: Grade breakdown | Over-allocated -->
       <div class="mgmt-card" style="grid-column:span 3">
-        <div class="mgmt-card__title">Utilisation by grade — fee earning</div>
-        <table class="mgmt-table" style="table-layout:fixed;width:100%">
-          <thead><tr><th style="white-space:nowrap">Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Fee earning</th><th style="text-align:right">Internal</th><th style="text-align:right">Available</th></tr></thead>
-          <tbody>${grades.map(([grade, g]) => {
-            const feePct  = g.capacity > 0 ? Math.round(g.feeEarning / g.capacity * 100) : 0;
-            const intPct  = g.capacity > 0 ? Math.round(g.internal   / g.capacity * 100) : 0;
-            const unalloc = Math.max(0, g.capacity - g.feeEarning - g.internal);
-            const col = feePct >= 80 ? "#008300" : feePct >= 50 ? "#eda100" : "#e34948";
+        <div class="mgmt-card__title">Grade breakdown — ${escHtml(p)}${lmNote}</div>
+        <table class="mgmt-table" style="margin-top:8px">
+          <thead><tr>
+            <th>Grade</th>
+            <th style="text-align:right">Capacity</th>
+            <th style="text-align:right;color:#2a78d6">Fee earning</th>
+            <th style="text-align:right;color:#6b7280">Internal</th>
+            <th style="text-align:right;color:#008300">Unallocated</th>
+          </tr></thead>
+          <tbody>${grades.map(([grade,g])=>{
+            const unallocG = Math.max(0, g.capacity - g.feeEarning - g.internal);
             return `<tr>
               <td style="font-size:11px;white-space:nowrap">${escHtml(grade)}</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.capacity)}d</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#2a78d6;font-weight:500">${feePct}%</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${intPct}%</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300;font-weight:500">${fmtD(unalloc)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#2a78d6">${fmtD(g.feeEarning)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(g.internal)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300">${fmtD(unallocG)}d</td>
             </tr>`;
           }).join("")}</tbody>
+          <tfoot><tr style="border-top:1px solid var(--border);font-weight:500">
+            <td style="font-size:11px">Total</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(capacity)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#2a78d6">${fmtD(feeEarning)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(internal)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300">${fmtD(unalloc)}d</td>
+          </tfoot>
         </table>
       </div>
 
       <div class="mgmt-card" style="grid-column:span 3">
-        <div class="mgmt-card__title">Bench strength by grade</div>
-        <table class="mgmt-table" style="table-layout:fixed;width:100%">
-          <thead><tr><th style="white-space:nowrap">Grade</th><th style="text-align:right">Capacity</th><th style="text-align:right">Allocated</th><th style="text-align:right">Available</th></tr></thead>
-          <tbody>${grades.map(([grade, g]) => {
-            const avail = Math.max(0, g.capacity - g.allocated);
-            return `<tr>
-              <td style="font-size:11px;white-space:nowrap">${escHtml(grade)}</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.capacity)}d</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.allocated)}d</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300;font-weight:500">${fmtD(avail)}d</td>
-            </tr>`;
-          }).join("")}</tbody>
-        </table>
+        <div class="mgmt-card__title">Over-allocated${lmNote}</div>
+        <div style="font-size:11px;font-weight:500;color:var(--text-secondary);margin:8px 0 4px">This month (${escHtml(p)})</div>
+        ${overTable(overThis, p)}
+        <div style="font-size:11px;font-weight:500;color:var(--text-secondary);margin:12px 0 4px">Next month (${escHtml(nextP)})</div>
+        ${overTable(overNext, nextP)}
       </div>
 
-      <!-- ROW 5: Top 10 projects — full width -->
+      <!-- ROW 6: Top 10 projects — full width -->
       <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Top 10 projects by days remaining</div>
-        <table class="mgmt-table">
-          <thead><tr><th>Project / task</th><th>Department</th><th style="text-align:right">This month</th><th style="text-align:right">Future days</th><th>Status</th></tr></thead>
-          <tbody>${topProjects.map(pr => `<tr>
+        ${noteHtml}
+        <table class="mgmt-table" style="margin-top:8px">
+          <thead><tr>
+            <th>Project / task</th><th>Department</th>
+            <th style="text-align:right">This month</th>
+            <th style="text-align:right">Future days</th>
+            <th>Status</th>
+          </tr></thead>
+          <tbody>${topProjects.map(pr=>`<tr>
             <td>
               <div class="proj-name">${escHtml(pr.name)}</div>
-              <div style="font-size:10px;color:var(--text-tertiary)">${escHtml(pr.task_name || "")}</div>
+              <div style="font-size:10px;color:var(--text-tertiary)">${escHtml(pr.task_name||"")}</div>
             </td>
-            <td><span class="team-badge">${escHtml(pr.department || "—")}</span></td>
-            <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(pr.total_days[p] || 0)}d</td>
-            <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(pr.future_days || 0)}d</td>
+            <td><span class="team-badge">${escHtml(pr.department||"—")}</span></td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(pr.total_days[p]||0)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(pr.future_days||0)}d</td>
             <td>${horizonBadge(pr.horizon_status)}</td>
           </tr>`).join("")}</tbody>
         </table>
       </div>
 
-      <!-- ROW 6: Over-allocated this month | next month -->
-      <div class="mgmt-card" style="grid-column:span 3">
-        <div class="mgmt-card__title">Over-allocated this month (${escHtml(p)})</div>
-        ${overTable(overThisMonth, p)}
-      </div>
-
-      <div class="mgmt-card" style="grid-column:span 3">
-        <div class="mgmt-card__title">Over-allocated next month (${escHtml(nextP)})</div>
-        ${overTable(overNextMonth, nextP)}
-      </div>
-
     </div>
   `;
 
-  // Charts
+  // ── Charts ────────────────────────────────────────────────────────────
   requestAnimationFrame(() => {
-    const horizonBarCtx = document.getElementById("mgmt-horizon-bar");
-    if (horizonBarCtx) {
-      _mgmtCharts.push(new Chart(horizonBarCtx, {
+    const horizonCtx = document.getElementById("mgmt-horizon-bar");
+    if (horizonCtx) {
+      const ch = new Chart(horizonCtx, {
         type: "bar",
-        data: {
-          labels: [""],
+        data: { labels: [""],
           datasets: [
-            { label: "Fee earning",  data: [linkedDays],   backgroundColor: "#2a78d6", stack: "h" },
-            { label: "Opportunity",  data: [oppDays],      backgroundColor: "#eda100", stack: "h" },
-            { label: "Not linked",   data: [unlinkedDays], backgroundColor: "#e34948", stack: "h" },
-            { label: "Internal",     data: [internalDays], backgroundColor: "#6b7280", stack: "h" },
-          ]
-        },
-        options: {
-          indexAxis: "y",
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: ctx => `${ctx.dataset.label}: ${Math.round(ctx.raw).toLocaleString("en-GB")}d`,
-              }
-            }
-          },
-          scales: {
-            x: { stacked: true, display: false },
-            y: { stacked: true, display: false },
-          }
+            { label:"Fee earning", data:[linkedDays],   backgroundColor:"#2a78d6", stack:"h" },
+            { label:"Opportunity", data:[oppDays],      backgroundColor:"#eda100", stack:"h" },
+            { label:"Not linked",  data:[unlinkedDays], backgroundColor:"#e34948", stack:"h" },
+            { label:"Internal",    data:[internalDays], backgroundColor:"#6b7280", stack:"h" },
+          ]},
+        options: { indexAxis:"y", responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{display:false}, tooltip:{callbacks:{
+            label: ctx=>`${ctx.dataset.label}: ${Math.round(ctx.raw).toLocaleString("en-GB")}d`
+          }}},
+          scales:{ x:{stacked:true,display:false}, y:{stacked:true,display:false} }
         }
-      }));
+      });
+      _mgmtCharts.push(ch);
     }
+
     const allocCtx = document.getElementById("mgmt-alloc-chart");
     if (allocCtx) {
-      _mgmtCharts.push(new Chart(allocCtx, {
-        type: "bar",
-        data: { labels: periods6, datasets: [
-          { label:"Fee earning", data:allocLinked,    backgroundColor:"#2a78d6", stack:"a" },
-          { label:"Opportunity", data:allocOpp,       backgroundColor:"#eda100", stack:"a" },
-          { label:"Not linked",  data:allocUnlinked,  backgroundColor:"#e34948", stack:"a" },
-          { label:"Internal",    data:allocInternal,  backgroundColor:"#6b7280", stack:"a" },
+      const ch = new Chart(allocCtx, {
+        type:"bar",
+        data:{ labels:periods6, datasets:[
+          { label:"Fee earning", data:allocLinked,   backgroundColor:"#2a78d6", stack:"a" },
+          { label:"Opportunity", data:allocOpp,      backgroundColor:"#eda100", stack:"a" },
+          { label:"Not linked",  data:allocUnlinked, backgroundColor:"#e34948", stack:"a" },
+          { label:"Internal",    data:allocInternal, backgroundColor:"#6b7280", stack:"a" },
         ]},
-        options: { responsive:true, maintainAspectRatio:false,
-          plugins:{ legend:{ display:false } },
+        options:{ responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{display:false} },
           scales:{
-            x:{ stacked:true, grid:{ display:false }, ticks:{ font:{ size:10 } } },
-            y:{ stacked:true, grid:{ color:"#e1e0d9" }, ticks:{ font:{ size:10 }, callback: v => Math.round(v).toLocaleString("en-GB") } }
+            x:{ stacked:true, grid:{display:false}, ticks:{font:{size:10}} },
+            y:{ stacked:true, grid:{color:"#e1e0d9"}, ticks:{font:{size:10}, callback:v=>Math.round(v).toLocaleString("en-GB")} }
           }
         }
-      }));
+      });
+      _mgmtCharts.push(ch);
     }
+
     const alCtx = document.getElementById("mgmt-al-chart");
     if (alCtx) {
-      _mgmtCharts.push(new Chart(alCtx, {
-        type: "bar",
-        data: { labels: periods6, datasets: [
+      const ch = new Chart(alCtx, {
+        type:"bar",
+        data:{ labels:periods6, datasets:[
           { label:"Expected", data:alExpected, backgroundColor:"#b4b2a9" },
           { label:"Actual",   data:alActual,   backgroundColor:"#2a78d6" },
         ]},
-        options: { responsive:true, maintainAspectRatio:false,
-          plugins:{ legend:{ display:false } },
+        options:{ responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{display:false} },
           scales:{
-            x:{ grid:{ display:false }, ticks:{ font:{ size:10 } } },
-            y:{ grid:{ color:"#e1e0d9" }, ticks:{ font:{ size:10 } } }
+            x:{ grid:{display:false}, ticks:{font:{size:10}} },
+            y:{ grid:{color:"#e1e0d9"}, ticks:{font:{size:10}} }
           }
         }
-      }));
+      });
+      _mgmtCharts.push(ch);
     }
   });
 }
@@ -1115,13 +1150,13 @@ function switchView(view) {
   // Show/hide filter slots per view
   const filterSlots = {
     projects: ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
-    staff: ["filter-job-title", "filter-job-function", "filter-line-manager", "filter-slot4-spacer"],
-    mgmt:     [],
+    staff:    ["filter-job-title", "filter-job-function", "filter-line-manager", "filter-slot4-spacer"],
+    mgmt:     ["filter-line-manager"],
   };
   const hiddenSlots = {
     staff:    ["filter-slot4-spacer"],
     projects: [],
-    mgmt:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
+    mgmt:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status"],
   };
   const allSlots = [
     "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
@@ -1634,6 +1669,8 @@ function wireEvents() {
       state.filters[key] = el.value;
       if (id === "filter-department" && state.activeView === "projects") {
         loadRtcs();
+      } else if (state.activeView === "mgmt") {
+        renderMgmtSummary();
       } else {
         renderView();
       }
