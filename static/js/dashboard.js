@@ -359,6 +359,7 @@ function renderMgmtSummary() {
   // Horizon days
   const linkedDays   = projsByDept.filter(pr => pr.horizon_status === "linked").reduce((sum, pr) => sum + (pr.future_days || 0), 0);
   const oppDays      = projsByDept.filter(pr => pr.horizon_status === "opportunity").reduce((sum, pr) => sum + (pr.future_days || 0), 0);
+  const SPECIAL_NUMS = new Set(["ID-06", "ID-04", "IDUK-01"]);
   const unlinkedDays = projsByDept.filter(pr => pr.horizon_status === "norecord").reduce((sum, pr) => sum + (pr.future_days || 0), 0);
   const linkedRtcs   = rtcs.filter(r => r.horizon_status === "linked" && !SPECIAL_NUMS.has(r.project_number));
   const oppRtcs      = rtcs.filter(r => r.horizon_status === "opportunity");
@@ -421,7 +422,6 @@ function renderMgmtSummary() {
   });
 
   // Allocated by horizon over 6 months
-  const SPECIAL_NUMS = new Set(["ID-06", "ID-04", "IDUK-01"]);
   const allocLinked   = periods6.map(per => Math.round(projsByDept.filter(pr => pr.horizon_status === "linked" && !SPECIAL_NUMS.has(pr.number)).reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
   const allocOpp      = periods6.map(per => Math.round(projsByDept.filter(pr => pr.horizon_status === "opportunity").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
   const allocUnlinked = periods6.map(per => Math.round(projsByDept.filter(pr => pr.horizon_status === "norecord").reduce((sum, pr) => sum + (pr.total_days[per] || 0), 0)));
