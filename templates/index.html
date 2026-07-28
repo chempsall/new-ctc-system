@@ -35,8 +35,11 @@
       <button class="topnav__tab" data-view="staff">
         People
       </button>
-      <button class="topnav__tab" data-view="mgmt">
-        Summary
+      <button class="topnav__tab" data-view="dept">
+        Department
+      </button>
+      <button class="topnav__tab" data-view="team">
+        Team
       </button>
     </div>
 
@@ -51,7 +54,7 @@
   <script>
     (function () {
       var v = (location.hash || "#projects").slice(1);
-      if (["projects", "staff", "mgmt"].indexOf(v) === -1) v = "projects";
+      if (["projects", "staff", "dept", "team"].indexOf(v) === -1) v = "projects";
       var btn = document.querySelector('.topnav__tab[data-view="' + v + '"]');
       if (btn) btn.classList.add("active");
     })();
@@ -281,8 +284,11 @@
          anything placed after </main> is pushed below the viewport-height
          container (the ~300px gap bug).
          =================================================================== -->
-    <div id="mgmt-panel" class="hidden">
-      <div id="mgmt-container"></div>
+    <div id="dept-panel" class="hidden">
+      <div id="dept-container"></div>
+    </div>
+    <div id="team-panel" class="hidden">
+      <div id="team-container"></div>
     </div>
 
   </main>

@@ -13,7 +13,7 @@
 const state = {
   summary:        null,    // Full summary payload from /api/summary
   activePeriod:   null,    // Currently selected month label e.g. "Apr-2026"
-  activeView: (["projects","staff","mgmt"].includes(window.location.hash.replace("#","")))
+  activeView: (["projects","staff","dept","team"].includes(window.location.hash.replace("#","")))
               ? window.location.hash.replace("#","")
               : "projects",
   filters: {
@@ -321,8 +321,8 @@ function filteredStaff() {
 
 let _mgmtCharts = [];
 
-function renderMgmtSummary() {
-  const container = document.getElementById("mgmt-container");
+function renderDeptSummary() {
+  const container = document.getElementById("dept-container");
   if (!container) return;
   const s = state.summary;
   if (!s) { container.innerHTML = '<div class="empty-state">Loading…</div>'; return; }
@@ -703,24 +703,237 @@ function renderMgmtSummary() {
   });
 }
 
+function renderTeamSummary() {
+  const container = document.getElementById("team-container");
+  if (!container) return;
+  const s = state.summary;
+  if (!s) { container.innerHTML = '<div class="empty-state">Loading…</div>'; return; }
+
+  if (_mgmtCharts && _mgmtCharts.length) {
+    _mgmtCharts.forEach(c => { try { c.destroy(); } catch(e) {} });
+  }
+  _mgmtCharts = [];
+
+  const dept = state.filters.department !== "all" ? state.filters.department : null;
+  const lm   = state.filters.line_manager !== "all" ? state.filters.line_manager : null;
+  const p    = state.activePeriod;
+  const curIdx = Math.max(0, s.periods.indexOf(p));
+  const periods6 = s.periods.slice(curIdx, curIdx + 6);
+  const nextP = periods6[1] || periods6[0];
+
+  const gradeSort = t => {
+    if (!t) return 999;
+    if (t.startsWith("L")) return -1;
+    const m = t.match(/^([PT])(\d+)/);
+    if (!m) return 998;
+    return (m[1] === "P" ? 0 : 1) * 100 + (99 - parseInt(m[2]));
+  };
+
+  // Cascading line manager filter
+  let lmFilter = null;
+  if (lm) {
+    const allStaff = s.staff || [];
+    const reportSet = new Set();
+    const queue = [lm];
+    while (queue.length) {
+      const mgr = queue.shift();
+      allStaff.filter(ps => ps.line_manager === mgr).forEach(ps => {
+        if (!reportSet.has(ps.name)) { reportSet.add(ps.name); queue.push(ps.name); }
+      });
+    }
+    lmFilter = reportSet;
+  }
+
+  if (!lm) {
+    container.innerHTML = `<div class="empty-state" style="padding:40px">
+      Select a line manager from the filter above to view their team summary.
+    </div>`;
+    return;
+  }
+
+  const staff = (s.staff || []).filter(ps =>
+    !ps.id.startsWith("GENERIC-") &&
+    (!dept || ps.department === dept) &&
+    (!lmFilter || lmFilter.has(ps.name))
+  );
+
+  const capacity   = staff.reduce((sum, ps) => sum + (ps.capacity[p]        || 0), 0);
+  const feeEarning = staff.reduce((sum, ps) => sum + (ps.horizon_days[p]    || 0), 0);
+  const internal   = staff.reduce((sum, ps) => sum + (ps.internal_days?.[p] || 0), 0);
+  const unalloc    = Math.max(0, capacity - feeEarning - internal);
+  const feePct     = capacity > 0 ? Math.round(feeEarning / capacity * 100) : 0;
+  const intPct     = capacity > 0 ? Math.round(internal   / capacity * 100) : 0;
+  const unallocPct = capacity > 0 ? Math.round(unalloc    / capacity * 100) : 0;
+
+  const gradeMap = {};
+  staff.forEach(ps => {
+    const g = ps.job_title || "Unknown";
+    if (!gradeMap[g]) gradeMap[g] = { capacity:0, feeEarning:0, internal:0 };
+    gradeMap[g].capacity   += ps.capacity[p]        || 0;
+    gradeMap[g].feeEarning += ps.horizon_days[p]    || 0;
+    gradeMap[g].internal   += ps.internal_days?.[p] || 0;
+  });
+  const grades = Object.entries(gradeMap)
+    .filter(([,g]) => g.capacity > 0)
+    .sort(([a],[b]) => gradeSort(a) - gradeSort(b));
+
+  const overThis = staff.filter(ps=>ps.kpi[p]===   "over").sort((a,b)=>(b.allocated[p]   ||0)-(a.allocated[p]   ||0));
+  const overNext = staff.filter(ps=>ps.kpi[nextP]==="over").sort((a,b)=>(b.allocated[nextP]||0)-(a.allocated[nextP]||0));
+
+  const projsByDept = (s.projects || []).filter(pr => !dept || pr.department === dept);
+  const AL_MONTHLY = {Jan:0.8,Feb:0.9,Mar:1.1,Apr:1.5,May:1.3,Jun:1.7,Jul:2.4,Aug:3.6,Sep:2.3,Oct:1.9,Nov:1.5,Dec:6.0};
+  const alExpected = periods6.map(per => {
+    const mon = per.split("-")[0];
+    const bh  = (s.bank_holidays || {})[per] || 0;
+    return Math.round(staff.reduce((sum, ps) => sum + (AL_MONTHLY[mon]||0)*(ps.fte[per]||0) + bh*(ps.fte[per]||0), 0));
+  });
+  const alActual = periods6.map(per =>
+    Math.round(projsByDept.filter(pr=>pr.number==="ID-06").reduce((sum,pr)=>sum+(pr.total_days[per]||0),0))
+  );
+
+  const fmtD = d => Math.round(d).toLocaleString("en-GB");
+
+  const overTable = (people, per) => {
+    if (!people.length) return `<div style="font-size:12px;color:var(--text-tertiary);font-style:italic;padding:4px 0">None</div>`;
+    return `<table class="mgmt-table">
+      <thead><tr><th>Name</th><th>Grade</th><th style="text-align:right">Allocated</th><th style="text-align:right">Capacity</th></tr></thead>
+      <tbody>${people.map(ps=>`<tr>
+        <td style="white-space:nowrap">${escHtml(ps.name)}</td>
+        <td style="font-size:11px;color:var(--text-tertiary);white-space:nowrap">${escHtml(fmt.gradeShort(ps.job_title))}</td>
+        <td style="text-align:right;font-family:var(--font-mono);font-size:12px;color:#e34948">${fmtD(ps.allocated[per]||0)}d</td>
+        <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmtD(ps.capacity[per]||0)}d</td>
+      </tr>`).join("")}</tbody></table>`;
+  };
+
+  container.innerHTML = `
+    <div class="mgmt-grid" style="grid-template-columns:repeat(6,1fr)">
+
+      <!-- ROW 1: Headline numbers -->
+      <div class="mgmt-card" style="grid-column:span 6">
+        <div class="mgmt-card__title">${escHtml(lm)}'s team — ${escHtml(p)}</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:8px">
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Capacity</div>
+            <div style="font-size:28px;font-weight:500">${fmtD(capacity)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${staff.length} staff</div>
+          </div>
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #2a78d6">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Fee earning</div>
+            <div style="font-size:28px;font-weight:500;color:#2a78d6">${fmtD(feeEarning)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${feePct}% of capacity</div>
+          </div>
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #6b7280">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Internal</div>
+            <div style="font-size:28px;font-weight:500;color:#6b7280">${fmtD(internal)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${intPct}% of capacity</div>
+          </div>
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #008300">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Unallocated</div>
+            <div style="font-size:28px;font-weight:500;color:#008300">${fmtD(unalloc)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${unallocPct}% of capacity</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 2: Grade breakdown | Over-allocated -->
+      <div class="mgmt-card" style="grid-column:span 3">
+        <div class="mgmt-card__title">Grade breakdown — ${escHtml(p)}</div>
+        <table class="mgmt-table" style="margin-top:8px">
+          <thead><tr>
+            <th>Grade</th>
+            <th style="text-align:right">Capacity</th>
+            <th style="text-align:right;color:#2a78d6">Fee earning</th>
+            <th style="text-align:right;color:#6b7280">Internal</th>
+            <th style="text-align:right;color:#008300">Unallocated</th>
+          </tr></thead>
+          <tbody>${grades.map(([grade,g])=>{
+            const unallocG = Math.max(0, g.capacity - g.feeEarning - g.internal);
+            return `<tr>
+              <td style="font-size:11px;white-space:nowrap">${escHtml(grade)}</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.capacity)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#2a78d6">${fmtD(g.feeEarning)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(g.internal)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300">${fmtD(unallocG)}d</td>
+            </tr>`;
+          }).join("")}</tbody>
+          <tfoot><tr style="border-top:1px solid var(--border);font-weight:500">
+            <td style="font-size:11px">Total</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(capacity)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#2a78d6">${fmtD(feeEarning)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(internal)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300">${fmtD(unalloc)}d</td>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="mgmt-card" style="grid-column:span 3">
+        <div class="mgmt-card__title">Over-allocated</div>
+        <div style="font-size:11px;font-weight:500;color:var(--text-secondary);margin:8px 0 4px">This month (${escHtml(p)})</div>
+        ${overTable(overThis, p)}
+        <div style="font-size:11px;font-weight:500;color:var(--text-secondary);margin:12px 0 4px">Next month (${escHtml(nextP)})</div>
+        ${overTable(overNext, nextP)}
+      </div>
+
+      <!-- ROW 3: Annual leave -->
+      <div class="mgmt-card" style="grid-column:span 6">
+        <div class="mgmt-card__title">Annual leave & public holidays — next 6 months</div>
+        <div style="display:flex;align-items:flex-start;gap:16px;margin-top:8px">
+          <div style="flex:1;position:relative;height:150px">
+            <canvas id="team-al-chart" role="img" aria-label="Annual leave expected vs actual">Annual leave.</canvas>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;flex-shrink:0">
+            ${[{col:"#b4b2a9",label:"Expected"},{col:"#2a78d6",label:"Actual"}]
+              .map(it=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.col}"></span>${escHtml(it.label)}
+              </div>`).join("")}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  requestAnimationFrame(() => {
+    const alCtx = document.getElementById("team-al-chart");
+    if (alCtx) {
+      const ch = new Chart(alCtx, {
+        type:"bar",
+        data:{ labels:periods6, datasets:[
+          { label:"Expected", data:alExpected, backgroundColor:"#b4b2a9" },
+          { label:"Actual",   data:alActual,   backgroundColor:"#2a78d6" },
+        ]},
+        options:{ responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{display:false} },
+          scales:{
+            x:{ grid:{display:false}, ticks:{font:{size:10}} },
+            y:{ grid:{color:"#e1e0d9"}, ticks:{font:{size:10}} }
+          }
+        }
+      });
+      _mgmtCharts.push(ch);
+    }
+  });
+}
+
 function renderView() {
-  const panels = ["staff-panel", "projects-panel", "rtcs-panel", "mgmt-panel"];
+  const panels = ["staff-panel", "projects-panel", "rtcs-panel", "dept-panel", "team-panel"];
   panels.forEach(id => document.getElementById(id)?.classList.add("hidden"));
 
   if (state.activeView === "staff") {
     buildFilterOptions();
     renderStaffTable();
     document.getElementById("staff-panel").classList.remove("hidden");
-  } else if (state.activeView === "mgmt") {
+  } else if (state.activeView === "dept" || state.activeView === "team") {
     buildFilterOptions();
     fetch("/api/rtcs")
       .then(r => r.json())
       .then(data => {
         state.mgmtRtcs = Array.isArray(data) ? data : (data.rtcs || []);
-        renderMgmtSummary();
+        if (state.activeView === "dept") renderDeptSummary();
+        else renderTeamSummary();
       })
-      .catch(() => renderMgmtSummary());
-    document.getElementById("mgmt-panel").classList.remove("hidden");
+      .catch(() => { if (state.activeView === "dept") renderDeptSummary(); else renderTeamSummary(); });
+    document.getElementById(state.activeView === "dept" ? "dept-panel" : "team-panel").classList.remove("hidden");
   } else {
     // Default: projects view (merged RTCs + Projects)
     renderProjectTable();
@@ -1151,12 +1364,14 @@ function switchView(view) {
   const filterSlots = {
     projects: ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
     staff:    ["filter-job-title", "filter-job-function", "filter-line-manager", "filter-slot4-spacer"],
-    mgmt:     ["filter-line-manager"],
+    dept:     [],
+    team:     ["filter-line-manager"],
   };
   const hiddenSlots = {
     staff:    ["filter-slot4-spacer"],
     projects: [],
-    mgmt:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status"],
+    dept:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
+    team:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status"],
   };
   const allSlots = [
     "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
@@ -1181,7 +1396,7 @@ function switchView(view) {
       el.style.pointerEvents = "";
     }
   });
-  const isMgmt = view === "mgmt";
+  const isMgmt = view === "dept" || view === "team";
   (hiddenSlots[view] || []).forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -1192,13 +1407,13 @@ function switchView(view) {
   });
 
   const monthTabs = document.getElementById("month-tabs");
-  if (monthTabs) monthTabs.style.display = "none";
+  if (monthTabs) monthTabs.style.display = (["dept","team","staff","projects"].includes(view)) ? "none" : "";
   const newRtcBtn = document.getElementById("btn-create-rtc");
   if (newRtcBtn) newRtcBtn.style.display = view === "projects" ? "" : "none";
   // visibility (not display) so the filter bar keeps identical height on
   // all three views — a display:none row collapsed the Summary bar by 34px
   const searchRow = document.querySelector(".filter-bar__row--search");
-  if (searchRow) searchRow.style.visibility = view === "mgmt" ? "hidden" : "visible";
+  if (searchRow) searchRow.style.visibility = (view === "dept" || view === "team") ? "hidden" : "visible";
 
   // Reload data fresh on every tab switch so changes made on one tab
   // are reflected immediately on the others without needing a page refresh
@@ -1669,8 +1884,10 @@ function wireEvents() {
       state.filters[key] = el.value;
       if (id === "filter-department" && state.activeView === "projects") {
         loadRtcs();
-      } else if (state.activeView === "mgmt") {
-        renderMgmtSummary();
+      } else if (state.activeView === "dept") {
+        renderDeptSummary();
+      } else if (state.activeView === "team") {
+        renderTeamSummary();
       } else {
         renderView();
       }
@@ -1701,12 +1918,14 @@ function wireEvents() {
   document.getElementById("filter-rtc-pm")?.addEventListener("change", e => {
     state.rtcFilters.pm = e.target.value === "all" ? "" : e.target.value;
     if (["rtcs","projects"].includes(state.activeView)) loadRtcs();
-    else if (state.activeView === "mgmt") renderMgmtSummary();
+else if (state.activeView === "dept") renderDeptSummary();
+    else if (state.activeView === "team") renderTeamSummary();
   });
   document.getElementById("filter-rtc-pd")?.addEventListener("change", e => {
     state.rtcFilters.pd = e.target.value === "all" ? "" : e.target.value;
     if (["rtcs","projects"].includes(state.activeView)) loadRtcs();
-    else if (state.activeView === "mgmt") renderMgmtSummary();
+else if (state.activeView === "dept") renderDeptSummary();
+    else if (state.activeView === "team") renderTeamSummary();
   });
   document.getElementById("filter-rtc-status")?.addEventListener("change", e => {
     state.rtcFilters.status = e.target.value;
