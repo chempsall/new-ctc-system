@@ -882,35 +882,59 @@ function renderProjectTable() {
     </tr>`);
 
     if (isExpanded) {
-      // Build staff list for this period from summary
+      // Fetch exact staff for this RTC from API (avoids cross-RTC project_id collision)
       const curIdx = Math.max(0, s.periods.indexOf(state.activePeriod));
       const cols   = s.periods.slice(curIdx, curIdx + 6);
-      const rtcMatch = state.rtcs.find(rx => rx.rtc_id === r.rtc_id);
-
-      const staffList = (s.staff || [])
-        .map(person => {
-          const proj = (person.projects || []).find(pr =>
-            rtcMatch && pr.project_id === rtcMatch.project_id
-          );
-          const totalDays = cols.reduce((sum, col) => sum + (proj?.days[col] || 0), 0);
-          const daysByPeriod = cols.map(col => proj?.days[col] || 0);
-          const isGeneric = person.id?.startsWith("GENERIC-");
-          return { name: person.name, job_title: person.job_title, daysByPeriod, totalDays, isGeneric };
-        })
-        .filter(ps => ps.totalDays > 0)
-        .sort((a, b) => {
-          if (a.isGeneric && !b.isGeneric) return 1;
-          if (!a.isGeneric && b.isGeneric) return -1;
-          const gradeSort = t => {
-            const m = (t || '').match(/^([PT])(\d+)/);
-            if (!m) return 999;
-            return (m[1] === 'P' ? 0 : 1) * 100 + (99 - parseInt(m[2]));
-          };
-          const ga = gradeSort(a.job_title);
-          const gb = gradeSort(b.job_title);
-          if (ga !== gb) return ga - gb;
-          return (a.name || '').localeCompare(b.name || '');
+      // Use cached RTC staff if available, otherwise show loading and fetch
+      const cacheKey = `rtc-staff-${r.rtc_id}`;
+      if (!state._rtcStaffCache) state._rtcStaffCache = {};
+      const gradeSort = t => {
+        if (!t) return 999;
+        if (t.startsWith("L")) return -1;
+        const m = t.match(/^([PT])(\d+)/);
+        if (!m) return 998;
+        return (m[1] === "P" ? 0 : 1) * 100 + (99 - parseInt(m[2]));
+      };
+      const buildStaffList = (apiStaff) => {
+        // Convert ISO period_start keys to period labels using summary periods
+        const periodMap = {};
+        s.periods.forEach((label, i) => {
+          const ps = s.period_starts ? s.period_starts[i] : null;
+          if (ps) periodMap[ps] = label;
         });
+        return apiStaff
+          .map(person => {
+            const isGeneric = person.horizon_person_number?.startsWith("GENERIC-");
+            const daysByPeriod = cols.map(col => {
+              // Find the period_start for this label
+              const idx = s.periods.indexOf(col);
+              const ps = s.period_starts ? s.period_starts[idx] : null;
+              return ps ? (person.allocations[ps] || 0) : 0;
+            });
+            const totalDays = daysByPeriod.reduce((sum, d) => sum + d, 0);
+            return { name: person.name, job_title: person.job_title, daysByPeriod, totalDays, isGeneric };
+          })
+          .filter(ps => ps.totalDays > 0)
+          .sort((a, b) => {
+            if (a.isGeneric && !b.isGeneric) return 1;
+            if (!a.isGeneric && b.isGeneric) return -1;
+            const ga = gradeSort(a.job_title), gb = gradeSort(b.job_title);
+            if (ga !== gb) return ga - gb;
+            return (a.name || "").localeCompare(b.name || "");
+          });
+      };
+      const cachedStaff = state._rtcStaffCache[cacheKey];
+      const staffList = cachedStaff ? buildStaffList(cachedStaff) : [];
+      // If not cached, fetch and re-render
+      if (!cachedStaff) {
+        fetch(`/api/rtcs/${r.rtc_id}`)
+          .then(res => res.json())
+          .then(data => {
+            state._rtcStaffCache[cacheKey] = data.staff || [];
+            renderProjectTable();
+          })
+          .catch(e => console.error("Failed to load RTC staff", e));
+      }
 
       const colHeaders = cols.map(col =>
         `<th style="text-align:right;font-size:10px;color:var(--text-tertiary);
@@ -1015,6 +1039,7 @@ async function loadRtcs() {
   try {
     const r = await fetch(`/api/rtcs?${params}`);
     state.rtcs = await r.json();
+    state._rtcStaffCache = {};  // clear per-RTC staff cache on reload
     buildFilterOptions();
     renderProjectTable();
     renderMetrics();

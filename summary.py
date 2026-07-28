@@ -368,6 +368,7 @@ def build() -> dict:
     summary = {
         "generated_at":  generated_at,
         "periods":       [p["label"] for p in periods],
+        "period_starts": [p["period_start"] for p in periods],
         "bank_holidays": {p["label"]: sum(
             1 for bh in conn.execute("SELECT date FROM bank_holidays").fetchall()
             if bh["date"].startswith(p["period_start"][:7])
