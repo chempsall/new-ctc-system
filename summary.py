@@ -135,7 +135,11 @@ def build() -> dict:
     person_alloc     = {}  # person_id -> period_start -> total days
     person_active    = {}  # person_id -> period_start -> days on Active projects (for no_rec)
     person_direct    = {}  # person_id -> period_start -> days on UK Direct + Active (true fee-earning)
-    person_internal  = {}  # person_id -> period_start -> days on special RTCs
+    person_opp       = {}  # person_id -> period_start -> days on Opportunity projects
+    person_al        = {}  # person_id -> period_start -> days on ID-06 (AL&PH)
+    person_training  = {}  # person_id -> period_start -> days on ID-04 (Training)
+    person_dayrel    = {}  # person_id -> period_start -> days on IDUK-01 (Day Release)
+    person_internal  = {}  # person_id -> period_start -> days on all special RTCs (combined)
     person_proj_days = {}  # person_id -> project_id -> period_start -> days
 
     for r in alloc_rows:
@@ -159,9 +163,22 @@ def build() -> dict:
 
         if pnum in SPECIAL_NUMS:
             person_internal.setdefault(pid, {})
-            person_internal[ps] = person_internal.get(ps, 0)  # placeholder
-            person_internal.setdefault(pid, {})
             person_internal[pid][ps] = person_internal[pid].get(ps, 0) + days
+            if pnum == "ID-06":
+                person_al.setdefault(pid, {})
+                person_al[pid][ps] = person_al[pid].get(ps, 0) + days
+            elif pnum == "ID-04":
+                person_training.setdefault(pid, {})
+                person_training[pid][ps] = person_training[pid].get(ps, 0) + days
+            elif pnum == "IDUK-01":
+                person_dayrel.setdefault(pid, {})
+                person_dayrel[pid][ps] = person_dayrel[pid].get(ps, 0) + days
+
+        # Opportunity days
+        if (r["project_type"] or "").strip() == "UK Opportunity" or \
+           (r["project_status"] or "").lower() == "opportunity":
+            person_opp.setdefault(pid, {})
+            person_opp[pid][ps] = person_opp[pid].get(ps, 0) + days
 
         person_proj_days.setdefault(pid, {}).setdefault(r["project_id"], {})
         person_proj_days[pid][r["project_id"]][ps] = days
@@ -174,6 +191,10 @@ def build() -> dict:
         capacity      = {}
         allocated     = {}
         horizon_days  = {}
+        opp_days      = {}
+        al_ph_days    = {}
+        training_days = {}
+        day_rel_days  = {}
         no_rec_days   = {}
         internal_days = {}
         fte           = {}
@@ -198,11 +219,19 @@ def build() -> dict:
             h_days     = round(person_direct.get(pid, {}).get(ps, 0), 2)
             active_days= round(person_active.get(pid, {}).get(ps, 0), 2)
             int_days   = round(person_internal.get(pid, {}).get(ps, 0), 2)
+            al_days    = round(person_al.get(pid, {}).get(ps, 0), 2)
+            tr_days    = round(person_training.get(pid, {}).get(ps, 0), 2)
+            dr_days    = round(person_dayrel.get(pid, {}).get(ps, 0), 2)
+            opp_days_p = round(person_opp.get(pid, {}).get(ps, 0), 2)
             nr_days    = round(alloc - active_days, 2)
 
             capacity[label]      = cap
             allocated[label]     = alloc
             horizon_days[label]  = h_days
+            opp_days[label]      = opp_days_p
+            al_ph_days[label]    = al_days
+            training_days[label] = tr_days
+            day_rel_days[label]  = dr_days
             no_rec_days[label]   = nr_days
             internal_days[label] = int_days
             fte[label]          = 0.0 if pid.startswith("GENERIC-") else _period_fte(
@@ -245,6 +274,10 @@ def build() -> dict:
             "capacity":     capacity,
             "allocated":    allocated,
             "horizon_days":   horizon_days,
+            "opp_days":       opp_days,
+            "al_ph_days":     al_ph_days,
+            "training_days":  training_days,
+            "day_rel_days":   day_rel_days,
             "internal_days":  internal_days,
             "no_record_days": no_rec_days,
             "fte":            fte,
@@ -269,6 +302,10 @@ def build() -> dict:
                     base["fte"][period]            = base["fte"].get(period, 0) + person["fte"].get(period, 0)
                     base["horizon_days"][period]   = base["horizon_days"].get(period, 0) + person["horizon_days"].get(period, 0)
                     base["internal_days"][period]  = base["internal_days"].get(period, 0) + person["internal_days"].get(period, 0)
+                    base["opp_days"][period]       = base["opp_days"].get(period, 0) + person["opp_days"].get(period, 0)
+                    base["al_ph_days"][period]     = base["al_ph_days"].get(period, 0) + person["al_ph_days"].get(period, 0)
+                    base["training_days"][period]  = base["training_days"].get(period, 0) + person["training_days"].get(period, 0)
+                    base["day_rel_days"][period]   = base["day_rel_days"].get(period, 0) + person["day_rel_days"].get(period, 0)
                     base["no_record_days"][period] = base["no_record_days"].get(period, 0) + person["no_record_days"].get(period, 0)
                 for p in person["projects"]:
                     existing = next((x for x in base["projects"] if x["project_id"] == p["project_id"]), None)

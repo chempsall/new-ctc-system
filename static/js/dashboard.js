@@ -432,10 +432,13 @@ function renderDeptSummary() {
   const gradeMap = {};
   staff.forEach(ps => {
     const g = ps.job_title || "Unknown";
-    if (!gradeMap[g]) gradeMap[g] = { capacity:0, feeEarning:0, internal:0 };
-    gradeMap[g].capacity   += ps.capacity[p]        || 0;
-    gradeMap[g].feeEarning += ps.horizon_days[p]    || 0;
-    gradeMap[g].internal   += ps.internal_days?.[p] || 0;
+    if (!gradeMap[g]) gradeMap[g] = { capacity:0, feeEarning:0, opp:0, alPh:0, training:0, dayRel:0 };
+    gradeMap[g].capacity   += ps.capacity[p]       || 0;
+    gradeMap[g].feeEarning += ps.horizon_days[p]   || 0;
+    gradeMap[g].opp        += ps.opp_days?.[p]     || 0;
+    gradeMap[g].alPh       += ps.al_ph_days?.[p]   || 0;
+    gradeMap[g].training   += ps.training_days?.[p]|| 0;
+    gradeMap[g].dayRel     += ps.day_rel_days?.[p] || 0;
   });
   const grades = Object.entries(gradeMap)
     .filter(([,g]) => g.capacity > 0)
@@ -572,24 +575,30 @@ function renderDeptSummary() {
         </div>
       </div>
 
-      <!-- ROW 5: Grade breakdown | Over-allocated -->
-      <div class="mgmt-card" style="grid-column:span 3">
+      <!-- ROW 5: Grade breakdown — full width -->
+      <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Grade breakdown — ${escHtml(p)}${lmNote}</div>
         <table class="mgmt-table" style="margin-top:8px">
           <thead><tr>
             <th>Grade</th>
             <th style="text-align:right">Capacity</th>
             <th style="text-align:right;color:#2a78d6">Fee earning</th>
-            <th style="text-align:right;color:#6b7280">Internal</th>
+            <th style="text-align:right;color:#eda100">Opportunity</th>
+            <th style="text-align:right;color:#6b7280">AL &amp; PH</th>
+            <th style="text-align:right;color:#6b7280">Training</th>
+            <th style="text-align:right;color:#6b7280">Day release</th>
             <th style="text-align:right;color:#008300">Unallocated</th>
           </tr></thead>
           <tbody>${grades.map(([grade,g])=>{
-            const unallocG = Math.max(0, g.capacity - g.feeEarning - g.internal);
+            const unallocG = Math.max(0, g.capacity - g.feeEarning - g.opp - g.alPh - g.training - g.dayRel);
             return `<tr>
               <td style="font-size:11px;white-space:nowrap">${escHtml(grade)}</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.capacity)}d</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#2a78d6">${fmtD(g.feeEarning)}d</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(g.internal)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#eda100">${fmtD(g.opp)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(g.alPh)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(g.training)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(g.dayRel)}d</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300">${fmtD(unallocG)}d</td>
             </tr>`;
           }).join("")}</tbody>
@@ -597,17 +606,22 @@ function renderDeptSummary() {
             <td style="font-size:11px">Total</td>
             <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(capacity)}d</td>
             <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#2a78d6">${fmtD(feeEarning)}d</td>
-            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(internal)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#eda100">${fmtD(opp)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(alPh)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(training)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(dayRel)}d</td>
             <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300">${fmtD(unalloc)}d</td>
           </tfoot>
         </table>
       </div>
 
+      <!-- ROW 6 (was 5): Over-allocated — two side by side -->
       <div class="mgmt-card" style="grid-column:span 3">
-        <div class="mgmt-card__title">Over-allocated${lmNote}</div>
-        <div style="font-size:11px;font-weight:500;color:var(--text-secondary);margin:8px 0 4px">This month (${escHtml(p)})</div>
+        <div class="mgmt-card__title">Over-allocated this month (${escHtml(p)})${lmNote}</div>
         ${overTable(overThis, p)}
-        <div style="font-size:11px;font-weight:500;color:var(--text-secondary);margin:12px 0 4px">Next month (${escHtml(nextP)})</div>
+      </div>
+      <div class="mgmt-card" style="grid-column:span 3">
+        <div class="mgmt-card__title">Over-allocated next month (${escHtml(nextP)})${lmNote}</div>
         ${overTable(overNext, nextP)}
       </div>
 
@@ -759,8 +773,12 @@ function renderTeamSummary() {
 
   const capacity   = staff.reduce((sum, ps) => sum + (ps.capacity[p]        || 0), 0);
   const feeEarning = staff.reduce((sum, ps) => sum + (ps.horizon_days[p]    || 0), 0);
+  const opp        = staff.reduce((sum, ps) => sum + (ps.opp_days?.[p]      || 0), 0);
+  const alPh       = staff.reduce((sum, ps) => sum + (ps.al_ph_days?.[p]    || 0), 0);
+  const training   = staff.reduce((sum, ps) => sum + (ps.training_days?.[p] || 0), 0);
+  const dayRel     = staff.reduce((sum, ps) => sum + (ps.day_rel_days?.[p]  || 0), 0);
   const internal   = staff.reduce((sum, ps) => sum + (ps.internal_days?.[p] || 0), 0);
-  const unalloc    = Math.max(0, capacity - feeEarning - internal);
+  const unalloc    = Math.max(0, capacity - feeEarning - opp - internal);
   const feePct     = capacity > 0 ? Math.round(feeEarning / capacity * 100) : 0;
   const intPct     = capacity > 0 ? Math.round(internal   / capacity * 100) : 0;
   const unallocPct = capacity > 0 ? Math.round(unalloc    / capacity * 100) : 0;
@@ -768,10 +786,13 @@ function renderTeamSummary() {
   const gradeMap = {};
   staff.forEach(ps => {
     const g = ps.job_title || "Unknown";
-    if (!gradeMap[g]) gradeMap[g] = { capacity:0, feeEarning:0, internal:0 };
-    gradeMap[g].capacity   += ps.capacity[p]        || 0;
-    gradeMap[g].feeEarning += ps.horizon_days[p]    || 0;
-    gradeMap[g].internal   += ps.internal_days?.[p] || 0;
+    if (!gradeMap[g]) gradeMap[g] = { capacity:0, feeEarning:0, opp:0, alPh:0, training:0, dayRel:0 };
+    gradeMap[g].capacity   += ps.capacity[p]       || 0;
+    gradeMap[g].feeEarning += ps.horizon_days[p]   || 0;
+    gradeMap[g].opp        += ps.opp_days?.[p]     || 0;
+    gradeMap[g].alPh       += ps.al_ph_days?.[p]   || 0;
+    gradeMap[g].training   += ps.training_days?.[p]|| 0;
+    gradeMap[g].dayRel     += ps.day_rel_days?.[p] || 0;
   });
   const grades = Object.entries(gradeMap)
     .filter(([,g]) => g.capacity > 0)
@@ -835,24 +856,30 @@ function renderTeamSummary() {
         </div>
       </div>
 
-      <!-- ROW 2: Grade breakdown | Over-allocated -->
-      <div class="mgmt-card" style="grid-column:span 3">
+      <!-- ROW 2: Grade breakdown — full width -->
+      <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Grade breakdown — ${escHtml(p)}</div>
         <table class="mgmt-table" style="margin-top:8px">
           <thead><tr>
             <th>Grade</th>
             <th style="text-align:right">Capacity</th>
             <th style="text-align:right;color:#2a78d6">Fee earning</th>
-            <th style="text-align:right;color:#6b7280">Internal</th>
+            <th style="text-align:right;color:#eda100">Opportunity</th>
+            <th style="text-align:right;color:#6b7280">AL &amp; PH</th>
+            <th style="text-align:right;color:#6b7280">Training</th>
+            <th style="text-align:right;color:#6b7280">Day release</th>
             <th style="text-align:right;color:#008300">Unallocated</th>
           </tr></thead>
           <tbody>${grades.map(([grade,g])=>{
-            const unallocG = Math.max(0, g.capacity - g.feeEarning - g.internal);
+            const unallocG = Math.max(0, g.capacity - g.feeEarning - g.opp - g.alPh - g.training - g.dayRel);
             return `<tr>
               <td style="font-size:11px;white-space:nowrap">${escHtml(grade)}</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(g.capacity)}d</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#2a78d6">${fmtD(g.feeEarning)}d</td>
-              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(g.internal)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#eda100">${fmtD(g.opp)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(g.alPh)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(g.training)}d</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(g.dayRel)}d</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300">${fmtD(unallocG)}d</td>
             </tr>`;
           }).join("")}</tbody>
@@ -860,17 +887,22 @@ function renderTeamSummary() {
             <td style="font-size:11px">Total</td>
             <td style="text-align:right;font-family:var(--font-mono);font-size:11px">${fmtD(capacity)}d</td>
             <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#2a78d6">${fmtD(feeEarning)}d</td>
-            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(internal)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#eda100">${fmtD(opp)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(alPh)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(training)}d</td>
+            <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#6b7280">${fmtD(dayRel)}d</td>
             <td style="text-align:right;font-family:var(--font-mono);font-size:11px;color:#008300">${fmtD(unalloc)}d</td>
           </tfoot>
         </table>
       </div>
 
+      <!-- ROW 3: Over-allocated — two side by side -->
       <div class="mgmt-card" style="grid-column:span 3">
-        <div class="mgmt-card__title">Over-allocated</div>
-        <div style="font-size:11px;font-weight:500;color:var(--text-secondary);margin:8px 0 4px">This month (${escHtml(p)})</div>
+        <div class="mgmt-card__title">Over-allocated this month (${escHtml(p)})</div>
         ${overTable(overThis, p)}
-        <div style="font-size:11px;font-weight:500;color:var(--text-secondary);margin:12px 0 4px">Next month (${escHtml(nextP)})</div>
+      </div>
+      <div class="mgmt-card" style="grid-column:span 3">
+        <div class="mgmt-card__title">Over-allocated next month (${escHtml(nextP)})</div>
         ${overTable(overNext, nextP)}
       </div>
 
