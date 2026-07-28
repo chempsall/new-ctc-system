@@ -813,7 +813,7 @@ function renderTeamSummary() {
     return Math.round(staff.reduce((sum, ps) => sum + (AL_MONTHLY[mon]||0)*(ps.fte[per]||0) + bh*(ps.fte[per]||0), 0));
   });
   const alActual = periods6.map(per =>
-    Math.round(projsByDept.filter(pr=>pr.number==="ID-06").reduce((sum,pr)=>sum+(pr.total_days[per]||0),0))
+    Math.round(staff.reduce((sum, ps) => sum + (ps.al_ph_days?.[per] || 0), 0))
   );
 
   const fmtD = d => Math.round(d).toLocaleString("en-GB");
@@ -939,6 +939,8 @@ function renderTeamSummary() {
 
     </div>
   `;
+
+  renderTeamStaffGrid(staff, periods6, s);
 
   requestAnimationFrame(() => {
     const alCtx = document.getElementById("team-al-chart");
