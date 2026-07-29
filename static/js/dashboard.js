@@ -389,11 +389,12 @@ function renderDeptSummary() {
   const capacity   = staff.reduce((sum, ps) => sum + (ps.capacity[p]        || 0), 0);
   const feeEarning = staff.reduce((sum, ps) => sum + (ps.horizon_days[p]    || 0), 0);
   const opp        = staff.reduce((sum, ps) => sum + (ps.opp_days?.[p]      || 0), 0);
+  const unlinked   = staff.reduce((sum, ps) => sum + (ps.unlinked_days?.[p] || 0), 0);
   const alPh       = staff.reduce((sum, ps) => sum + (ps.al_ph_days?.[p]    || 0), 0);
   const training   = staff.reduce((sum, ps) => sum + (ps.training_days?.[p] || 0), 0);
   const dayRel     = staff.reduce((sum, ps) => sum + (ps.day_rel_days?.[p]  || 0), 0);
   const internal   = staff.reduce((sum, ps) => sum + (ps.internal_days?.[p] || 0), 0);
-  const unalloc    = Math.max(0, capacity - feeEarning - opp - internal);
+  const unalloc    = Math.max(0, capacity - feeEarning - opp - unlinked - internal);
   const feePct     = capacity > 0 ? Math.round(feeEarning / capacity * 100) : 0;
   const intPct     = capacity > 0 ? Math.round(internal   / capacity * 100) : 0;
   const unallocPct = capacity > 0 ? Math.round(unalloc    / capacity * 100) : 0;
@@ -488,24 +489,29 @@ function renderDeptSummary() {
       <!-- ROW 1: Headline numbers — full width -->
       <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Team capacity — ${escHtml(p)}${lmNote}</div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:8px">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:8px">
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Capacity</div>
-            <div style="font-size:28px;font-weight:500">${fmtD(capacity)}d</div>
+            <div style="font-size:24px;font-weight:500">${fmtD(capacity)}d</div>
           </div>
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #2a78d6">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Fee earning</div>
-            <div style="font-size:28px;font-weight:500;color:#2a78d6">${fmtD(feeEarning)}d</div>
+            <div style="font-size:24px;font-weight:500;color:#2a78d6">${fmtD(feeEarning)}d</div>
             <div style="font-size:11px;color:var(--text-secondary)">${feePct}% of capacity</div>
+          </div>
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #eda100">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Opportunity</div>
+            <div style="font-size:24px;font-weight:500;color:#eda100">${fmtD(opp)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${capacity>0?Math.round(opp/capacity*100):0}% of capacity</div>
           </div>
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #6b7280">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Internal</div>
-            <div style="font-size:28px;font-weight:500;color:#6b7280">${fmtD(internal)}d</div>
+            <div style="font-size:24px;font-weight:500;color:#6b7280">${fmtD(internal)}d</div>
             <div style="font-size:11px;color:var(--text-secondary)">${intPct}% of capacity</div>
           </div>
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #008300">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Unallocated</div>
-            <div style="font-size:28px;font-weight:500;color:#008300">${fmtD(unalloc)}d</div>
+            <div style="font-size:24px;font-weight:500;color:#008300">${fmtD(unalloc)}d</div>
             <div style="font-size:11px;color:var(--text-secondary)">${unallocPct}% of capacity</div>
           </div>
         </div>
@@ -845,11 +851,12 @@ function renderTeamSummary() {
   const capacity   = staff.reduce((sum, ps) => sum + (ps.capacity[p]        || 0), 0);
   const feeEarning = staff.reduce((sum, ps) => sum + (ps.horizon_days[p]    || 0), 0);
   const opp        = staff.reduce((sum, ps) => sum + (ps.opp_days?.[p]      || 0), 0);
+  const unlinked   = staff.reduce((sum, ps) => sum + (ps.unlinked_days?.[p] || 0), 0);
   const alPh       = staff.reduce((sum, ps) => sum + (ps.al_ph_days?.[p]    || 0), 0);
   const training   = staff.reduce((sum, ps) => sum + (ps.training_days?.[p] || 0), 0);
   const dayRel     = staff.reduce((sum, ps) => sum + (ps.day_rel_days?.[p]  || 0), 0);
   const internal   = staff.reduce((sum, ps) => sum + (ps.internal_days?.[p] || 0), 0);
-  const unalloc    = Math.max(0, capacity - feeEarning - opp - internal);
+  const unalloc    = Math.max(0, capacity - feeEarning - opp - unlinked - internal);
   const feePct     = capacity > 0 ? Math.round(feeEarning / capacity * 100) : 0;
   const intPct     = capacity > 0 ? Math.round(internal   / capacity * 100) : 0;
   const unallocPct = capacity > 0 ? Math.round(unalloc    / capacity * 100) : 0;
@@ -903,25 +910,30 @@ function renderTeamSummary() {
       <!-- ROW 1: Headline numbers -->
       <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">${escHtml(lm)}'s team — ${escHtml(p)}</div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:8px">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:8px">
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Capacity</div>
-            <div style="font-size:28px;font-weight:500">${fmtD(capacity)}d</div>
+            <div style="font-size:24px;font-weight:500">${fmtD(capacity)}d</div>
             <div style="font-size:11px;color:var(--text-secondary)">${staff.length} staff</div>
           </div>
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #2a78d6">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Fee earning</div>
-            <div style="font-size:28px;font-weight:500;color:#2a78d6">${fmtD(feeEarning)}d</div>
+            <div style="font-size:24px;font-weight:500;color:#2a78d6">${fmtD(feeEarning)}d</div>
             <div style="font-size:11px;color:var(--text-secondary)">${feePct}% of capacity</div>
+          </div>
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #eda100">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Opportunity</div>
+            <div style="font-size:24px;font-weight:500;color:#eda100">${fmtD(opp)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${capacity>0?Math.round(opp/capacity*100):0}% of capacity</div>
           </div>
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #6b7280">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Internal</div>
-            <div style="font-size:28px;font-weight:500;color:#6b7280">${fmtD(internal)}d</div>
+            <div style="font-size:24px;font-weight:500;color:#6b7280">${fmtD(internal)}d</div>
             <div style="font-size:11px;color:var(--text-secondary)">${intPct}% of capacity</div>
           </div>
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #008300">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Unallocated</div>
-            <div style="font-size:28px;font-weight:500;color:#008300">${fmtD(unalloc)}d</div>
+            <div style="font-size:24px;font-weight:500;color:#008300">${fmtD(unalloc)}d</div>
             <div style="font-size:11px;color:var(--text-secondary)">${unallocPct}% of capacity</div>
           </div>
         </div>
@@ -1487,7 +1499,7 @@ function switchView(view) {
     staff:    ["filter-slot4-spacer"],
     projects: [],
     dept:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
-    team:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status"],
+    team:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
   };
   const allSlots = [
     "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
@@ -1522,8 +1534,6 @@ function switchView(view) {
     }
   });
 
-  const monthTabs = document.getElementById("month-tabs");
-  if (monthTabs) monthTabs.style.display = (["dept","team","staff","projects"].includes(view)) ? "none" : "";
   const newRtcBtn = document.getElementById("btn-create-rtc");
   if (newRtcBtn) newRtcBtn.style.display = view === "projects" ? "" : "none";
   // visibility (not display) so the filter bar keeps identical height on

@@ -136,6 +136,7 @@ def build() -> dict:
     person_active    = {}  # person_id -> period_start -> days on Active projects (for no_rec)
     person_direct    = {}  # person_id -> period_start -> days on UK Direct + Active (true fee-earning)
     person_opp       = {}  # person_id -> period_start -> days on Opportunity projects
+    person_unlinked  = {}  # person_id -> period_start -> days on norecord projects
     person_al        = {}  # person_id -> period_start -> days on ID-06 (AL&PH)
     person_training  = {}  # person_id -> period_start -> days on ID-04 (Training)
     person_dayrel    = {}  # person_id -> period_start -> days on IDUK-01 (Day Release)
@@ -180,6 +181,12 @@ def build() -> dict:
             person_opp.setdefault(pid, {})
             person_opp[pid][ps] = person_opp[pid].get(ps, 0) + days
 
+        # Unlinked days (no Horizon record - pending/placeholder)
+        if not r["project_status"] or r["project_status"].lower() in ("pending", "placeholder", ""):
+            if pnum not in SPECIAL_NUMS:
+                person_unlinked.setdefault(pid, {})
+                person_unlinked[pid][ps] = person_unlinked[pid].get(ps, 0) + days
+
         person_proj_days.setdefault(pid, {}).setdefault(r["project_id"], {})
         person_proj_days[pid][r["project_id"]][ps] = days
 
@@ -192,6 +199,7 @@ def build() -> dict:
         allocated     = {}
         horizon_days  = {}
         opp_days      = {}
+        unlinked_days = {}
         al_ph_days    = {}
         training_days = {}
         day_rel_days  = {}
@@ -223,12 +231,14 @@ def build() -> dict:
             tr_days    = round(person_training.get(pid, {}).get(ps, 0), 2)
             dr_days    = round(person_dayrel.get(pid, {}).get(ps, 0), 2)
             opp_days_p = round(person_opp.get(pid, {}).get(ps, 0), 2)
+            ul_days    = round(person_unlinked.get(pid, {}).get(ps, 0), 2)
             nr_days    = round(alloc - active_days, 2)
 
             capacity[label]      = cap
             allocated[label]     = alloc
             horizon_days[label]  = h_days
             opp_days[label]      = opp_days_p
+            unlinked_days[label] = ul_days
             al_ph_days[label]    = al_days
             training_days[label] = tr_days
             day_rel_days[label]  = dr_days
@@ -275,6 +285,7 @@ def build() -> dict:
             "allocated":    allocated,
             "horizon_days":   horizon_days,
             "opp_days":       opp_days,
+            "unlinked_days":  unlinked_days,
             "al_ph_days":     al_ph_days,
             "training_days":  training_days,
             "day_rel_days":   day_rel_days,
@@ -303,6 +314,7 @@ def build() -> dict:
                     base["horizon_days"][period]   = base["horizon_days"].get(period, 0) + person["horizon_days"].get(period, 0)
                     base["internal_days"][period]  = base["internal_days"].get(period, 0) + person["internal_days"].get(period, 0)
                     base["opp_days"][period]       = base["opp_days"].get(period, 0) + person["opp_days"].get(period, 0)
+                    base["unlinked_days"][period]  = base["unlinked_days"].get(period, 0) + person["unlinked_days"].get(period, 0)
                     base["al_ph_days"][period]     = base["al_ph_days"].get(period, 0) + person["al_ph_days"].get(period, 0)
                     base["training_days"][period]  = base["training_days"].get(period, 0) + person["training_days"].get(period, 0)
                     base["day_rel_days"][period]   = base["day_rel_days"].get(period, 0) + person["day_rel_days"].get(period, 0)
