@@ -1499,7 +1499,7 @@ function switchView(view) {
     staff:    ["filter-slot4-spacer"],
     projects: [],
     dept:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
-    team:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status", "filter-horizon"],
+    team:     ["filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status"],
   };
   const allSlots = [
     "filter-rtc-pd", "filter-rtc-pm", "filter-rtc-status",
