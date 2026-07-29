@@ -489,7 +489,7 @@ function renderDeptSummary() {
       <!-- ROW 1: Headline numbers — full width -->
       <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">Team capacity — ${escHtml(p)}${lmNote}</div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:8px">
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:8px">
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Capacity</div>
             <div style="font-size:24px;font-weight:500">${fmtD(capacity)}d</div>
@@ -503,6 +503,11 @@ function renderDeptSummary() {
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Opportunity</div>
             <div style="font-size:24px;font-weight:500;color:#eda100">${fmtD(opp)}d</div>
             <div style="font-size:11px;color:var(--text-secondary)">${capacity>0?Math.round(opp/capacity*100):0}% of capacity</div>
+          </div>
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #e34948">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Not linked</div>
+            <div style="font-size:24px;font-weight:500;color:#e34948">${fmtD(unlinked)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${capacity>0?Math.round(unlinked/capacity*100):0}% of capacity</div>
           </div>
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #6b7280">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Internal</div>
@@ -910,7 +915,7 @@ function renderTeamSummary() {
       <!-- ROW 1: Headline numbers -->
       <div class="mgmt-card" style="grid-column:span 6">
         <div class="mgmt-card__title">${escHtml(lm)}'s team — ${escHtml(p)}</div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:8px">
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:8px">
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Capacity</div>
             <div style="font-size:24px;font-weight:500">${fmtD(capacity)}d</div>
@@ -925,6 +930,11 @@ function renderTeamSummary() {
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Opportunity</div>
             <div style="font-size:24px;font-weight:500;color:#eda100">${fmtD(opp)}d</div>
             <div style="font-size:11px;color:var(--text-secondary)">${capacity>0?Math.round(opp/capacity*100):0}% of capacity</div>
+          </div>
+          <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #e34948">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Not linked</div>
+            <div style="font-size:24px;font-weight:500;color:#e34948">${fmtD(unlinked)}d</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${capacity>0?Math.round(unlinked/capacity*100):0}% of capacity</div>
           </div>
           <div style="background:var(--surface-1);border-radius:8px;padding:12px 16px;border-left:3px solid #6b7280">
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Internal</div>
