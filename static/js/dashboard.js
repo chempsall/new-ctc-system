@@ -721,6 +721,73 @@ function renderDeptSummary() {
   });
 }
 
+function renderTeamStaffGrid(staff, periods6, s) {
+  const thead = document.getElementById("team-staff-thead");
+  const tbody = document.getElementById("team-staff-tbody");
+  if (!thead || !tbody) return;
+
+  thead.innerHTML = `<th style="min-width:200px">Name / Title / Function</th>` +
+    periods6.map(p => `<th style="text-align:center;min-width:72px;white-space:nowrap">${escHtml(p)}</th>`).join("");
+
+  const rows = [];
+  staff.forEach(person => {
+    const isGeneric  = person.id?.startsWith("GENERIC-");
+    const isExpanded = _expandedStaff.has(person.id);
+    const dayCells = periods6.map(p => {
+      const alloc = person.allocated[p] || 0;
+      const kpi   = person.kpi[p];
+      if (alloc === 0) return `<td></td>`;
+      return `<td style="text-align:center;font-family:var(--font-mono);font-size:12px;white-space:nowrap;vertical-align:middle">
+        <span>${alloc.toFixed(2)}d</span>${isGeneric ? "" : kpiDot(kpi)}
+      </td>`;
+    }).join("");
+
+    rows.push(`<tr data-id="${escHtml(person.id)}"
+                   class="staff-person-row${isExpanded ? " staff-row--expanded" : ""}"
+                   style="cursor:pointer">
+      <td>
+        <div class="staff-name" style="font-weight:600">${escHtml(person.name)}</div>
+        <div class="staff-grade">${escHtml(person.job_title || "")}</div>
+        <div class="staff-grade" style="color:var(--text-tertiary)">${escHtml(person.job_function || "")}</div>
+      </td>
+      ${dayCells}
+    </tr>`);
+
+    if (isExpanded) {
+      const projRows = (person.projects || [])
+        .filter(pr => periods6.some(p => (pr.days[p] || 0) > 0))
+        .sort((a, b) => periods6.reduce((s,p)=>s+(b.days[p]||0),0) - periods6.reduce((s,p)=>s+(a.days[p]||0),0));
+      projRows.forEach(pr => {
+        const proj = (s.projects || []).find(sp => sp.project_id === pr.project_id);
+        const name = proj ? (proj.name || `Project ${pr.project_id}`) : `Project ${pr.project_id}`;
+        const task = proj ? (proj.task_name || "") : "";
+        const projDayCells = periods6.map(p => {
+          const d = pr.days[p] || 0;
+          if (d === 0) return `<td></td>`;
+          return `<td style="text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);white-space:nowrap">${d.toFixed(2)}d</td>`;
+        }).join("");
+        rows.push(`<tr class="staff-project-row" style="background:var(--surface-2)">
+          <td style="padding-left:24px">
+            <div style="font-size:11px;color:var(--text-secondary)">${escHtml(name)}</div>
+            ${task ? `<div style="font-size:10px;color:var(--text-tertiary)">${escHtml(task)}</div>` : ""}
+          </td>
+          ${projDayCells}
+        </tr>`);
+      });
+    }
+  });
+
+  tbody.innerHTML = rows.join("");
+  tbody.querySelectorAll("tr.staff-person-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const id = row.dataset.id;
+      if (_expandedStaff.has(id)) _expandedStaff.delete(id);
+      else _expandedStaff.add(id);
+      renderTeamStaffGrid(staff, periods6, s);
+    });
+  });
+}
+
 function renderTeamSummary() {
   const container = document.getElementById("team-container");
   if (!container) return;
