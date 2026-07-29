@@ -450,16 +450,53 @@ def admin_log():
 @require_admin
 def admin_config():
     """Returns non-sensitive config summary for diagnostics."""
+    conn = database.get_connection()
+    c    = conn.cursor()
+    db_path = Path(config.BASE_DIR) / "data" / "resource_forecast.db"
+    db_size = round(db_path.stat().st_size / 1024, 1) if db_path.exists() else 0
+
+    staff_count   = (c.execute("SELECT COUNT(*) FROM staff WHERE end_date IS NULL OR end_date >= date('now')").fetchone() or [0])[0]
+    rtc_count     = (c.execute("SELECT COUNT(*) FROM rtcs WHERE is_archived = 0").fetchone() or [0])[0]
+    project_count = (c.execute("SELECT COUNT(*) FROM projects").fetchone() or [0])[0]
+    bh_count      = (c.execute("SELECT COUNT(*) FROM bank_holidays").fetchone() or [0])[0]
+    last_staff    = (c.execute("SELECT MAX(last_imported) FROM staff").fetchone() or [None])[0]
+    last_par      = (c.execute("SELECT MAX(last_imported) FROM projects").fetchone() or [None])[0]
+    conn.close()
+
+    def fmt_dt(dt):
+        if not dt: return "Never"
+        try:
+            from datetime import datetime as _dt
+            d = _dt.fromisoformat(dt.replace("Z",""))
+            return d.strftime("%d %b %Y %H:%M")
+        except Exception:
+            return dt
+
     return jsonify({
-        "environment":       config.ENV,
-        "base_dir":          str(config.BASE_DIR),
-        "flask_host":        config.FLASK_HOST,
-        "flask_port":        config.FLASK_PORT,
-        "staff_list_path":   str(config.STAFF_LIST_PATH),
-        "par_path":          str(config.PAR_ACTUALS_PATH),
-        "par_sharepoint":    config.PAR_USE_SHAREPOINT,
-        "scheduler":         f"{config.SCHEDULER_HOUR:02d}:{config.SCHEDULER_MINUTE:02d}",
-        "forecast_months":   config.FORECAST_HORIZON_MONTHS,
-        "staff_list_exists": Path(config.STAFF_LIST_PATH).exists(),
-        "current_user":      get_current_user(),
+        "database": {
+            "path":          str(db_path),
+            "size_kb":       db_size,
+            "staff":         staff_count,
+            "active_rtcs":   rtc_count,
+            "projects":      project_count,
+            "bank_holidays": bh_count,
+        },
+        "imports": {
+            "last_staff_import": fmt_dt(last_staff),
+            "last_par_import":   fmt_dt(last_par),
+            "staff_list_path":   str(config.STAFF_LIST_PATH),
+            "par_path":          str(config.PAR_ACTUALS_PATH),
+            "staff_file_exists": Path(config.STAFF_LIST_PATH).exists(),
+            "par_file_exists":   Path(config.PAR_ACTUALS_PATH).exists(),
+        },
+        "scheduler": {
+            "daily_run_time":  f"{config.SCHEDULER_HOUR:02d}:{config.SCHEDULER_MINUTE:02d}",
+            "forecast_months": config.FORECAST_HORIZON_MONTHS,
+        },
+        "environment": {
+            "mode":         config.ENV,
+            "host":         f"{config.FLASK_HOST}:{config.FLASK_PORT}",
+            "base_dir":     str(config.BASE_DIR),
+            "current_user": get_current_user(),
+        },
     })
