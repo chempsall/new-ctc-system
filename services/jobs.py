@@ -234,6 +234,52 @@ def relink_pending_rtcs(conn=None):
     return linked
 
 
+def refresh_linked_rtcs(conn=None):
+    """
+    Re-syncs department, PD, PM, customer, project name and task name
+    from PAR for all currently linked, non-archived RTCs.
+    Called from nightly_imports after the PAR import completes.
+    """
+    close = conn is None
+    if conn is None:
+        conn = database.get_connection()
+    c   = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+
+    rows = c.execute("""
+        SELECT r.rtc_id, r.department, r.project_director, r.project_manager,
+               p.project_organisation, p.project_director AS par_pd,
+               p.project_manager AS par_pm, p.project_customer AS par_customer
+        FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE p.project_status = 'Active'
+        AND r.is_archived = 0
+    """).fetchall()
+
+    updated = 0
+    for row in rows:
+        new_dept = row["project_organisation"] or row["department"]
+        new_pd   = row["par_pd"]   or row["project_director"]
+        new_pm   = row["par_pm"]   or row["project_manager"]
+        if (new_dept == row["department"] and
+                new_pd == row["project_director"] and
+                new_pm == row["project_manager"]):
+            continue
+        c.execute("""
+            UPDATE rtcs SET department = ?, project_director = ?,
+                            project_manager = ?, last_updated_at = ?
+            WHERE rtc_id = ?
+        """, (new_dept, new_pd, new_pm, now, row["rtc_id"]))
+        updated += c.rowcount
+
+    conn.commit()
+    if close:
+        conn.close()
+    if updated:
+        logger.info(f"Refresh linked RTCs: {updated} updated from PAR")
+    return updated
+
+
 def nightly_imports():
     """
     Runs at the configured time (default midnight).
@@ -251,6 +297,8 @@ def nightly_imports():
     r = par_import.run()
     logger.info(f"PAR import: {r['rows_processed']} rows, "
                 f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
+
+    refresh_linked_rtcs()
 
     relinked = relink_pending_rtcs()
     if relinked:
