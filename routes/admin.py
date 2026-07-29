@@ -368,7 +368,7 @@ def admin_run_cleanup():
     just hidden from the default list view.
     """
     now         = datetime.now(timezone.utc)
-    today       = now.date().isoformat()
+    today       = now.date().replace(day=1).isoformat()
 
     conn = database.get_connection()
     c    = conn.cursor()

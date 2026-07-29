@@ -200,6 +200,7 @@
           <div class="admin-action__desc">
             Re-reads the staff list Excel file and updates the database.
             Rebuilds the summary cache automatically on completion.
+            Runs automatically every night.
           </div>
           <div class="admin-action__result" id="result-staff"></div>
         </div>
@@ -225,6 +226,7 @@
           <div class="admin-action__desc">
             Re-reads the PAR actuals export and updates all project metadata.
             Rebuilds the summary cache automatically on completion.
+            Runs automatically every night.
           </div>
           <div class="admin-action__result" id="result-par"></div>
         </div>
@@ -282,17 +284,6 @@
           <div class="admin-action__result" id="result-cleanup"></div>
         </div>
         <button class="btn" onclick="runCleanup(this)">Run now</button>
-      </div>
-
-      <div class="admin-action">
-        <div class="admin-action__name">Import log</div>
-        <div>
-          <div class="admin-action__desc">
-            Shows the 10 most recent import runs with row counts and errors.
-          </div>
-          <div class="admin-action__result" id="result-log"></div>
-        </div>
-        <button class="btn" onclick="loadImportLog(this)">View log</button>
       </div>
 
       <div class="admin-action">
