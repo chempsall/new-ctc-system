@@ -1592,7 +1592,6 @@ function updateStatusBar() {
   const builtAt = fmtDate(s.generated_at);
 
   const parts = [];
-  if (builtAt) parts.push(`Dashboard built <strong>${builtAt}</strong>`);
   if (staffRun) parts.push(`Staff list imported <strong>${staffRun}</strong>`);
   if (parRun) parts.push(`PAR imported <strong>${parRun}</strong>`);
   
