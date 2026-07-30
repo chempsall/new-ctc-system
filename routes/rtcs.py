@@ -487,6 +487,12 @@ def api_update_rtc(rtc_id):
         WHERE rtc_id = ?
     """, (user, now, user, now, rtc_id))
 
+    # Auto-unarchive if allocations have been added to an archived RTC
+    c.execute(
+        "UPDATE rtcs SET is_archived = 0 WHERE rtc_id = ? AND is_archived = 1",
+        (rtc_id,)
+    )
+
     conn.commit()
     conn.close()
 

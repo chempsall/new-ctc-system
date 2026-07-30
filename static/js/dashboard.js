@@ -110,8 +110,11 @@ function buildFilterOptions() {
   populateSelect("filter-department", deptList, "Department");
 
   // Line manager filter
+  const currentDept = state.filters.department !== "all" ? state.filters.department : null;
   const managers = [...new Set(
-    (s.staff || []).map(p => p.line_manager).filter(Boolean)
+    (s.staff || [])
+      .filter(ps => !currentDept || ps.department === currentDept)
+      .map(p => p.line_manager).filter(Boolean)
   )].sort();
   populateSelect("filter-line-manager", managers, "Line Manager");
 

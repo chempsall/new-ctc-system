@@ -280,6 +280,55 @@ def refresh_linked_rtcs(conn=None):
     return updated
 
 
+def archive_old_rtcs(conn=None):
+    """
+    Archives RTCs that have had zero allocations for the current month
+    and the previous calendar month. Special RTCs are never archived.
+    Called from nightly_imports and from the admin button.
+    Returns count of archived RTCs.
+    """
+    close = conn is None
+    if conn is None:
+        conn = database.get_connection()
+    c   = conn.cursor()
+    now = datetime.now(timezone.utc)
+
+    today          = now.date().replace(day=1).isoformat()
+    last_month_start = (now.date().replace(day=1) - timedelta(days=1)).replace(day=1).isoformat()
+    last_month_end   = now.date().replace(day=1).isoformat()
+
+    eligible = c.execute("""
+        SELECT r.rtc_id, p.project_number, p.project_name
+        FROM rtcs r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE r.is_archived = 0
+        AND p.project_number NOT IN ('ID-06', 'ID-04', 'IDUK-01')
+        AND COALESCE((
+            SELECT SUM(a.days) FROM allocations a
+            WHERE a.rtc_id = r.rtc_id AND a.period_start >= ?
+        ), 0) = 0
+        AND COALESCE((
+            SELECT SUM(a.days) FROM allocations a
+            WHERE a.rtc_id = r.rtc_id
+            AND a.period_start >= ? AND a.period_start < ?
+        ), 0) = 0
+    """, (today, last_month_start, last_month_end)).fetchall()
+
+    count = 0
+    for row in eligible:
+        c.execute("UPDATE rtcs SET is_archived = 1 WHERE rtc_id = ?", (row["rtc_id"],))
+        count += row["rtc_id"] and 1 or 0
+        count = c.rowcount + count - (c.rowcount)  # use rowcount
+    count = len(eligible)
+
+    conn.commit()
+    if close:
+        conn.close()
+    if count:
+        logger.info(f"Archive old RTCs: {count} archived")
+    return count
+
+
 def nightly_imports():
     """
     Runs at the configured time (default midnight).
@@ -307,6 +356,10 @@ def nightly_imports():
     run_special_rtc_maintenance()
 
     process_leavers()
+
+    archived = archive_old_rtcs()
+    if archived:
+        logger.info(f"Nightly archive: {archived} RTC(s) archived")
 
     summary_module.build()
     logger.info("Summary cache rebuilt")

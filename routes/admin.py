@@ -363,64 +363,21 @@ def admin_process_leavers():
 @require_admin
 def admin_run_cleanup():
     """
-    Archives RTCs that have no future allocations and no allocations
-    last calendar month. Data is preserved — RTCs are never deleted,
-    just hidden from the default list view.
+    Archives RTCs that have no current or future allocations and no
+    allocations last calendar month. Data is preserved — RTCs are never
+    deleted, just hidden from the default list view.
+    Delegates to jobs_module.archive_old_rtcs for shared logic.
     """
-    now         = datetime.now(timezone.utc)
-    today       = now.date().replace(day=1).isoformat()
-
-    conn = database.get_connection()
-    c    = conn.cursor()
-
-    # Archive RTCs with no future allocations AND no allocations last calendar month
-    last_month_start = (now.date().replace(day=1) - timedelta(days=1)).replace(day=1).isoformat()
-    last_month_end   = now.date().replace(day=1).isoformat()
-    eligible = c.execute("""
-        SELECT r.rtc_id, p.project_number, p.project_name,
-               r.last_opened, r.department
-        FROM rtcs r
-        JOIN projects p ON p.project_id = r.project_id
-        WHERE r.is_archived = 0
-        AND p.project_number NOT IN ('ID-06', 'ID-04', 'IDUK-01')
-        AND COALESCE((
-            SELECT SUM(a.days)
-            FROM allocations a
-            WHERE a.rtc_id = r.rtc_id AND a.period_start >= ?
-        ), 0) = 0
-        AND COALESCE((
-            SELECT SUM(a.days)
-            FROM allocations a
-            WHERE a.rtc_id = r.rtc_id
-            AND a.period_start >= ? AND a.period_start < ?
-        ), 0) = 0
-    """, (today, last_month_start, last_month_end)).fetchall()
-
-    archived = []
-    for row in eligible:
-        c.execute(
-            "UPDATE rtcs SET is_archived = 1 WHERE rtc_id = ?",
-            (row["rtc_id"],)
-        )
-        archived.append({
-            "rtc_id":         row["rtc_id"],
-            "project_number": row["project_number"],
-            "project_name":   row["project_name"],
-            "last_opened":    row["last_opened"],
-        })
-
-    conn.commit()
-    conn.close()
-
-    if archived:
+    count = jobs_module.archive_old_rtcs()
+    if count:
         summary_module.build()
-        logger.info(f"Admin: cleanup archived {len(archived)} RTC(s)")
+        logger.info(f"Admin: cleanup archived {count} RTC(s)")
     else:
         logger.info("Admin: cleanup — no RTCs eligible for archiving")
 
     return jsonify({
-        "archived_count": len(archived),
-        "archived":       archived,
+        "archived_count": count,
+        "archived":       [],
     })
 
 
