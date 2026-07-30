@@ -21,7 +21,7 @@ try:
     from dotenv import load_dotenv
     _env_path = Path(__file__).parent / ".env"
     if _env_path.exists():
-        load_dotenv(_env_path)
+        load_dotenv(_env_path, override=True)
         print(f"Loaded configuration from {_env_path}")
     else:
         print("No .env file found — using environment variables and config.py defaults.")
