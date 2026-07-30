@@ -119,9 +119,6 @@
         <select id="filter-rtc-pd" style="display:none">
           <option value="">Project Director</option>
         </select>
-        <select id="filter-project-pd" style="display:none">
-          <option value="all">Project Director</option>
-        </select>
         <select id="filter-job-title" style="display:none">
           <option value="all">Job Title</option>
         </select>
@@ -129,9 +126,6 @@
         <!-- Slot 3: Project Manager / Job Function -->
         <select id="filter-rtc-pm" style="display:none">
           <option value="">Project Manager</option>
-        </select>
-        <select id="filter-project-pm" style="display:none">
-          <option value="all">Project Manager</option>
         </select>
         <select id="filter-job-function" style="display:none">
           <option value="all">Job Function</option>
@@ -241,36 +235,6 @@
       </div>
     </div>
 
-    <!-- ===================================================================
-         RTCs VIEW
-         =================================================================== -->
-    <div id="rtcs-panel" class="hidden">
-      <div class="card">
-        <div class="card__header">
-          <span class="card__title">Resource to Complete</span>
-        </div>
-        <div class="card__body">
-          <table class="rtc-table">
-            <thead>
-              <tr>
-                <th>Customer / Project / Task</th>
-                <th class="sortable" onclick="toggleSort('rtcs','department')">Department <span id="sort-rtcs-department"></span></th>
-                <th class="sortable" onclick="toggleSort('rtcs','pd')">PD <span id="sort-rtcs-pd"></span></th>
-                <th class="sortable" onclick="toggleSort('rtcs','pm')">PM <span id="sort-rtcs-pm"></span></th>
-                <th class="sortable" style="text-align:center" onclick="toggleSort('rtcs','status')">Status <span id="sort-rtcs-status"></span></th>
-                <th class="sortable" style="text-align:center" onclick="toggleSort('rtcs','days')">Days remaining <span id="sort-rtcs-days"></span></th>
-                <th class="sortable" onclick="toggleSort('rtcs','last_updated')">Last updated <span id="sort-rtcs-last_updated"></span></th>
-              </tr>
-            </thead>
-            <tbody id="rtc-tbody">
-              <tr><td colspan="7">
-                <div class="empty-state">Loading...</div>
-              </td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
 
     <!-- ===================================================================
          MANAGEMENT SUMMARY VIEW
@@ -300,59 +264,6 @@
 <!-- =========================================================================
      Detail panel (slides in from right on row click)
      ========================================================================= -->
-<div class="detail-panel" id="detail-panel">
-
-  <div class="detail-panel__header">
-    <div class="detail-panel__avatar" id="dp-avatar">?</div>
-    <div>
-      <div class="detail-panel__name" id="dp-name">—</div>
-      <div class="detail-panel__role" id="dp-role">—</div>
-    </div>
-    <button class="detail-panel__close" id="dp-close" aria-label="Close">✕</button>
-  </div>
-
-  <!-- Summary stats -->
-  <div class="detail-panel__section">
-    <div class="detail-panel__section-title">This period</div>
-    <div class="detail-stat-grid">
-      <div class="detail-stat">
-        <div class="detail-stat__label">Allocated</div>
-        <div class="detail-stat__value" id="dp-stat-alloc">—</div>
-      </div>
-      <div class="detail-stat">
-        <div class="detail-stat__label">Capacity</div>
-        <div class="detail-stat__value" id="dp-stat-cap">—</div>
-      </div>
-      <div class="detail-stat">
-        <div class="detail-stat__label">Available</div>
-        <div class="detail-stat__value" id="dp-stat-remain">—</div>
-      </div>
-    </div>
-    <div style="margin-top:8px">
-      <span id="dp-kpi" class="kpi kpi--ok">ok</span>
-    </div>
-
-    <!-- No-record warning -->
-    <div class="warn-strip hidden" id="dp-norec-warn">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <path d="M7 1L13 12H1L7 1Z" stroke="currentColor"
-              stroke-width="1.5" stroke-linejoin="round"/>
-        <path d="M7 5.5v3M7 9.5v.5" stroke="currentColor"
-              stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-      <span id="dp-norec-days"></span>
-    </div>
-  </div>
-
-  <!-- Project allocation details -->
-  <div class="detail-panel__section">
-    <div class="detail-panel__section-title">Details</div>
-    <div id="dp-projects">
-      <!-- Populated by JavaScript -->
-    </div>
-  </div>
-
-</div>
 
 
 <!-- CREATE / DUPLICATE RTC MODAL -->

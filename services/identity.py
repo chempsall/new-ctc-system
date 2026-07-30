@@ -1,12 +1,13 @@
 """
 services/identity.py
-Who is making the request, and is it an admin?
+Who is making the request.
 
-get_current_user() is a lightweight placeholder — replace this single
-function when WSP corporate auth is available (Microsoft SSO or
-equivalent). Every part of the codebase that needs to know "who is
-doing this" calls get_current_user() and nothing else.
+Reads the signed session set by routes/auth.py. When Entra ID SSO
+replaces the login page, only routes/auth.py changes — the session
+shape and these functions stay identical.
 """
+
+from flask import session, has_request_context
 
 import secrets
 from functools import wraps
@@ -18,8 +19,20 @@ import config
 
 def get_current_user() -> str:
     """Returns the current user's display name."""
-    # TODO: replace with real auth when corporate SSO is available
-    return "Test User"
+    if has_request_context():
+        u = session.get("user")
+        if u:
+            return u.get("name", "Unknown")
+    return "System"
+
+
+def get_current_person_number():
+    """Returns the current user's Horizon person number, or None."""
+    if has_request_context():
+        u = session.get("user")
+        if u:
+            return u.get("person_number")
+    return None
 
 
 def require_admin(f):

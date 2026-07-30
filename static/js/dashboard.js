@@ -1057,7 +1057,7 @@ function renderTeamSummary() {
 }
 
 function renderView() {
-  const panels = ["staff-panel", "projects-panel", "rtcs-panel", "dept-panel", "team-panel"];
+  const panels = ["staff-panel", "projects-panel", "dept-panel", "team-panel"];
   panels.forEach(id => document.getElementById(id)?.classList.add("hidden"));
 
   if (state.activeView === "staff") {

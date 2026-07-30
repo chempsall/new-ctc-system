@@ -5,7 +5,7 @@ re-link pass. Callable from the scheduler and from admin routes.
 """
 
 import logging
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from pathlib import Path
 
 from dateutil.relativedelta import relativedelta
@@ -236,8 +236,9 @@ def relink_pending_rtcs(conn=None):
 
 def refresh_linked_rtcs(conn=None):
     """
-    Re-syncs department, PD, PM, customer, project name and task name
-    from PAR for all currently linked, non-archived RTCs.
+    Re-syncs department (project_organisation) from PAR for all currently
+    linked, non-archived RTCs. All other project attributes live on the
+    shared projects row and are refreshed by the PAR import itself.
     Called from nightly_imports after the PAR import completes.
     """
     close = conn is None
@@ -247,29 +248,25 @@ def refresh_linked_rtcs(conn=None):
     now = datetime.now(timezone.utc).isoformat()
 
     rows = c.execute("""
-        SELECT r.rtc_id, r.department, r.project_director, r.project_manager,
-               p.project_organisation, p.project_director AS par_pd,
-               p.project_manager AS par_pm, p.project_customer AS par_customer
+        SELECT r.rtc_id, r.department, p.project_organisation
         FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
         WHERE p.project_status = 'Active'
         AND r.is_archived = 0
     """).fetchall()
 
+    # PD, PM, customer, and names live on the shared projects row and are
+    # refreshed directly by the PAR import; department is the only linked
+    # attribute stored on the RTC itself.
     updated = 0
     for row in rows:
         new_dept = row["project_organisation"] or row["department"]
-        new_pd   = row["par_pd"]   or row["project_director"]
-        new_pm   = row["par_pm"]   or row["project_manager"]
-        if (new_dept == row["department"] and
-                new_pd == row["project_director"] and
-                new_pm == row["project_manager"]):
+        if new_dept == row["department"]:
             continue
         c.execute("""
-            UPDATE rtcs SET department = ?, project_director = ?,
-                            project_manager = ?, last_updated_at = ?
+            UPDATE rtcs SET department = ?, last_updated_at = ?
             WHERE rtc_id = ?
-        """, (new_dept, new_pd, new_pm, now, row["rtc_id"]))
+        """, (new_dept, now, row["rtc_id"]))
         updated += c.rowcount
 
     conn.commit()
@@ -297,12 +294,13 @@ def archive_old_rtcs(conn=None):
     last_month_start = (now.date().replace(day=1) - timedelta(days=1)).replace(day=1).isoformat()
     last_month_end   = now.date().replace(day=1).isoformat()
 
-    eligible = c.execute("""
+    special_ph = ",".join("?" * len(SPECIAL_PROJECT_NUMBERS))
+    eligible = c.execute(f"""
         SELECT r.rtc_id, p.project_number, p.project_name
         FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
         WHERE r.is_archived = 0
-        AND p.project_number NOT IN ('ID-06', 'ID-04', 'IDUK-01')
+        AND p.project_number NOT IN ({special_ph})
         AND COALESCE((
             SELECT SUM(a.days) FROM allocations a
             WHERE a.rtc_id = r.rtc_id AND a.period_start >= ?
@@ -312,13 +310,11 @@ def archive_old_rtcs(conn=None):
             WHERE a.rtc_id = r.rtc_id
             AND a.period_start >= ? AND a.period_start < ?
         ), 0) = 0
-    """, (today, last_month_start, last_month_end)).fetchall()
+    """, (*sorted(SPECIAL_PROJECT_NUMBERS),
+          today, last_month_start, last_month_end)).fetchall()
 
-    count = 0
     for row in eligible:
         c.execute("UPDATE rtcs SET is_archived = 1 WHERE rtc_id = ?", (row["rtc_id"],))
-        count += row["rtc_id"] and 1 or 0
-        count = c.rowcount + count - (c.rowcount)  # use rowcount
     count = len(eligible)
 
     conn.commit()

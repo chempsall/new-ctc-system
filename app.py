@@ -11,6 +11,7 @@ To start the development server:
 """
 
 import logging
+from datetime import timedelta
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
@@ -82,6 +83,7 @@ def _setup_logging():
 logger = _setup_logging()
 
 # Routes and jobs import config/database, so they come after setup.
+from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
 from routes.rtcs import rtcs_bp
 from routes.admin import admin_bp
@@ -89,10 +91,28 @@ from services.jobs import nightly_imports
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
+app.permanent_session_lifetime = timedelta(days=31)
 
+app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(rtcs_bp)
 app.register_blueprint(admin_bp)
+
+
+from flask import session, request, redirect
+
+@app.before_request
+def require_identity():
+    endpoint = request.endpoint or ""
+    if endpoint.startswith("auth.") or endpoint == "static":
+        return
+    if "user" in session:
+        return
+    if request.path.startswith("/api/") or request.path.startswith("/admin/"):
+        # fetch() calls must see a status they can handle, not a login page
+        if request.path != "/admin":       # the admin *page* itself redirects
+            return jsonify({"error": "Not signed in"}), 401
+    return redirect("/login?next=" + request.path)
 
 
 @app.errorhandler(404)

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in — Resource Forecast</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <style>
+    .login-wrap  { min-height: 100vh; display: flex; align-items: center;
+                   justify-content: center; background: var(--surface-2); }
+    .login-card  { background: var(--surface); border: 1px solid var(--border);
+                   border-radius: var(--radius, 10px); padding: 36px 40px;
+                   width: 380px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+    .login-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .login-sub   { font-size: 12px; color: var(--text-secondary); margin-bottom: 22px; }
+    .login-card label { font-size: 11px; font-weight: 500; text-transform: uppercase;
+                   letter-spacing: 0.06em; color: var(--text-tertiary);
+                   display: block; margin-bottom: 6px; }
+    .login-card input, .login-card select {
+                   width: 100%; font-family: var(--font-body); font-size: 13px;
+                   padding: 8px 10px; border: 1px solid var(--border);
+                   border-radius: var(--radius-sm, 6px); background: var(--surface-2);
+                   color: var(--text-primary); margin-bottom: 14px; }
+    .login-card select { cursor: pointer; }
+    .login-btn   { width: 100%; padding: 9px 0; font-size: 13px; font-weight: 600;
+                   border: none; border-radius: var(--radius-sm, 6px);
+                   background: var(--blue, #2C72C7); color: #fff; cursor: pointer; }
+    .login-btn:hover { filter: brightness(1.06); }
+    .login-error { font-size: 12px; color: #e34948; margin-bottom: 12px; }
+    .login-note  { font-size: 11px; color: var(--text-tertiary); margin-top: 16px;
+                   line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-title">Resource Forecast</div>
+      <div class="login-sub">WSP London Building Services</div>
+
+      {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
+
+      <form method="POST" action="/login">
+        <input type="hidden" name="next" value="{{ request.args.get('next', '/') }}">
+
+        <label for="login-search">Find your name</label>
+        <input type="text" id="login-search" placeholder="Type to filter…"
+               autocomplete="off" autofocus>
+
+        <label for="login-select">Sign in as</label>
+        <select name="horizon_person_number" id="login-select" size="8" required>
+          {% for s in staff %}
+          <option value="{{ s.horizon_person_number }}">{{ s.name }} — {{ s.job_title }}</option>
+          {% endfor %}
+        </select>
+
+        <button type="submit" class="login-btn">Continue</button>
+      </form>
+
+      <div class="login-note">
+        Your name is recorded against the changes you make
+        (“last edited by”). No password is required on the WSP network
+        during alpha testing.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Filter the list as the user types; Enter submits the highlighted match.
+    const search = document.getElementById("login-search");
+    const select = document.getElementById("login-select");
+    const options = [...select.options];
+    search.addEventListener("input", () => {
+      const q = search.value.toLowerCase();
+      select.innerHTML = "";
+      options.filter(o => o.textContent.toLowerCase().includes(q))
+             .forEach(o => select.appendChild(o));
+      if (select.options.length) select.selectedIndex = 0;
+    });
+    search.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault();
+        if (select.value) select.form.requestSubmit(); }
+    });
+    select.addEventListener("dblclick", () => select.form.requestSubmit());
+  </script>
+</body>
+</html>
