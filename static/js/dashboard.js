@@ -1108,9 +1108,11 @@ function renderStaffTable() {
   const curIdx = Math.max(0, s.periods.indexOf(state.activePeriod));
   const cols   = s.periods.slice(curIdx, curIdx + 6);
 
-  // Update column headers dynamically
+  // Update column headers only if periods have changed
   const thead = document.querySelector(".staff-table thead tr");
-  if (thead) {
+  const colKey = cols.join(",");
+  if (thead && thead.dataset.colKey !== colKey) {
+    thead.dataset.colKey = colKey;
     thead.innerHTML =
       `<th class="sortable" onclick="toggleSort('staff','name')" style="min-width:180px">
          Name / Title / Function <span id="sort-staff-name"></span>
@@ -2026,8 +2028,10 @@ function wireEvents() {
       } else if (state.activeView === "dept") {
         renderDeptSummary();
       } else if (state.activeView === "team") {
+        buildFilterOptions();
         renderTeamSummary();
       } else {
+        buildFilterOptions();
         renderView();
       }
     });

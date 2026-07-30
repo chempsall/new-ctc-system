@@ -427,8 +427,9 @@ a:hover { text-decoration: underline; }
 /* --------------------------------------------------------------------------
    Staff allocation table
    -------------------------------------------------------------------------- */
-.staff-table { width: 100%; border-collapse: collapse; table-layout: auto; }
-.staff-table th:nth-child(1) { min-width: 200px; } /* Name */
+.staff-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.staff-table th:nth-child(1) { width: 30%; } /* Name */
+.staff-table th:nth-child(n+2) { width: 11.67%; } /* Month columns */
 .staff-person-row:hover { background: var(--surface-2); cursor: pointer; }
 .proj-person-row:hover  { background: var(--surface-2); cursor: pointer; }
 .proj-row--expanded     { background: var(--surface-2); }
