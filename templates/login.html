@@ -49,7 +49,7 @@
         <label for="login-select">Sign in as</label>
         <select name="horizon_person_number" id="login-select" size="8" required>
           {% for s in staff %}
-          <option value="{{ s.horizon_person_number }}">{{ s.name }} — {{ s.job_title }}</option>
+          <option value="{{ s.horizon_person_number }}">{{ s.name }}</option>
           {% endfor %}
         </select>
 
