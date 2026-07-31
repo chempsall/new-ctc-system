@@ -88,18 +88,18 @@ def api_rtcs():
                 SELECT SUM(a.days)
                 FROM allocations a
                 WHERE a.rtc_id = r.rtc_id
-                AND a.period_start = ?
+                AND a.period_start = %s
             ), 0) AS current_month_days,
             COALESCE((
                 SELECT SUM(a.days)
                 FROM allocations a
                 WHERE a.rtc_id = r.rtc_id
-                AND a.period_start >= ?
+                AND a.period_start >= %s
             ), 0) AS future_days
         FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
         WHERE 1=1
-        AND (? = '1' OR r.is_archived = 0)
+        AND (%s = '1' OR r.is_archived = 0)
     """, (selected_period, next_period, archived)).fetchall()
 
     conn.close()
@@ -202,11 +202,12 @@ def api_create_rtc():
                           last_updated_by, last_updated_at,
                           last_opened_by, last_opened,
                           is_archived)
-        VALUES (?,?,?,?,?,?,?,?,?,0)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,0)
+        RETURNING rtc_id
     """, (project_id, data["department"], data["start_date"],
           user, now, user, now, user, now))
 
-    rtc_id = c.lastrowid
+    rtc_id = c.fetchone()["rtc_id"]
     conn.commit()
     conn.close()
 
@@ -242,7 +243,7 @@ def api_duplicate_rtc(rtc_id):
 
     # Confirm the source RTC exists
     source = c.execute(
-        "SELECT rtc_id FROM rtcs WHERE rtc_id = ?", (rtc_id,)
+        "SELECT rtc_id FROM rtcs WHERE rtc_id = %s", (rtc_id,)
     ).fetchone()
     if not source:
         conn.close()
@@ -256,27 +257,29 @@ def api_duplicate_rtc(rtc_id):
                           last_updated_by, last_updated_at,
                           last_opened_by, last_opened,
                           is_archived)
-        VALUES (?,?,?,?,?,?,?,?,?,0)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,0)
+        RETURNING rtc_id
     """, (project_id, data["department"], data["start_date"],
           user, now, user, now, user, now))
 
-    new_rtc_id = c.lastrowid
+    new_rtc_id = c.fetchone()["rtc_id"]
 
     # Copy the distinct set of people who appear in the source RTC,
     # but create NO allocation rows — they start from zero in the new RTC.
     staff_members = c.execute("""
         SELECT DISTINCT horizon_person_number
         FROM allocations
-        WHERE rtc_id = ?
+        WHERE rtc_id = %s
     """, (rtc_id,)).fetchall()
 
     # Insert zero-allocation rows for the new RTC's start month only,
     # so the staff appear in the editor ready to be allocated.
     for s in staff_members:
         c.execute("""
-            INSERT OR IGNORE INTO allocations
+            INSERT INTO allocations
                 (horizon_person_number, rtc_id, period_start, days, last_updated)
-            VALUES (?, ?, ?, 0, ?)
+            VALUES (%s, %s, %s, 0, %s)
+            ON CONFLICT DO NOTHING
         """, (s["horizon_person_number"], new_rtc_id, data["start_date"], now))
 
     conn.commit()
@@ -301,7 +304,7 @@ def api_get_rtc(rtc_id):
                p.project_director, p.project_manager, p.project_status
         FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
-        WHERE r.rtc_id = ?
+        WHERE r.rtc_id = %s
     """, (rtc_id,)).fetchone()
 
     if not rtc:
@@ -314,28 +317,28 @@ def api_get_rtc(rtc_id):
                s.name, s.job_title, s.job_function, s.availability
         FROM allocations a
         JOIN staff s ON s.horizon_person_number = a.horizon_person_number
-        WHERE a.rtc_id = ?
+        WHERE a.rtc_id = %s
         ORDER BY s.name, a.period_start
     """, (rtc_id,)).fetchall()
 
     # Fetch reporting periods actually in use for this RTC
     # Based on the max period_start in allocations, minimum 12 months
     max_period = c.execute("""
-        SELECT MAX(period_start) FROM allocations WHERE rtc_id = ?
-    """, (rtc_id,)).fetchone()[0]
+        SELECT MAX(period_start) AS m FROM allocations WHERE rtc_id = %s
+    """, (rtc_id,)).fetchone()["m"]
 
     if max_period:
         periods = c.execute("""
             SELECT period_start, label, working_days
             FROM reporting_periods
-            WHERE period_start >= ? AND period_start <= ?
+            WHERE period_start >= %s AND period_start <= %s
             ORDER BY period_start
         """, (rtc["start_date"], max_period)).fetchall()
     else:
         periods = c.execute("""
             SELECT period_start, label, working_days
             FROM reporting_periods
-            WHERE period_start >= ?
+            WHERE period_start >= %s
             ORDER BY period_start LIMIT 12
         """, (rtc["start_date"],)).fetchall()
 
@@ -393,7 +396,7 @@ def api_update_rtc(rtc_id):
     c    = conn.cursor()
 
     rtc = c.execute(
-        "SELECT rtc_id FROM rtcs WHERE rtc_id = ?", (rtc_id,)
+        "SELECT rtc_id FROM rtcs WHERE rtc_id = %s", (rtc_id,)
     ).fetchone()
     if not rtc:
         conn.close()
@@ -423,18 +426,18 @@ def api_update_rtc(rtc_id):
             SELECT p.project_id, p.project_status
             FROM rtcs r
             JOIN projects p ON p.project_id = r.project_id
-            WHERE r.rtc_id = ?
+            WHERE r.rtc_id = %s
         """, (rtc_id,)).fetchone()
         if proj and proj["project_status"] in ("Placeholder", "Pending"):
-            set_clause = ", ".join(f"{k} = ?" for k in proj_updates)
-            c.execute(f"UPDATE projects SET {set_clause} WHERE project_id = ?",
+            set_clause = ", ".join(f"{k} = %s" for k in proj_updates)
+            c.execute(f"UPDATE projects SET {set_clause} WHERE project_id = %s",
                       list(proj_updates.values()) + [proj["project_id"]])
 
     if updates:
         updates["last_updated_by"] = user
         updates["last_updated_at"] = now
-        set_clause = ", ".join(f"{k} = ?" for k in updates)
-        c.execute(f"UPDATE rtcs SET {set_clause} WHERE rtc_id = ?",
+        set_clause = ", ".join(f"{k} = %s" for k in updates)
+        c.execute(f"UPDATE rtcs SET {set_clause} WHERE rtc_id = %s",
                   list(updates.values()) + [rtc_id])
 
     # Upsert allocations
@@ -456,7 +459,7 @@ def api_update_rtc(rtc_id):
 
         # Validate period_start exists in reporting_periods
         valid_period = c.execute(
-            "SELECT 1 FROM reporting_periods WHERE period_start = ?", (period,)
+            "SELECT 1 FROM reporting_periods WHERE period_start = %s", (period,)
         ).fetchone()
         if not valid_period:
             continue
@@ -465,7 +468,7 @@ def api_update_rtc(rtc_id):
         # Prevents a removed person being silently reinstated via a PATCH.
         is_member = c.execute("""
             SELECT 1 FROM allocations
-            WHERE rtc_id = ? AND horizon_person_number = ?
+            WHERE rtc_id = %s AND horizon_person_number = %s
             LIMIT 1
         """, (rtc_id, pid)).fetchone()
         if not is_member:
@@ -474,7 +477,7 @@ def api_update_rtc(rtc_id):
         c.execute("""
             INSERT INTO allocations
                 (horizon_person_number, rtc_id, period_start, days, last_updated)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT(horizon_person_number, rtc_id, period_start)
             DO UPDATE SET days = excluded.days, last_updated = excluded.last_updated
         """, (pid, rtc_id, period, days, now))
@@ -482,14 +485,14 @@ def api_update_rtc(rtc_id):
 
     # Update last_updated_by and last_edited_by on the RTC itself
     c.execute("""
-        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?,
-                        last_edited_by = ?, last_edited_at = ?
-        WHERE rtc_id = ?
+        UPDATE rtcs SET last_updated_by = %s, last_updated_at = %s,
+                        last_edited_by = %s, last_edited_at = %s
+        WHERE rtc_id = %s
     """, (user, now, user, now, rtc_id))
 
     # Auto-unarchive if allocations have been added to an archived RTC
     c.execute(
-        "UPDATE rtcs SET is_archived = 0 WHERE rtc_id = ? AND is_archived = 1",
+        "UPDATE rtcs SET is_archived = 0 WHERE rtc_id = %s AND is_archived = 1",
         (rtc_id,)
     )
 
@@ -517,7 +520,7 @@ def api_add_rtc_staff(rtc_id):
     c    = conn.cursor()
 
     rtc = c.execute(
-        "SELECT rtc_id, start_date FROM rtcs WHERE rtc_id = ?", (rtc_id,)
+        "SELECT rtc_id, start_date FROM rtcs WHERE rtc_id = %s", (rtc_id,)
     ).fetchone()
     if not rtc:
         conn.close()
@@ -527,7 +530,7 @@ def api_add_rtc_staff(rtc_id):
     special_check = c.execute("""
         SELECT p.project_number FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
-        WHERE r.rtc_id = ?
+        WHERE r.rtc_id = %s
     """, (rtc_id,)).fetchone()
     if special_check and special_check["project_number"] in ("ID-06", "ID-04", "IDUK-01"):
         conn.close()
@@ -535,7 +538,7 @@ def api_add_rtc_staff(rtc_id):
 
     # Confirm person exists in staff
     if not c.execute(
-        "SELECT 1 FROM staff WHERE horizon_person_number = ?", (pid,)
+        "SELECT 1 FROM staff WHERE horizon_person_number = %s", (pid,)
     ).fetchone():
         conn.close()
         return jsonify({"error": f"Staff member {pid} not found"}), 404
@@ -543,55 +546,57 @@ def api_add_rtc_staff(rtc_id):
     # For generics, allow multiple instances by creating a unique suffixed ID
     if pid.startswith('GENERIC-'):
         existing_count = c.execute("""
-            SELECT COUNT(DISTINCT horizon_person_number) FROM allocations
-            WHERE rtc_id = ? AND horizon_person_number LIKE ?
-        """, (rtc_id, pid + '%')).fetchone()[0]
+            SELECT COUNT(DISTINCT horizon_person_number) AS n FROM allocations
+            WHERE rtc_id = %s AND horizon_person_number LIKE %s
+        """, (rtc_id, pid + '%')).fetchone()["n"]
         if existing_count > 0:
             pid = f"{pid}_{existing_count + 1}"
             original_pid = str(data["horizon_person_number"]).strip()
             orig = c.execute(
-                "SELECT * FROM staff WHERE horizon_person_number = ?", (original_pid,)
+                "SELECT * FROM staff WHERE horizon_person_number = %s", (original_pid,)
             ).fetchone()
             if orig:
                 c.execute("""
-                    INSERT OR IGNORE INTO staff
+                    INSERT INTO staff
                         (horizon_person_number, name, job_title,
                          job_function, department, availability, last_imported)
-                    VALUES (?, ?, ?, ?, ?, ?, 'seeded')
+                    VALUES (%s, %s, %s, %s, %s, %s, 'seeded')
+                    ON CONFLICT DO NOTHING
                 """, (pid, orig["name"], orig["job_title"],
                       orig["job_function"], orig["department"], orig["availability"]))
 
     # Get the periods already in use for this RTC
     # (match existing staff's allocation range, minimum 12)
     existing_end = c.execute("""
-        SELECT MAX(period_start) FROM allocations WHERE rtc_id = ?
-    """, (rtc_id,)).fetchone()[0]
+        SELECT MAX(period_start) AS m FROM allocations WHERE rtc_id = %s
+    """, (rtc_id,)).fetchone()["m"]
 
     if existing_end:
         periods = c.execute("""
             SELECT period_start FROM reporting_periods
-            WHERE period_start >= ? AND period_start <= ?
+            WHERE period_start >= %s AND period_start <= %s
             ORDER BY period_start
         """, (rtc["start_date"], existing_end)).fetchall()
     else:
         periods = c.execute("""
             SELECT period_start FROM reporting_periods
-            WHERE period_start >= ?
+            WHERE period_start >= %s
             ORDER BY period_start LIMIT 12
         """, (rtc["start_date"],)).fetchall()
 
     added = 0
     for p in periods:
         c.execute("""
-            INSERT OR IGNORE INTO allocations
+            INSERT INTO allocations
                 (horizon_person_number, rtc_id, period_start, days, last_updated)
-            VALUES (?, ?, ?, 0, ?)
+            VALUES (%s, %s, %s, 0, %s)
+            ON CONFLICT DO NOTHING
         """, (pid, rtc_id, p["period_start"], now))
         added += c.rowcount
 
     c.execute("""
-        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
-        WHERE rtc_id = ?
+        UPDATE rtcs SET last_updated_by = %s, last_updated_at = %s
+        WHERE rtc_id = %s
     """, (user, now, rtc_id))
 
     conn.commit()
@@ -611,7 +616,7 @@ def api_remove_rtc_staff(rtc_id, person_id):
     # Refuse to modify staff on special RTCs
     _sp = c.execute("""
         SELECT p.project_number FROM rtcs r
-        JOIN projects p ON p.project_id = r.project_id WHERE r.rtc_id = ?
+        JOIN projects p ON p.project_id = r.project_id WHERE r.rtc_id = %s
     """, (rtc_id,)).fetchone()
     if _sp and _sp["project_number"] in SPECIAL_PROJECT_NUMBERS:
         conn.close()
@@ -619,13 +624,13 @@ def api_remove_rtc_staff(rtc_id, person_id):
 
     c.execute("""
         DELETE FROM allocations
-        WHERE rtc_id = ? AND horizon_person_number = ?
+        WHERE rtc_id = %s AND horizon_person_number = %s
     """, (rtc_id, person_id))
     deleted = c.rowcount
 
     c.execute("""
-        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
-        WHERE rtc_id = ?
+        UPDATE rtcs SET last_updated_by = %s, last_updated_at = %s
+        WHERE rtc_id = %s
     """, (user, now, rtc_id))
 
     conn.commit()
@@ -649,7 +654,7 @@ def api_replace_rtc_staff(rtc_id, person_id):
     _conn_tmp = database.get_connection()
     _sp = _conn_tmp.execute("""
         SELECT p.project_number FROM rtcs r
-        JOIN projects p ON p.project_id = r.project_id WHERE r.rtc_id = ?
+        JOIN projects p ON p.project_id = r.project_id WHERE r.rtc_id = %s
     """, (rtc_id,)).fetchone()
     _conn_tmp.close()
     if _sp and _sp["project_number"] in SPECIAL_PROJECT_NUMBERS:
@@ -663,7 +668,7 @@ def api_replace_rtc_staff(rtc_id, person_id):
 
     # Confirm new person exists in staff
     if not c.execute(
-        "SELECT 1 FROM staff WHERE horizon_person_number = ?", (new_pid,)
+        "SELECT 1 FROM staff WHERE horizon_person_number = %s", (new_pid,)
     ).fetchone():
         conn.close()
         return jsonify({"error": f"Staff member {new_pid} not found"}), 404
@@ -671,7 +676,7 @@ def api_replace_rtc_staff(rtc_id, person_id):
     # Get the existing allocations for the old person on this RTC
     old_allocs = c.execute("""
         SELECT period_start, days FROM allocations
-        WHERE rtc_id = ? AND horizon_person_number = ?
+        WHERE rtc_id = %s AND horizon_person_number = %s
     """, (rtc_id, person_id)).fetchall()
 
     if not old_allocs:
@@ -683,20 +688,20 @@ def api_replace_rtc_staff(rtc_id, person_id):
         c.execute("""
             INSERT INTO allocations
                 (horizon_person_number, rtc_id, period_start, days, last_updated)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT(horizon_person_number, rtc_id, period_start)
             DO UPDATE SET days = excluded.days, last_updated = excluded.last_updated
         """, (new_pid, rtc_id, row["period_start"], row["days"], now))
 
     # Delete old person's rows
     c.execute(
-        "DELETE FROM allocations WHERE rtc_id = ? AND horizon_person_number = ?",
+        "DELETE FROM allocations WHERE rtc_id = %s AND horizon_person_number = %s",
         (rtc_id, person_id)
     )
 
     c.execute("""
-        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
-        WHERE rtc_id = ?
+        UPDATE rtcs SET last_updated_by = %s, last_updated_at = %s
+        WHERE rtc_id = %s
     """, (user, now, rtc_id))
 
     conn.commit()
@@ -720,7 +725,7 @@ def api_extend_rtc(rtc_id):
     # Get current staff on this RTC
     staff_rows = c.execute("""
         SELECT DISTINCT horizon_person_number FROM allocations
-        WHERE rtc_id = ?
+        WHERE rtc_id = %s
     """, (rtc_id,)).fetchall()
     if not staff_rows:
         conn.close()
@@ -728,8 +733,8 @@ def api_extend_rtc(rtc_id):
 
     # Find the current last period
     last_period = c.execute("""
-        SELECT MAX(period_start) FROM allocations WHERE rtc_id = ?
-    """, (rtc_id,)).fetchone()[0]
+        SELECT MAX(period_start) AS m FROM allocations WHERE rtc_id = %s
+    """, (rtc_id,)).fetchone()["m"]
     if not last_period:
         conn.close()
         return jsonify({"error": "No existing periods found"}), 400
@@ -746,7 +751,7 @@ def api_extend_rtc(rtc_id):
     special_check = c.execute("""
         SELECT p.project_number FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
-        WHERE r.rtc_id = ?
+        WHERE r.rtc_id = %s
     """, (rtc_id,)).fetchone()
     if special_check and special_check["project_number"] in ("ID-06", "ID-04", "IDUK-01"):
         conn.close()
@@ -759,7 +764,7 @@ def api_extend_rtc(rtc_id):
     # Get the next 12 periods after the current last one
     new_periods = c.execute("""
         SELECT period_start FROM reporting_periods
-        WHERE period_start > ?
+        WHERE period_start > %s
         ORDER BY period_start LIMIT 12
     """, (last_period,)).fetchall()
 
@@ -767,7 +772,7 @@ def api_extend_rtc(rtc_id):
     rtc_proj = c.execute("""
         SELECT p.project_number FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
-        WHERE r.rtc_id = ?
+        WHERE r.rtc_id = %s
     """, (rtc_id,)).fetchone()
     is_alph = rtc_proj and rtc_proj["project_number"] == "ID-06"
 
@@ -782,21 +787,22 @@ def api_extend_rtc(rtc_id):
                 year, month, _ = p["period_start"].split("-")
                 bh_row = c.execute("""
                     SELECT COUNT(*) FROM bank_holidays
-                    WHERE date LIKE ?
+                    WHERE date LIKE %s
                 """, (f"{year}-{month}-%",)).fetchone()
                 days = bh_row[0] if bh_row else 0
                 if p["period_start"][5:7] == "12":
                     days += 3
             c.execute("""
-                INSERT OR IGNORE INTO allocations
+                INSERT INTO allocations
                     (horizon_person_number, rtc_id, period_start, days, last_updated)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
             """, (pid, rtc_id, p["period_start"], days, now))
             added += c.rowcount
 
     c.execute("""
-        UPDATE rtcs SET last_updated_by = ?, last_updated_at = ?
-        WHERE rtc_id = ?
+        UPDATE rtcs SET last_updated_by = %s, last_updated_at = %s
+        WHERE rtc_id = %s
     """, (user, now, rtc_id))
 
     conn.commit()
@@ -811,8 +817,8 @@ def api_rtc_opened(rtc_id):
     now  = datetime.now(timezone.utc).isoformat()
     conn = database.get_connection()
     conn.execute("""
-        UPDATE rtcs SET last_opened_by = ?, last_opened = ?
-        WHERE rtc_id = ?
+        UPDATE rtcs SET last_opened_by = %s, last_opened = %s
+        WHERE rtc_id = %s
     """, (user, now, rtc_id))
     conn.commit()
     conn.close()
@@ -823,7 +829,7 @@ def api_rtc_opened(rtc_id):
 def api_clear_auto_link(rtc_id):
     """Clears the auto_linked flag after user has confirmed the link."""
     conn = database.get_connection()
-    conn.execute("UPDATE rtcs SET auto_linked = 0 WHERE rtc_id = ?", (rtc_id,))
+    conn.execute("UPDATE rtcs SET auto_linked = 0 WHERE rtc_id = %s", (rtc_id,))
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
@@ -841,7 +847,7 @@ def api_check_horizon(rtc_id):
         SELECT r.rtc_id, p.project_status, p.project_name, p.project_id
         FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
-        WHERE r.rtc_id = ?
+        WHERE r.rtc_id = %s
     """, (rtc_id,)).fetchone()
 
     if not rtc:
@@ -882,7 +888,7 @@ def api_link_horizon(rtc_id):
         SELECT project_id, project_name, task_name, project_customer,
                project_director, project_manager, project_organisation
         FROM projects
-        WHERE project_number = ? AND task_order_number = ?
+        WHERE project_number = %s AND task_order_number = %s
         AND project_status != 'Placeholder'
     """, (proj_num, task_order)).fetchone()
 
@@ -891,7 +897,7 @@ def api_link_horizon(rtc_id):
         return jsonify({"error": "Project not found in PAR data"}), 404
 
     rtc = c.execute(
-        "SELECT project_id FROM rtcs WHERE rtc_id = ?", (rtc_id,)
+        "SELECT project_id FROM rtcs WHERE rtc_id = %s", (rtc_id,)
     ).fetchone()
     if not rtc:
         conn.close()
@@ -902,21 +908,21 @@ def api_link_horizon(rtc_id):
     user = get_current_user()
 
     c.execute("""
-        UPDATE rtcs SET project_id = ?, last_updated_by = ?, last_updated_at = ?,
-                        department = COALESCE(?, department)
-        WHERE rtc_id = ?
+        UPDATE rtcs SET project_id = %s, last_updated_by = %s, last_updated_at = %s,
+                        department = COALESCE(%s, department)
+        WHERE rtc_id = %s
     """, (real_project["project_id"], user, now,
           real_project["project_organisation"] or None, rtc_id))
 
     # Update the old placeholder project row with authoritative PAR data
     c.execute("""
         UPDATE projects SET
-            project_name     = COALESCE(?, project_name),
-            task_name        = COALESCE(?, task_name),
-            project_customer = COALESCE(?, project_customer),
-            project_director = COALESCE(?, project_director),
-            project_manager  = COALESCE(?, project_manager)
-        WHERE project_id = ?
+            project_name     = COALESCE(%s, project_name),
+            task_name        = COALESCE(%s, task_name),
+            project_customer = COALESCE(%s, project_customer),
+            project_director = COALESCE(%s, project_director),
+            project_manager  = COALESCE(%s, project_manager)
+        WHERE project_id = %s
     """, (real_project["project_name"],
           real_project["task_name"],
           real_project["project_customer"],
@@ -926,10 +932,10 @@ def api_link_horizon(rtc_id):
 
     # Clean up orphaned placeholder project row
     other_refs = c.execute(
-        "SELECT COUNT(*) FROM rtcs WHERE project_id = ?", (old_project_id,)
-    ).fetchone()[0]
+        "SELECT COUNT(*) AS n FROM rtcs WHERE project_id = %s", (old_project_id,)
+    ).fetchone()["n"]
     if other_refs == 0:
-        c.execute("DELETE FROM projects WHERE project_id = ?", (old_project_id,))
+        c.execute("DELETE FROM projects WHERE project_id = %s", (old_project_id,))
 
     conn.commit()
     conn.close()
