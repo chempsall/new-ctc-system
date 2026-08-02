@@ -98,7 +98,10 @@ def _clean(val):
     if isinstance(val, str):
         v = val.strip().lstrip("'").strip()
         return v if v else None
-    return val
+    # openpyxl returns numeric cells (project_number, task_order_number) as
+    # int/float; those DB columns are TEXT and PostgreSQL will not compare
+    # text = integer. Coerce every non-null value to a stripped string.
+    return str(val).strip() or None
 
 
 def _clean_name(val):

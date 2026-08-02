@@ -61,7 +61,10 @@ def _clean(val):
     if isinstance(val, str):
         v = val.strip()
         return v if v else None
-    return val
+    # openpyxl returns numeric cells as int/float; the DB columns these feed
+    # (horizon_person_number etc.) are TEXT, and PostgreSQL will not compare
+    # text = integer. Coerce every non-null value to a stripped string.
+    return str(val).strip() or None
 
 
 def _parse_date(val):
