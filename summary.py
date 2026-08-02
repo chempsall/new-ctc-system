@@ -74,9 +74,9 @@ def _get_active_periods(conn, from_date=None):
     rows = conn.execute("""
         SELECT period_start, period_end, working_days, label
         FROM reporting_periods
-        WHERE period_start >= ?
+        WHERE period_start >= %s
         ORDER BY period_start
-        LIMIT ?
+        LIMIT %s
     """, (from_date, HORIZON_MONTHS)).fetchall()
 
     return [dict(r) for r in rows]
@@ -87,360 +87,362 @@ def build() -> dict:
     Returns the summary dict and also writes it to summary_cache table.
     """
     conn = get_connection()
-    generated_at = datetime.now(timezone.utc).isoformat()
+    try:
+        generated_at = datetime.now(timezone.utc).isoformat()
 
-    periods = _get_active_periods(conn)
-    period_starts = [p["period_start"] for p in periods]
-    # -- Working days lookup -------------------------------------------------
-    working_days = {p["label"]: p["working_days"] for p in periods}
+        periods = _get_active_periods(conn)
+        period_starts = [p["period_start"] for p in periods]
+        # -- Working days lookup -------------------------------------------------
+        working_days = {p["label"]: p["working_days"] for p in periods}
 
-    # -- Staff ---------------------------------------------------------------
-    first_period = period_starts[0] if period_starts else date.today().isoformat()
-    last_period  = period_starts[-1] if period_starts else date.today().isoformat()
-    staff_query  = """
-        SELECT * FROM staff
-        WHERE (end_date IS NULL OR end_date > ?)
-        AND   (start_date IS NULL OR start_date <= ?)
-        ORDER BY horizon_person_number
-    """
+        # -- Staff ---------------------------------------------------------------
+        first_period = period_starts[0] if period_starts else date.today().isoformat()
+        last_period  = period_starts[-1] if period_starts else date.today().isoformat()
+        staff_query  = """
+            SELECT * FROM staff
+            WHERE (end_date IS NULL OR end_date > %s)
+            AND   (start_date IS NULL OR start_date <= %s)
+            ORDER BY horizon_person_number
+        """
     
-    staff_rows = conn.execute(staff_query, (first_period, last_period)).fetchall()
+        staff_rows = conn.execute(staff_query, (first_period, last_period)).fetchall()
 
-    # Availability fractions per person per period
-    avail_rows = conn.execute("""
-        SELECT horizon_person_number, period_start, availability_fraction
-        FROM staff_availability
-        WHERE period_start IN ({})
-    """.format(",".join("?" * len(period_starts))), period_starts).fetchall()
+        # Availability fractions per person per period
+        avail_rows = conn.execute("""
+            SELECT horizon_person_number, period_start, availability_fraction
+            FROM staff_availability
+            WHERE period_start IN ({})
+        """.format(",".join(["%s"] * len(period_starts))), period_starts).fetchall()
 
-    avail_map = {}  # person_id -> {period_start -> fraction}
-    for r in avail_rows:
-        avail_map.setdefault(r["horizon_person_number"], {})[r["period_start"]] = \
-            r["availability_fraction"]
+        avail_map = {}  # person_id -> {period_start -> fraction}
+        for r in avail_rows:
+            avail_map.setdefault(r["horizon_person_number"], {})[r["period_start"]] = \
+                r["availability_fraction"]
 
-    # Allocations per person per project per period.
-    # Join through rtcs to get project context.
-    # A project is "linked" (fee-earning) if it has a real project_status
-    # of "Active" from the PAR import — i.e. it exists in Horizon.
-    alloc_rows = conn.execute("""
-        SELECT a.horizon_person_number, r.project_id, a.period_start, a.days,
-               p.project_status, p.project_type, p.project_number, r.department, r.rtc_id
-        FROM allocations a
-        JOIN rtcs r     ON r.rtc_id = a.rtc_id
-        JOIN projects p ON p.project_id = r.project_id
-        WHERE a.period_start IN ({})
-    """.format(",".join("?" * len(period_starts))), period_starts).fetchall()
+        # Allocations per person per project per period.
+        # Join through rtcs to get project context.
+        # A project is "linked" (fee-earning) if it has a real project_status
+        # of "Active" from the PAR import — i.e. it exists in Horizon.
+        alloc_rows = conn.execute("""
+            SELECT a.horizon_person_number, r.project_id, a.period_start, a.days,
+                   p.project_status, p.project_type, p.project_number, r.department, r.rtc_id
+            FROM allocations a
+            JOIN rtcs r     ON r.rtc_id = a.rtc_id
+            JOIN projects p ON p.project_id = r.project_id
+            WHERE a.period_start IN ({})
+        """.format(",".join(["%s"] * len(period_starts))), period_starts).fetchall()
 
-    SPECIAL_NUMS     = {"ID-06", "ID-04", "IDUK-01"}
-    person_alloc     = {}  # person_id -> period_start -> total days
-    person_active    = {}  # person_id -> period_start -> days on Active projects (for no_rec)
-    person_direct    = {}  # person_id -> period_start -> days on UK Direct + Active (true fee-earning)
-    person_opp       = {}  # person_id -> period_start -> days on Opportunity projects
-    person_unlinked  = {}  # person_id -> period_start -> days on norecord projects
-    person_al        = {}  # person_id -> period_start -> days on ID-06 (AL&PH)
-    person_training  = {}  # person_id -> period_start -> days on ID-04 (Training)
-    person_dayrel    = {}  # person_id -> period_start -> days on IDUK-01 (Day Release)
-    person_internal  = {}  # person_id -> period_start -> days on all special RTCs (combined)
-    person_proj_days = {}  # person_id -> project_id -> period_start -> days
+        SPECIAL_NUMS     = {"ID-06", "ID-04", "IDUK-01"}
+        person_alloc     = {}  # person_id -> period_start -> total days
+        person_active    = {}  # person_id -> period_start -> days on Active projects (for no_rec)
+        person_direct    = {}  # person_id -> period_start -> days on UK Direct + Active (true fee-earning)
+        person_opp       = {}  # person_id -> period_start -> days on Opportunity projects
+        person_unlinked  = {}  # person_id -> period_start -> days on norecord projects
+        person_al        = {}  # person_id -> period_start -> days on ID-06 (AL&PH)
+        person_training  = {}  # person_id -> period_start -> days on ID-04 (Training)
+        person_dayrel    = {}  # person_id -> period_start -> days on IDUK-01 (Day Release)
+        person_internal  = {}  # person_id -> period_start -> days on all special RTCs (combined)
+        person_proj_days = {}  # person_id -> project_id -> period_start -> days
 
-    for r in alloc_rows:
-        pid   = r["horizon_person_number"]
-        ps    = r["period_start"]
-        days  = r["days"] or 0
-        pstat = (r["project_status"] or "").lower()
-        ptype = (r["project_type"] or "").strip()
-        pnum  = (r["project_number"] or "").strip()
+        for r in alloc_rows:
+            pid   = r["horizon_person_number"]
+            ps    = r["period_start"]
+            days  = r["days"] or 0
+            pstat = (r["project_status"] or "").lower()
+            ptype = (r["project_type"] or "").strip()
+            pnum  = (r["project_number"] or "").strip()
 
-        person_alloc.setdefault(pid, {})
-        person_alloc[pid][ps] = person_alloc[pid].get(ps, 0) + days
+            person_alloc.setdefault(pid, {})
+            person_alloc[pid][ps] = person_alloc[pid].get(ps, 0) + days
 
-        if pstat == "active":
-            person_active.setdefault(pid, {})
-            person_active[pid][ps] = person_active[pid].get(ps, 0) + days
+            if pstat == "active":
+                person_active.setdefault(pid, {})
+                person_active[pid][ps] = person_active[pid].get(ps, 0) + days
 
-        if pstat == "active" and ptype == "UK Direct" and pnum not in SPECIAL_NUMS:
-            person_direct.setdefault(pid, {})
-            person_direct[pid][ps] = person_direct[pid].get(ps, 0) + days
+            if pstat == "active" and ptype == "UK Direct" and pnum not in SPECIAL_NUMS:
+                person_direct.setdefault(pid, {})
+                person_direct[pid][ps] = person_direct[pid].get(ps, 0) + days
 
-        if pnum in SPECIAL_NUMS:
-            person_internal.setdefault(pid, {})
-            person_internal[pid][ps] = person_internal[pid].get(ps, 0) + days
-            if pnum == "ID-06":
-                person_al.setdefault(pid, {})
-                person_al[pid][ps] = person_al[pid].get(ps, 0) + days
-            elif pnum == "ID-04":
-                person_training.setdefault(pid, {})
-                person_training[pid][ps] = person_training[pid].get(ps, 0) + days
-            elif pnum == "IDUK-01":
-                person_dayrel.setdefault(pid, {})
-                person_dayrel[pid][ps] = person_dayrel[pid].get(ps, 0) + days
+            if pnum in SPECIAL_NUMS:
+                person_internal.setdefault(pid, {})
+                person_internal[pid][ps] = person_internal[pid].get(ps, 0) + days
+                if pnum == "ID-06":
+                    person_al.setdefault(pid, {})
+                    person_al[pid][ps] = person_al[pid].get(ps, 0) + days
+                elif pnum == "ID-04":
+                    person_training.setdefault(pid, {})
+                    person_training[pid][ps] = person_training[pid].get(ps, 0) + days
+                elif pnum == "IDUK-01":
+                    person_dayrel.setdefault(pid, {})
+                    person_dayrel[pid][ps] = person_dayrel[pid].get(ps, 0) + days
 
-        # Opportunity days
-        if (r["project_type"] or "").strip() == "UK Opportunity" or \
-           (r["project_status"] or "").lower() == "opportunity":
-            person_opp.setdefault(pid, {})
-            person_opp[pid][ps] = person_opp[pid].get(ps, 0) + days
+            # Opportunity days
+            if (r["project_type"] or "").strip() == "UK Opportunity" or \
+               (r["project_status"] or "").lower() == "opportunity":
+                person_opp.setdefault(pid, {})
+                person_opp[pid][ps] = person_opp[pid].get(ps, 0) + days
 
-        # Unlinked days (no Horizon record - pending/placeholder)
-        if not r["project_status"] or r["project_status"].lower() in ("pending", "placeholder", ""):
-            if pnum not in SPECIAL_NUMS:
-                person_unlinked.setdefault(pid, {})
-                person_unlinked[pid][ps] = person_unlinked[pid].get(ps, 0) + days
+            # Unlinked days (no Horizon record - pending/placeholder)
+            if not r["project_status"] or r["project_status"].lower() in ("pending", "placeholder", ""):
+                if pnum not in SPECIAL_NUMS:
+                    person_unlinked.setdefault(pid, {})
+                    person_unlinked[pid][ps] = person_unlinked[pid].get(ps, 0) + days
 
-        person_proj_days.setdefault(pid, {}).setdefault(r["project_id"], {})
-        person_proj_days[pid][r["project_id"]][ps] = days
+            person_proj_days.setdefault(pid, {}).setdefault(r["project_id"], {})
+            person_proj_days[pid][r["project_id"]][ps] = days
 
-    # Build staff list for JSON
-    staff_list = []
-    for s in staff_rows:
-        pid = s["horizon_person_number"]
+        # Build staff list for JSON
+        staff_list = []
+        for s in staff_rows:
+            pid = s["horizon_person_number"]
 
-        capacity      = {}
-        allocated     = {}
-        horizon_days  = {}
-        opp_days      = {}
-        unlinked_days = {}
-        al_ph_days    = {}
-        training_days = {}
-        day_rel_days  = {}
-        no_rec_days   = {}
-        internal_days = {}
-        fte           = {}
-        kpi           = {}
+            capacity      = {}
+            allocated     = {}
+            horizon_days  = {}
+            opp_days      = {}
+            unlinked_days = {}
+            al_ph_days    = {}
+            training_days = {}
+            day_rel_days  = {}
+            no_rec_days   = {}
+            internal_days = {}
+            fte           = {}
+            kpi           = {}
 
-        for p in periods:
-            ps    = p["period_start"]
-            label = p["label"]
-            wdays = p["working_days"]
+            for p in periods:
+                ps    = p["period_start"]
+                label = p["label"]
+                wdays = p["working_days"]
 
-            if pid.startswith("GENERIC-"):
-                cap = None
-            else:
-                frac = avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
-                proportion = _period_fte(
+                if pid.startswith("GENERIC-"):
+                    cap = None
+                else:
+                    frac = avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
+                    proportion = _period_fte(
+                        s["start_date"], s["end_date"],
+                        ps, p["period_end"], 1.0
+                    )
+                    cap = round(wdays * frac * proportion, 2)
+
+                alloc      = round(person_alloc.get(pid, {}).get(ps, 0), 2)
+                h_days     = round(person_direct.get(pid, {}).get(ps, 0), 2)
+                active_days= round(person_active.get(pid, {}).get(ps, 0), 2)
+                int_days   = round(person_internal.get(pid, {}).get(ps, 0), 2)
+                al_days    = round(person_al.get(pid, {}).get(ps, 0), 2)
+                tr_days    = round(person_training.get(pid, {}).get(ps, 0), 2)
+                dr_days    = round(person_dayrel.get(pid, {}).get(ps, 0), 2)
+                opp_days_p = round(person_opp.get(pid, {}).get(ps, 0), 2)
+                ul_days    = round(person_unlinked.get(pid, {}).get(ps, 0), 2)
+                nr_days    = round(alloc - active_days, 2)
+
+                capacity[label]      = cap
+                allocated[label]     = alloc
+                horizon_days[label]  = h_days
+                opp_days[label]      = opp_days_p
+                unlinked_days[label] = ul_days
+                al_ph_days[label]    = al_days
+                training_days[label] = tr_days
+                day_rel_days[label]  = dr_days
+                no_rec_days[label]   = nr_days
+                internal_days[label] = int_days
+                fte[label]          = 0.0 if pid.startswith("GENERIC-") else _period_fte(
                     s["start_date"], s["end_date"],
-                    ps, p["period_end"], 1.0
+                    ps, p["period_end"],
+                    avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
                 )
-                cap = round(wdays * frac * proportion, 2)
-
-            alloc      = round(person_alloc.get(pid, {}).get(ps, 0), 2)
-            h_days     = round(person_direct.get(pid, {}).get(ps, 0), 2)
-            active_days= round(person_active.get(pid, {}).get(ps, 0), 2)
-            int_days   = round(person_internal.get(pid, {}).get(ps, 0), 2)
-            al_days    = round(person_al.get(pid, {}).get(ps, 0), 2)
-            tr_days    = round(person_training.get(pid, {}).get(ps, 0), 2)
-            dr_days    = round(person_dayrel.get(pid, {}).get(ps, 0), 2)
-            opp_days_p = round(person_opp.get(pid, {}).get(ps, 0), 2)
-            ul_days    = round(person_unlinked.get(pid, {}).get(ps, 0), 2)
-            nr_days    = round(alloc - active_days, 2)
-
-            capacity[label]      = cap
-            allocated[label]     = alloc
-            horizon_days[label]  = h_days
-            opp_days[label]      = opp_days_p
-            unlinked_days[label] = ul_days
-            al_ph_days[label]    = al_days
-            training_days[label] = tr_days
-            day_rel_days[label]  = dr_days
-            no_rec_days[label]   = nr_days
-            internal_days[label] = int_days
-            fte[label]          = 0.0 if pid.startswith("GENERIC-") else _period_fte(
-                s["start_date"], s["end_date"],
-                ps, p["period_end"],
-                avail_map.get(pid, {}).get(ps, s["availability"] or 1.0)
-            )
 
 
-            # KPI: compare allocated vs capacity
-            if pid.startswith("GENERIC-"):
-                kpi[label] = "none"
-            elif cap == 0:
-                kpi[label] = "unavailable"
-            elif alloc > cap * KPI_OVER_THRESHOLD:
-                kpi[label] = "over"
-            elif alloc >= cap * KPI_UNDER_THRESHOLD:
-                kpi[label] = "ok"
-            else:
-                kpi[label] = "under"
-        # Projects this person is on
-        proj_entries = []
-        for project_id, period_days in person_proj_days.get(pid, {}).items():
-            proj_entries.append({
-                "project_id": project_id,
-                "days": {
-                    p["label"]: round(period_days.get(p["period_start"], 0), 2)
-                    for p in periods
-                }
+                # KPI: compare allocated vs capacity
+                if pid.startswith("GENERIC-"):
+                    kpi[label] = "none"
+                elif cap == 0:
+                    kpi[label] = "unavailable"
+                elif alloc > cap * KPI_OVER_THRESHOLD:
+                    kpi[label] = "over"
+                elif alloc >= cap * KPI_UNDER_THRESHOLD:
+                    kpi[label] = "ok"
+                else:
+                    kpi[label] = "under"
+            # Projects this person is on
+            proj_entries = []
+            for project_id, period_days in person_proj_days.get(pid, {}).items():
+                proj_entries.append({
+                    "project_id": project_id,
+                    "days": {
+                        p["label"]: round(period_days.get(p["period_start"], 0), 2)
+                        for p in periods
+                    }
+                })
+
+            staff_list.append({
+                "id":           pid,
+                "name":         s["name"],
+                "job_title":    s["job_title"] or "",
+                "job_function": s["job_function"] or "",
+                "line_manager": s["line_manager"] or "",
+                "department":   s["department"] or "",
+                "availability": s["availability"],
+                "capacity":     capacity,
+                "allocated":    allocated,
+                "horizon_days":   horizon_days,
+                "opp_days":       opp_days,
+                "unlinked_days":  unlinked_days,
+                "al_ph_days":     al_ph_days,
+                "training_days":  training_days,
+                "day_rel_days":   day_rel_days,
+                "internal_days":  internal_days,
+                "no_record_days": no_rec_days,
+                "fte":            fte,
+                "kpi":            kpi,
+                "projects":     proj_entries
             })
 
-        staff_list.append({
-            "id":           pid,
-            "name":         s["name"],
-            "job_title":    s["job_title"] or "",
-            "job_function": s["job_function"] or "",
-            "line_manager": s["line_manager"] or "",
-            "department":   s["department"] or "",
-            "availability": s["availability"],
-            "capacity":     capacity,
-            "allocated":    allocated,
-            "horizon_days":   horizon_days,
-            "opp_days":       opp_days,
-            "unlinked_days":  unlinked_days,
-            "al_ph_days":     al_ph_days,
-            "training_days":  training_days,
-            "day_rel_days":   day_rel_days,
-            "internal_days":  internal_days,
-            "no_record_days": no_rec_days,
-            "fte":            fte,
-            "kpi":            kpi,
-            "projects":     proj_entries
-        })
+        # Merge suffixed generic copies (e.g. GENERIC-UK-SENIOR-ENGINEER_2)
+        # into their base generic record, summing allocations
+        import re as _re
+        base_generics = {}
+        merged_list = []
+        for person in staff_list:
+            pid = person["id"]
+            m = _re.match(r'^(GENERIC-.+?)_\d+$', pid)
+            if m:
+                base_pid = m.group(1)
+                if base_pid in base_generics:
+                    base = base_generics[base_pid]
+                    for period in person["allocated"]:
+                        base["allocated"][period]     = base["allocated"].get(period, 0) + person["allocated"].get(period, 0)
+                        base["fte"][period]            = base["fte"].get(period, 0) + person["fte"].get(period, 0)
+                        base["horizon_days"][period]   = base["horizon_days"].get(period, 0) + person["horizon_days"].get(period, 0)
+                        base["internal_days"][period]  = base["internal_days"].get(period, 0) + person["internal_days"].get(period, 0)
+                        base["opp_days"][period]       = base["opp_days"].get(period, 0) + person["opp_days"].get(period, 0)
+                        base["unlinked_days"][period]  = base["unlinked_days"].get(period, 0) + person["unlinked_days"].get(period, 0)
+                        base["al_ph_days"][period]     = base["al_ph_days"].get(period, 0) + person["al_ph_days"].get(period, 0)
+                        base["training_days"][period]  = base["training_days"].get(period, 0) + person["training_days"].get(period, 0)
+                        base["day_rel_days"][period]   = base["day_rel_days"].get(period, 0) + person["day_rel_days"].get(period, 0)
+                        base["no_record_days"][period] = base["no_record_days"].get(period, 0) + person["no_record_days"].get(period, 0)
+                    for p in person["projects"]:
+                        existing = next((x for x in base["projects"] if x["project_id"] == p["project_id"]), None)
+                        if existing:
+                            for period, days in p["days"].items():
+                                existing["days"][period] = existing["days"].get(period, 0) + days
+                        else:
+                            base["projects"].append(p)
+            else:
+                merged_list.append(person)
+                if pid.startswith("GENERIC-"):
+                    base_generics[pid] = person
 
-    # Merge suffixed generic copies (e.g. GENERIC-UK-SENIOR-ENGINEER_2)
-    # into their base generic record, summing allocations
-    import re as _re
-    base_generics = {}
-    merged_list = []
-    for person in staff_list:
-        pid = person["id"]
-        m = _re.match(r'^(GENERIC-.+?)_\d+$', pid)
-        if m:
-            base_pid = m.group(1)
-            if base_pid in base_generics:
-                base = base_generics[base_pid]
-                for period in person["allocated"]:
-                    base["allocated"][period]     = base["allocated"].get(period, 0) + person["allocated"].get(period, 0)
-                    base["fte"][period]            = base["fte"].get(period, 0) + person["fte"].get(period, 0)
-                    base["horizon_days"][period]   = base["horizon_days"].get(period, 0) + person["horizon_days"].get(period, 0)
-                    base["internal_days"][period]  = base["internal_days"].get(period, 0) + person["internal_days"].get(period, 0)
-                    base["opp_days"][period]       = base["opp_days"].get(period, 0) + person["opp_days"].get(period, 0)
-                    base["unlinked_days"][period]  = base["unlinked_days"].get(period, 0) + person["unlinked_days"].get(period, 0)
-                    base["al_ph_days"][period]     = base["al_ph_days"].get(period, 0) + person["al_ph_days"].get(period, 0)
-                    base["training_days"][period]  = base["training_days"].get(period, 0) + person["training_days"].get(period, 0)
-                    base["day_rel_days"][period]   = base["day_rel_days"].get(period, 0) + person["day_rel_days"].get(period, 0)
-                    base["no_record_days"][period] = base["no_record_days"].get(period, 0) + person["no_record_days"].get(period, 0)
-                for p in person["projects"]:
-                    existing = next((x for x in base["projects"] if x["project_id"] == p["project_id"]), None)
-                    if existing:
-                        for period, days in p["days"].items():
-                            existing["days"][period] = existing["days"].get(period, 0) + days
-                    else:
-                        base["projects"].append(p)
-        else:
-            merged_list.append(person)
-            if pid.startswith("GENERIC-"):
-                base_generics[pid] = person
+        staff_list = merged_list
 
-    staff_list = merged_list
+        # -- Projects ------------------------------------------------------------
+        # Query projects that have at least one RTC (i.e. are being worked on).
+        proj_rows = conn.execute("""
+            SELECT DISTINCT p.*, r.department, r.rtc_id,
+                   r.start_date, r.last_updated_at
+            FROM projects p
+            JOIN rtcs r ON r.project_id = p.project_id
+            WHERE r.is_archived = 0
+        """).fetchall()
 
-    # -- Projects ------------------------------------------------------------
-    # Query projects that have at least one RTC (i.e. are being worked on).
-    proj_rows = conn.execute("""
-        SELECT DISTINCT p.*, r.department, r.rtc_id,
-               r.start_date, r.last_updated_at
-        FROM projects p
-        JOIN rtcs r ON r.project_id = p.project_id
-        WHERE r.is_archived = 0
-    """).fetchall()
+        # Total allocated days per project per period (across all RTCs)
+        proj_days_map = {}  # (project_id, rtc_id) -> period_start -> days
+        for r in alloc_rows:
+            key = (r["project_id"], r["rtc_id"])
+            pd = proj_days_map.setdefault(key, {})
+            pd[r["period_start"]] = pd.get(r["period_start"], 0) + (r["days"] or 0)
 
-    # Total allocated days per project per period (across all RTCs)
-    proj_days_map = {}  # (project_id, rtc_id) -> period_start -> days
-    for r in alloc_rows:
-        key = (r["project_id"], r["rtc_id"])
-        pd = proj_days_map.setdefault(key, {})
-        pd[r["period_start"]] = pd.get(r["period_start"], 0) + (r["days"] or 0)
+        projects_list = []
+        for p in proj_rows:
+            project_id = p["project_id"]
+            proj_number = p["project_number"] or ""
+            task_order  = p["task_order_number"] or ""
 
-    projects_list = []
-    for p in proj_rows:
-        project_id = p["project_id"]
-        proj_number = p["project_number"] or ""
-        task_order  = p["task_order_number"] or ""
+            # Days per period
+            rtc_id_val = p["rtc_id"] if "rtc_id" in p.keys() else None
+            days_key   = (project_id, rtc_id_val)
+            period_days = {}
+            future_days = 0.0
+            today_ps    = date.today().replace(day=1).isoformat()
+            for period in periods:
+                ps    = period["period_start"]
+                label = period["label"]
+                d = round(proj_days_map.get(days_key, {}).get(ps, 0), 2)
+                period_days[label] = d
+                if ps >= today_ps:
+                    future_days += d
 
-        # Days per period
-        rtc_id_val = p["rtc_id"] if "rtc_id" in p.keys() else None
-        days_key   = (project_id, rtc_id_val)
-        period_days = {}
-        future_days = 0.0
-        today_ps    = date.today().replace(day=1).isoformat()
-        for period in periods:
-            ps    = period["period_start"]
-            label = period["label"]
-            d = round(proj_days_map.get(days_key, {}).get(ps, 0), 2)
-            period_days[label] = d
-            if ps >= today_ps:
-                future_days += d
+            # Horizon status based on project_status and project_type
+            _ptype   = (p["project_type"] or "").strip()
+            _pstat   = (p["project_status"] or "").strip().lower()
+            _pnum    = (p["project_number"] or "").strip()
+            _special = _pnum in {"ID-06", "ID-04", "IDUK-01"}
+            if _special:
+                horizon_status = "other"
+            elif _pstat == "active" and _ptype == "UK Direct":
+                horizon_status = "linked"
+            elif _pstat == "active" and _ptype == "UK Opportunity":
+                horizon_status = "opportunity"
+            elif _pstat == "active":
+                horizon_status = "other"
+            else:
+                horizon_status = "norecord"
 
-        # Horizon status based on project_status and project_type
-        _ptype   = (p["project_type"] or "").strip()
-        _pstat   = (p["project_status"] or "").strip().lower()
-        _pnum    = (p["project_number"] or "").strip()
-        _special = _pnum in {"ID-06", "ID-04", "IDUK-01"}
-        if _special:
-            horizon_status = "other"
-        elif _pstat == "active" and _ptype == "UK Direct":
-            horizon_status = "linked"
-        elif _pstat == "active" and _ptype == "UK Opportunity":
-            horizon_status = "opportunity"
-        elif _pstat == "active":
-            horizon_status = "other"
-        else:
-            horizon_status = "norecord"
+            projects_list.append({
+                "project_id":       project_id,
+                "rtc_id":           p["rtc_id"] if "rtc_id" in p.keys() else None,
+                "number":           proj_number,
+                "task_order":       task_order,
+                "display_project_number": display_number(proj_number),
+                "display_task_order":     display_number(task_order),
+                "is_placeholder_number":  (is_suffixed(proj_number) or
+                                           is_placeholder(proj_number)),
+                "name":             p["project_name"] or "No Horizon Record Found",
+                "task_name":        p["task_name"] or "No Horizon Record Found",
+                "organisation":     p["project_organisation"] or "No Horizon Record Found",
+                "horizon_status":   horizon_status,
+                "project_type":     p["project_type"] or "",
+                "department":       p["department"] if "department" in p.keys() else "",
+                "pm":               p["project_manager"],
+                "director":         p["project_director"],
+                "task_start_date":  p["task_start_date"],
+                "task_end_date":    p["task_end_date"],
+                "reporting_period": p["reporting_period"],
+                "start_date":       p["start_date"] if "start_date" in p.keys() else None,
+                "last_updated_at":  p["last_updated_at"] if "last_updated_at" in p.keys() else None,
+                "last_imported":    p["last_imported"],
+                "total_days":       period_days,
+                "future_days":      round(future_days, 2),
+            })
 
-        projects_list.append({
-            "project_id":       project_id,
-            "rtc_id":           p["rtc_id"] if "rtc_id" in p.keys() else None,
-            "number":           proj_number,
-            "task_order":       task_order,
-            "display_project_number": display_number(proj_number),
-            "display_task_order":     display_number(task_order),
-            "is_placeholder_number":  (is_suffixed(proj_number) or
-                                       is_placeholder(proj_number)),
-            "name":             p["project_name"] or "No Horizon Record Found",
-            "task_name":        p["task_name"] or "No Horizon Record Found",
-            "organisation":     p["project_organisation"] or "No Horizon Record Found",
-            "horizon_status":   horizon_status,
-            "project_type":     p["project_type"] or "",
-            "department":       p["department"] if "department" in p.keys() else "",
-            "pm":               p["project_manager"],
-            "director":         p["project_director"],
-            "task_start_date":  p["task_start_date"],
-            "task_end_date":    p["task_end_date"],
-            "reporting_period": p["reporting_period"],
-            "start_date":       p["start_date"] if "start_date" in p.keys() else None,
-            "last_updated_at":  p["last_updated_at"] if "last_updated_at" in p.keys() else None,
-            "last_imported":    p["last_imported"],
-            "total_days":       period_days,
-            "future_days":      round(future_days, 2),
-        })
+        # -- Assemble final payload ----------------------------------------------
+        summary = {
+            "generated_at":  generated_at,
+            "periods":       [p["label"] for p in periods],
+            "period_starts": [p["period_start"] for p in periods],
+            "bank_holidays": {p["label"]: sum(
+                1 for bh in conn.execute("SELECT date FROM bank_holidays").fetchall()
+                if bh["date"].startswith(p["period_start"][:7])
+            ) for p in periods},
+            "working_days":  working_days,
+            "staff":         staff_list,
+            "projects":      projects_list,
+            "departments":   _get_departments(conn),
+            "job_functions": _get_job_functions(conn),
+            "last_imports":  _get_last_imports(conn)
+        }
 
-    # -- Assemble final payload ----------------------------------------------
-    summary = {
-        "generated_at":  generated_at,
-        "periods":       [p["label"] for p in periods],
-        "period_starts": [p["period_start"] for p in periods],
-        "bank_holidays": {p["label"]: sum(
-            1 for bh in conn.execute("SELECT date FROM bank_holidays").fetchall()
-            if bh["date"].startswith(p["period_start"][:7])
-        ) for p in periods},
-        "working_days":  working_days,
-        "staff":         staff_list,
-        "projects":      projects_list,
-        "departments":   _get_departments(conn),
-        "job_functions": _get_job_functions(conn),
-        "last_imports":  _get_last_imports(conn)
-    }
-
-    # Write to cache table (single row, always cache_id=1)
-    payload_json = json.dumps(summary, default=str)
-    conn.execute("""
-        INSERT INTO summary_cache (cache_id, generated_at, payload)
-        VALUES (1, ?, ?)
-        ON CONFLICT(cache_id) DO UPDATE SET
-            generated_at = excluded.generated_at,
-            payload = excluded.payload
-    """, (generated_at, payload_json))
-    conn.commit()
-    conn.close()
+        # Write to cache table (single row, always cache_id=1)
+        payload_json = json.dumps(summary, default=str)
+        conn.execute("""
+            INSERT INTO summary_cache (cache_id, generated_at, payload)
+            VALUES (1, %s, %s)
+            ON CONFLICT(cache_id) DO UPDATE SET
+                generated_at = excluded.generated_at,
+                payload = excluded.payload
+        """, (generated_at, payload_json))
+        conn.commit()
+    finally:
+        conn.close()
 
     return summary
 
@@ -466,7 +468,7 @@ def _get_job_functions(conn):
     return [{"job_function": r["job_function"]} for r in rows]
 def _get_last_imports(conn):
     rows = conn.execute("""
-        SELECT import_type, MAX(completed_at) as last_run, SUM(errors != '[]') as had_errors
+        SELECT import_type, MAX(completed_at) as last_run, SUM(CASE WHEN errors != '[]' THEN 1 ELSE 0 END) as had_errors
         FROM import_log
         GROUP BY import_type
     """).fetchall()

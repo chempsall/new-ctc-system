@@ -37,20 +37,20 @@ def admin_delete_rtc(rtc_id):
     """Permanently deletes an RTC and all its allocations."""
     conn = database.get_connection()
     c    = conn.cursor()
-    rtc = c.execute("SELECT project_id FROM rtcs WHERE rtc_id = ?", (rtc_id,)).fetchone()
+    rtc = c.execute("SELECT project_id FROM rtcs WHERE rtc_id = %s", (rtc_id,)).fetchone()
     if not rtc:
         conn.close()
         return jsonify({"error": f"RTC {rtc_id} not found"}), 404
     project_id = rtc["project_id"]
-    c.execute("DELETE FROM allocations WHERE rtc_id = ?", (rtc_id,))
+    c.execute("DELETE FROM allocations WHERE rtc_id = %s", (rtc_id,))
     alloc_count = c.rowcount
-    c.execute("DELETE FROM rtcs WHERE rtc_id = ?", (rtc_id,))
+    c.execute("DELETE FROM rtcs WHERE rtc_id = %s", (rtc_id,))
     # Clean up orphaned placeholder project
-    other_refs = c.execute("SELECT COUNT(*) FROM rtcs WHERE project_id = ?", (project_id,)).fetchone()[0]
+    other_refs = c.execute("SELECT COUNT(*) AS n FROM rtcs WHERE project_id = %s", (project_id,)).fetchone()["n"]
     if other_refs == 0:
-        proj = c.execute("SELECT project_status FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+        proj = c.execute("SELECT project_status FROM projects WHERE project_id = %s", (project_id,)).fetchone()
         if proj and proj["project_status"] == "Placeholder":
-            c.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
+            c.execute("DELETE FROM projects WHERE project_id = %s", (project_id,))
     conn.commit()
     conn.close()
     summary_module.mark_dirty()
@@ -136,7 +136,7 @@ def admin_import_ctc():
     # Look up project — exact match only
     proj_row = c.execute("""
         SELECT project_id, project_name FROM projects
-        WHERE project_number = ? AND task_order_number = ?
+        WHERE project_number = %s AND task_order_number = %s
         AND project_status = 'Active'
     """, (proj_num, task_num)).fetchone()
 
@@ -144,7 +144,7 @@ def admin_import_ctc():
         project_id = proj_row["project_id"]
         # Check for existing RTC
         existing = c.execute(
-            "SELECT rtc_id FROM rtcs WHERE project_id = ?", (project_id,)
+            "SELECT rtc_id FROM rtcs WHERE project_id = %s", (project_id,)
         ).fetchone()
         if existing:
             conn.close()
@@ -158,19 +158,20 @@ def admin_import_ctc():
                 (project_number, task_order_number, project_name, task_name,
                  project_customer, project_director, project_manager,
                  project_status, last_imported)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'Pending', %s)
+            RETURNING project_id
         """, (proj_num, unique_task,
               proj_name or f"{proj_num} / {task_num}",
               task_name or "",
               customer, pd_clean, pm_clean, now))
-        project_id = c.lastrowid
+        project_id = c.fetchone()["project_id"]
 
     # Create RTC
     file_name = data.get("fileName", "")
     # Check if this filename has been imported before
     if file_name:
         existing_import = c.execute(
-            "SELECT rtc_id FROM rtcs WHERE source_file = ?", (file_name,)
+            "SELECT rtc_id FROM rtcs WHERE source_file = %s", (file_name,)
         ).fetchone()
         if existing_import:
             conn.close()
@@ -181,9 +182,10 @@ def admin_import_ctc():
             (project_id, department, start_date,
              created_by, created_at, last_updated_by, last_updated_at,
              is_archived, auto_linked, source_file)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0, %s)
+        RETURNING rtc_id
     """, (project_id, dept, first_alloc, user, now, user, now, file_name))
-    rtc_id = c.lastrowid
+    rtc_id = c.fetchone()["rtc_id"]
 
     # Ensure reporting periods cover the full range + 12 months
     _start  = date.fromisoformat(first_alloc)
@@ -196,7 +198,7 @@ def admin_import_ctc():
     # Get all periods from first_alloc to target
     periods = c.execute("""
         SELECT period_start FROM reporting_periods
-        WHERE period_start >= ? AND period_start <= ?
+        WHERE period_start >= %s AND period_start <= %s
         ORDER BY period_start
     """, (first_alloc, target.isoformat())).fetchall()
     period_starts = [p["period_start"] for p in periods]
@@ -217,15 +219,15 @@ def admin_import_ctc():
         # Ladder 1: exact name
         staff_row = c.execute("""
             SELECT horizon_person_number FROM staff
-            WHERE name = ? AND (end_date IS NULL OR end_date > ?)
+            WHERE name = %s AND (end_date IS NULL OR end_date > %s)
         """, (name, first_alloc)).fetchone()
 
         if not staff_row:
             # Ladder 2: case/whitespace-normalised exact
             staff_row = c.execute("""
                 SELECT horizon_person_number FROM staff
-                WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
-                AND (end_date IS NULL OR end_date > ?)
+                WHERE LOWER(TRIM(name)) = LOWER(TRIM(%s))
+                AND (end_date IS NULL OR end_date > %s)
             """, (name, first_alloc)).fetchone()
 
         if not staff_row:
@@ -237,8 +239,8 @@ def admin_import_ctc():
                 if surname and first_ini:
                     matches = c.execute("""
                         SELECT horizon_person_number FROM staff
-                        WHERE LOWER(name) LIKE LOWER(?)
-                        AND (end_date IS NULL OR end_date > ?)
+                        WHERE LOWER(name) LIKE LOWER(%s)
+                        AND (end_date IS NULL OR end_date > %s)
                     """, (f"{surname}, {first_ini}%", first_alloc)).fetchall()
                     if len(matches) == 1:
                         staff_row = matches[0]
@@ -261,9 +263,10 @@ def admin_import_ctc():
             except (ValueError, TypeError):
                 days = 0.0
             c.execute("""
-                INSERT OR IGNORE INTO allocations
+                INSERT INTO allocations
                     (horizon_person_number, rtc_id, period_start, days, last_updated)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
             """, (pid, rtc_id, period, days, now))
             if days > 0:
                 rows_added += 1
@@ -318,8 +321,8 @@ def admin_refresh_linked():
         if new_dept == row["department"]:
             continue  # no change — skip to avoid clobbering last_updated_at
         c.execute("""
-            UPDATE rtcs SET department = ?, last_updated_at = ?
-            WHERE rtc_id = ?
+            UPDATE rtcs SET department = %s, last_updated_at = %s
+            WHERE rtc_id = %s
         """, (new_dept, now, row["rtc_id"]))
         updated += 1
 
@@ -412,10 +415,10 @@ def admin_config():
     db_path = Path(config.BASE_DIR) / "data" / "resource_forecast.db"
     db_size = round(db_path.stat().st_size / 1024, 1) if db_path.exists() else 0
 
-    staff_count   = (c.execute("SELECT COUNT(*) FROM staff WHERE end_date IS NULL OR end_date >= date('now')").fetchone() or [0])[0]
-    rtc_count     = (c.execute("SELECT COUNT(*) FROM rtcs WHERE is_archived = 0").fetchone() or [0])[0]
-    project_count = (c.execute("SELECT COUNT(*) FROM projects").fetchone() or [0])[0]
-    bh_count      = (c.execute("SELECT COUNT(*) FROM bank_holidays").fetchone() or [0])[0]
+    staff_count   = c.execute("SELECT COUNT(*) AS n FROM staff WHERE end_date IS NULL OR end_date >= TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')").fetchone()["n"]
+    rtc_count     = c.execute("SELECT COUNT(*) AS n FROM rtcs WHERE is_archived = 0").fetchone()["n"]
+    project_count = c.execute("SELECT COUNT(*) AS n FROM projects").fetchone()["n"]
+    bh_count      = c.execute("SELECT COUNT(*) AS n FROM bank_holidays").fetchone()["n"]
     last_staff    = (c.execute("SELECT MAX(last_imported) FROM staff").fetchone() or [None])[0]
     last_par      = (c.execute("SELECT MAX(last_imported) FROM projects").fetchone() or [None])[0]
     conn.close()

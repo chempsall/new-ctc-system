@@ -72,8 +72,8 @@ def process_leavers():
         FROM staff s
         JOIN allocations a ON a.horizon_person_number = s.horizon_person_number
         WHERE s.end_date IS NOT NULL
-        AND s.end_date < ?
-        AND a.period_start >= ?
+        AND s.end_date < %s
+        AND a.period_start >= %s
         AND a.days > 0
     """, (actual_today, today)).fetchall()
 
@@ -96,8 +96,8 @@ def process_leavers():
             FROM allocations a
             JOIN rtcs r ON r.rtc_id = a.rtc_id
             JOIN projects p ON p.project_id = r.project_id
-            WHERE a.horizon_person_number = ?
-            AND a.period_start >= ?
+            WHERE a.horizon_person_number = %s
+            AND a.period_start >= %s
             AND a.days > 0
         """, (pid, today)).fetchall()
 
@@ -109,13 +109,13 @@ def process_leavers():
                 # Just zero out future rows — no replacement
                 c.execute("""
                     DELETE FROM allocations
-                    WHERE horizon_person_number = ? AND rtc_id = ?
-                    AND period_start >= ?
+                    WHERE horizon_person_number = %s AND rtc_id = %s
+                    AND period_start >= %s
                 """, (pid, rtc_id, today))
                 zeroed += c.rowcount
             elif base_gid:
                 # Transfer days to the base generic for this grade.
-                # The INSERT OR IGNORE + additive UPDATE pair below handles
+                # The insert-if-absent + additive UPDATE pair below handles
                 # both cases: generic already on the RTC (days accumulate)
                 # or not yet present (row created, then incremented).
                 gid = base_gid
@@ -123,31 +123,32 @@ def process_leavers():
                 # Get the leaver's future periods and days
                 future_rows = c.execute("""
                     SELECT period_start, days FROM allocations
-                    WHERE horizon_person_number = ? AND rtc_id = ?
-                    AND period_start >= ? AND days > 0
+                    WHERE horizon_person_number = %s AND rtc_id = %s
+                    AND period_start >= %s AND days > 0
                 """, (pid, rtc_id, today)).fetchall()
 
                 for row in future_rows:
                     period = row["period_start"]
                     days   = row["days"]
-                    # Add to generic (INSERT OR IGNORE then UPDATE)
+                    # Add to generic (insert-if-absent then UPDATE)
                     c.execute("""
-                        INSERT OR IGNORE INTO allocations
+                        INSERT INTO allocations
                             (horizon_person_number, rtc_id, period_start, days, last_updated)
-                        VALUES (?, ?, ?, 0, ?)
+                        VALUES (%s, %s, %s, 0, %s)
+                        ON CONFLICT DO NOTHING
                     """, (gid, rtc_id, period, now))
                     c.execute("""
                         UPDATE allocations
-                        SET days = days + ?, last_updated = ?
-                        WHERE horizon_person_number = ? AND rtc_id = ? AND period_start = ?
+                        SET days = days + %s, last_updated = %s
+                        WHERE horizon_person_number = %s AND rtc_id = %s AND period_start = %s
                     """, (days, now, gid, rtc_id, period))
                     transferred += 1
 
                 # Delete leaver's future rows
                 c.execute("""
                     DELETE FROM allocations
-                    WHERE horizon_person_number = ? AND rtc_id = ?
-                    AND period_start >= ?
+                    WHERE horizon_person_number = %s AND rtc_id = %s
+                    AND period_start >= %s
                 """, (pid, rtc_id, today))
                 zeroed += c.rowcount
             else:
@@ -155,9 +156,9 @@ def process_leavers():
                 logger.warning(f"Leaver {leaver['name']} ({pid}) has unknown grade "
                                f"{grade!r} — zeroing future rows without replacement")
                 c.execute("""
-                    UPDATE allocations SET days = 0, last_updated = ?
-                    WHERE horizon_person_number = ? AND rtc_id = ?
-                    AND period_start >= ?
+                    UPDATE allocations SET days = 0, last_updated = %s
+                    WHERE horizon_person_number = %s AND rtc_id = %s
+                    AND period_start >= %s
                 """, (now, pid, rtc_id, today))
                 zeroed += c.rowcount
 
@@ -198,31 +199,31 @@ def relink_pending_rtcs(conn=None):
 
         match = c.execute("""
             SELECT project_id FROM projects
-            WHERE project_number = ? AND task_order_number = ?
+            WHERE project_number = %s AND task_order_number = %s
             AND project_status = 'Active'
         """, (proj_num, task_num)).fetchone()
 
         if match:
             # Store old project_id for orphan cleanup
             old_proj_row = c.execute(
-                "SELECT project_id FROM rtcs WHERE rtc_id = ?", (rtc_id,)
+                "SELECT project_id FROM rtcs WHERE rtc_id = %s", (rtc_id,)
             ).fetchone()
             old_project_id = old_proj_row["project_id"] if old_proj_row else None
             c.execute("""
-                UPDATE rtcs SET project_id = ?, last_updated_at = ?,
+                UPDATE rtcs SET project_id = %s, last_updated_at = %s,
                                auto_linked = 1
-                WHERE rtc_id = ?
+                WHERE rtc_id = %s
             """, (match["project_id"], now, rtc_id))
             linked += 1
             # Delete orphan Pending project row if nothing else references it
             if old_project_id and old_project_id != match["project_id"]:
                 other_refs = c.execute(
-                    "SELECT COUNT(*) FROM rtcs WHERE project_id = ?",
+                    "SELECT COUNT(*) FROM rtcs WHERE project_id = %s",
                     (old_project_id,)
-                ).fetchone()[0]
+                ).fetchone()["n"]
                 if other_refs == 0:
                     c.execute(
-                        "DELETE FROM projects WHERE project_id = ? AND project_status = 'Pending'",
+                        "DELETE FROM projects WHERE project_id = %s AND project_status = 'Pending'",
                         (old_project_id,)
                     )
 
@@ -264,8 +265,8 @@ def refresh_linked_rtcs(conn=None):
         if new_dept == row["department"]:
             continue
         c.execute("""
-            UPDATE rtcs SET department = ?, last_updated_at = ?
-            WHERE rtc_id = ?
+            UPDATE rtcs SET department = %s, last_updated_at = %s
+            WHERE rtc_id = %s
         """, (new_dept, now, row["rtc_id"]))
         updated += c.rowcount
 
@@ -294,7 +295,7 @@ def archive_old_rtcs(conn=None):
     last_month_start = (now.date().replace(day=1) - timedelta(days=1)).replace(day=1).isoformat()
     last_month_end   = now.date().replace(day=1).isoformat()
 
-    special_ph = ",".join("?" * len(SPECIAL_PROJECT_NUMBERS))
+    special_ph = ",".join(["%s"] * len(SPECIAL_PROJECT_NUMBERS))
     eligible = c.execute(f"""
         SELECT r.rtc_id, p.project_number, p.project_name
         FROM rtcs r
@@ -303,18 +304,18 @@ def archive_old_rtcs(conn=None):
         AND p.project_number NOT IN ({special_ph})
         AND COALESCE((
             SELECT SUM(a.days) FROM allocations a
-            WHERE a.rtc_id = r.rtc_id AND a.period_start >= ?
+            WHERE a.rtc_id = r.rtc_id AND a.period_start >= %s
         ), 0) = 0
         AND COALESCE((
             SELECT SUM(a.days) FROM allocations a
             WHERE a.rtc_id = r.rtc_id
-            AND a.period_start >= ? AND a.period_start < ?
+            AND a.period_start >= %s AND a.period_start < %s
         ), 0) = 0
     """, (*sorted(SPECIAL_PROJECT_NUMBERS),
           today, last_month_start, last_month_end)).fetchall()
 
     for row in eligible:
-        c.execute("UPDATE rtcs SET is_archived = 1 WHERE rtc_id = ?", (row["rtc_id"],))
+        c.execute("UPDATE rtcs SET is_archived = 1 WHERE rtc_id = %s", (row["rtc_id"],))
     count = len(eligible)
 
     conn.commit()

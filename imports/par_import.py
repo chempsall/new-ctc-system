@@ -294,18 +294,18 @@ def _upsert_projects(data_rows, now):
 
         existing = c.execute("""
             SELECT project_id FROM projects
-            WHERE project_number = ? AND task_order_number = ?
+            WHERE project_number = %s AND task_order_number = %s
         """, (proj_num, task_num)).fetchone()
 
         if existing:
             c.execute("""
                 UPDATE projects SET
-                    project_type=?, project_name=?, task_name=?,
-                    project_organisation=?, project_customer=?,
-                    project_status=?, project_director=?, project_manager=?,
-                    task_start_date=?, task_end_date=?, reporting_period=?,
-                    last_imported=?
-                WHERE project_id=?
+                    project_type=%s, project_name=%s, task_name=%s,
+                    project_organisation=%s, project_customer=%s,
+                    project_status=%s, project_director=%s, project_manager=%s,
+                    task_start_date=%s, task_end_date=%s, reporting_period=%s,
+                    last_imported=%s
+                WHERE project_id=%s
             """, vals + (existing["project_id"],))
             updated += 1
         else:
@@ -317,7 +317,7 @@ def _upsert_projects(data_rows, now):
                     project_director, project_manager,
                     task_start_date, task_end_date, reporting_period,
                     last_imported
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (proj_num, task_num) + vals)
             inserted += 1
 
@@ -389,7 +389,7 @@ def _log(filename, started_at, processed, inserted, updated, errors):
             INSERT INTO import_log
                 (import_type, filename, started_at, completed_at,
                  rows_processed, rows_inserted, rows_updated, errors)
-            VALUES (?,?,?,?,?,?,?,?)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
         """, (result["import_type"], result["filename"],
               result["started_at"], result["completed_at"],
               result["rows_processed"], result["rows_inserted"],

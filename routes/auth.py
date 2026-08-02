@@ -27,9 +27,9 @@ def _active_staff(conn):
     return conn.execute("""
         SELECT horizon_person_number, name, job_title
         FROM staff
-        WHERE horizon_person_number NOT LIKE 'GENERIC-%'
-        AND (end_date IS NULL OR end_date > ?)
-        AND (start_date IS NULL OR start_date <= ?)
+        WHERE horizon_person_number NOT LIKE 'GENERIC-%%'
+        AND (end_date IS NULL OR end_date > %s)
+        AND (start_date IS NULL OR start_date <= %s)
         ORDER BY name
     """, (today, today)).fetchall()
 
@@ -48,9 +48,9 @@ def login_submit():
     conn = database.get_connection()
     row = conn.execute("""
         SELECT horizon_person_number, name FROM staff
-        WHERE horizon_person_number = ?
-        AND horizon_person_number NOT LIKE 'GENERIC-%'
-        AND (end_date IS NULL OR end_date > date('now'))
+        WHERE horizon_person_number = %s
+        AND horizon_person_number NOT LIKE 'GENERIC-%%'
+        AND (end_date IS NULL OR end_date > TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD'))
     """, (pid,)).fetchone()
 
     if not row:

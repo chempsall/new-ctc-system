@@ -45,19 +45,15 @@ BASE_DIR = Path(os.environ.get("RF_BASE_DIR", Path(__file__).parent.resolve()))
 # ---------------------------------------------------------------------------
 # Development: SQLite file in the data/ subfolder
 # Beta/Production: Set RF_DATABASE_URL to a connection string.
-#   SQLite:   sqlite:///path/to/file.db
-#   Postgres: postgresql://user:pass@host/dbname  (future)
+#   postgresql://user:pass@host:5432/dbname
 DATABASE_URL = os.environ.get(
     "RF_DATABASE_URL",
-    f"sqlite:///{BASE_DIR / 'data' / 'resource_forecast.db'}"
+    "postgresql://rft@localhost:5432/resource_forecast"
 )
 
-# Convenience: extracted path for SQLite usage
-# Will be None if DATABASE_URL points to a non-SQLite database
-if DATABASE_URL.startswith("sqlite:///"):
-    SQLITE_PATH = Path(DATABASE_URL[len("sqlite:///"):])
-else:
-    SQLITE_PATH = None
+# The application now requires PostgreSQL.
+#   e.g. postgresql://rft_user:password@localhost:5432/resource_forecast
+# (SQLITE_PATH removed with the SQLite -> PostgreSQL migration.)
 
 # ---------------------------------------------------------------------------
 # Flask
@@ -180,10 +176,10 @@ def validate():
                 "RF_SECRET_KEY must be set to a secure random value in beta and production."
             )
 
-    if SQLITE_PATH and not SQLITE_PATH.parent.exists():
+    if not DATABASE_URL.startswith("postgresql"):
         errors.append(
-            f"Database directory does not exist: {SQLITE_PATH.parent}\n"
-            f"Create it with: mkdir {SQLITE_PATH.parent}"
+            "RF_DATABASE_URL must be a postgresql:// connection string, "
+            f"got: {DATABASE_URL!r}"
         )
 
     if errors:
@@ -193,11 +189,17 @@ def validate():
         )
 
 
+def _masked_database_url():
+    """DATABASE_URL with any password replaced for safe display."""
+    import re
+    return re.sub(r"://([^:/@]+):[^@]+@", r"://\1:****@", DATABASE_URL)
+
+
 def summary():
     """Print a human-readable config summary (without secrets)."""
     print(f"  Environment      : {ENV}")
     print(f"  Base directory   : {BASE_DIR}")
-    print(f"  Database         : {DATABASE_URL if not SQLITE_PATH else SQLITE_PATH}")
+    print(f"  Database         : {_masked_database_url()}")
     print(f"  Flask            : {FLASK_HOST}:{FLASK_PORT} (debug={FLASK_DEBUG})")
     print(f"  Admin token      : {'set' if ADMIN_TOKEN else 'NOT SET'}")
     print(f"  Staff list       : {STAFF_LIST_PATH}")
