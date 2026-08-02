@@ -171,17 +171,17 @@ def run(file_path: str) -> dict:
             job_function = _job_function_from_title(job_title)
 
         existing = c.execute(
-            "SELECT horizon_person_number FROM staff WHERE horizon_person_number = %s",
+            "SELECT horizon_person_number FROM staff WHERE horizon_person_number = ?",
             (horizon_id,)
         ).fetchone()
 
         if existing:
             c.execute("""
                 UPDATE staff SET
-                    name=%s, job_title=%s, job_function=%s,
-                    department=%s, availability=%s, start_date=%s,
-                    end_date=%s, line_manager=%s, last_imported=%s
-                WHERE horizon_person_number=%s
+                    name=?, job_title=?, job_function=?,
+                    department=?, availability=?, start_date=?,
+                    end_date=?, line_manager=?, last_imported=?
+                WHERE horizon_person_number=?
             """, (name, job_title, job_function,
                   department, availability, start_date,
                   end_date, line_manager, now, horizon_id))
@@ -192,7 +192,7 @@ def run(file_path: str) -> dict:
                     horizon_person_number, name, job_title,
                     job_function, department, availability,
                     start_date, end_date, line_manager, last_imported
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
             """, (horizon_id, name, job_title,
                   job_function, department, availability,
                   start_date, end_date, line_manager, now))
@@ -224,7 +224,7 @@ def _log(file_path, started_at, processed, inserted, updated, skipped, errors):
             INSERT INTO import_log
                 (import_type, filename, started_at, completed_at,
                  rows_processed, rows_inserted, rows_updated, errors)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (?,?,?,?,?,?,?,?)
         """, (result["import_type"], result["filename"],
               result["started_at"], result["completed_at"],
               result["rows_processed"], result["rows_inserted"],

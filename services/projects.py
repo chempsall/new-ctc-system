@@ -61,7 +61,7 @@ def get_or_create_project(cursor, data: dict, now: str) -> int:
     if not is_placeholder(proj_num) and task_order:
         row = cursor.execute("""
             SELECT project_id FROM projects
-            WHERE project_number = %s AND task_order_number = %s
+            WHERE project_number = ? AND task_order_number = ?
         """, (proj_num, task_order)).fetchone()
         if row:
             return row["project_id"]
@@ -78,7 +78,7 @@ def get_or_create_project(cursor, data: dict, now: str) -> int:
                 project_name, task_name,
                 project_customer, project_director, project_manager,
                 project_status, last_imported
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ) VALUES (?,?,?,?,?,?,?,?,?)
             ON CONFLICT(project_number, task_order_number) DO UPDATE SET
                 last_imported = excluded.last_imported
         """, (
@@ -92,7 +92,7 @@ def get_or_create_project(cursor, data: dict, now: str) -> int:
         ))
         row = cursor.execute("""
             SELECT project_id FROM projects
-            WHERE project_number = %s AND task_order_number = %s
+            WHERE project_number = ? AND task_order_number = ?
         """, (proj_num, task_order)).fetchone()
         return row["project_id"]
 
@@ -108,7 +108,7 @@ def get_or_create_project(cursor, data: dict, now: str) -> int:
             project_customer,
             project_director, project_manager,
             project_status, last_imported
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        ) VALUES (?,?,?,?,?,?,?,?,?)
     """, (
         unique_proj, unique_task,
         data.get("project_name",     "Placeholder \u2014 awaiting Horizon record"),
@@ -120,6 +120,6 @@ def get_or_create_project(cursor, data: dict, now: str) -> int:
     ))
     row = cursor.execute("""
         SELECT project_id FROM projects
-        WHERE project_number = %s AND task_order_number = %s
+        WHERE project_number = ? AND task_order_number = ?
     """, (unique_proj, unique_task)).fetchone()
     return row["project_id"]

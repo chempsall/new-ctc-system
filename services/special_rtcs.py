@@ -47,14 +47,14 @@ def ensure_special_projects(c, now):
     for cfg in SPECIAL_RTC_CONFIGS:
         existing = c.execute("""
             SELECT project_id FROM projects
-            WHERE project_number = %s AND task_order_number = %s
+            WHERE project_number = ? AND task_order_number = ?
         """, (cfg["project_number"], cfg["task_order"])).fetchone()
         if not existing:
             c.execute("""
                 INSERT INTO projects
                     (project_number, task_order_number, project_name, task_name,
                      project_status, project_type, last_imported)
-                VALUES (%s, %s, %s, %s, 'Active', 'UK Indirect', %s)
+                VALUES (?, ?, ?, ?, 'Active', 'UK Indirect', ?)
             """, (cfg["project_number"], cfg["task_order"],
                   cfg["name"], cfg["name"], now))
 
@@ -63,10 +63,10 @@ def get_bank_holidays(c, period_start):
     """Number of cached bank holidays falling in the given month."""
     year, month, _ = period_start.split("-")
     rows = c.execute("""
-        SELECT COUNT(*) AS n FROM bank_holidays
-        WHERE date LIKE %s
+        SELECT COUNT(*) FROM bank_holidays
+        WHERE date LIKE ?
     """, (f"{year}-{month}-%",)).fetchone()
-    return rows["n"] if rows else 0
+    return rows[0] if rows else 0
 
 
 def fetch_bank_holidays(c, now):
@@ -77,14 +77,11 @@ def fetch_bank_holidays(c, now):
         holidays = bh_import.fetch()
         for date_iso, days in holidays.items():
             c.execute("""
-                INSERT INTO bank_holidays (date, days, last_updated)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (date) DO UPDATE SET
-                    days = EXCLUDED.days, last_updated = EXCLUDED.last_updated
+                INSERT OR REPLACE INTO bank_holidays (date, days, last_updated)
+                VALUES (?, ?, ?)
             """, (date_iso, days, now))
         logger.info(f"Bank holidays: cached {len(holidays)} entries")
     except Exception as e:
-        c.connection.rollback()
         logger.error(f"Failed to fetch bank holidays: {e}")
 
 
@@ -110,7 +107,7 @@ def run_special_rtc_maintenance():
         SELECT DISTINCT department FROM staff
         WHERE department IS NOT NULL
         AND department != '_GENERIC'
-        AND (end_date IS NULL OR end_date > %s)
+        AND (end_date IS NULL OR end_date > ?)
     """, (current_period,)).fetchall()]
 
     rtcs_created   = 0
@@ -121,7 +118,7 @@ def run_special_rtc_maintenance():
         for cfg in SPECIAL_RTC_CONFIGS:
             proj = c.execute("""
                 SELECT project_id FROM projects
-                WHERE project_number = %s AND task_order_number = %s
+                WHERE project_number = ? AND task_order_number = ?
             """, (cfg["project_number"], cfg["task_order"])).fetchone()
             if not proj:
                 continue
@@ -129,7 +126,7 @@ def run_special_rtc_maintenance():
 
             rtc = c.execute("""
                 SELECT rtc_id FROM rtcs
-                WHERE project_id = %s AND department = %s AND is_archived = 0
+                WHERE project_id = ? AND department = ? AND is_archived = 0
             """, (project_id, dept)).fetchone()
 
             if not rtc:
@@ -139,10 +136,9 @@ def run_special_rtc_maintenance():
                         (project_id, department, start_date,
                          created_by, created_at, last_updated_by, last_updated_at,
                          is_archived, auto_linked)
-                    VALUES (%s, %s, %s, 'System', %s, 'System', %s, 0, 0)
-                    RETURNING rtc_id
+                    VALUES (?, ?, ?, 'System', ?, 'System', ?, 0, 0)
                 """, (project_id, dept, current_period, now, now))
-                rtc_id = c.fetchone()["rtc_id"]
+                rtc_id = c.lastrowid
                 rtcs_created += 1
             else:
                 rtc_id = rtc["rtc_id"]
@@ -151,21 +147,21 @@ def run_special_rtc_maintenance():
             grade_filter = ""
             params = [dept, current_period]
             if cfg["grades"]:
-                placeholders = ",".join(["%s"] * len(cfg["grades"]))
+                placeholders = ",".join("?" * len(cfg["grades"]))
                 grade_filter = f"AND SUBSTR(job_title, 1, 2) IN ({placeholders})"
                 params.extend(cfg["grades"])
 
             staff_rows = c.execute(f"""
                 SELECT horizon_person_number FROM staff
-                WHERE department = %s
-                AND (end_date IS NULL OR end_date > %s)
-                AND NOT horizon_person_number LIKE 'GENERIC-%%'
+                WHERE department = ?
+                AND (end_date IS NULL OR end_date > ?)
+                AND NOT horizon_person_number LIKE 'GENERIC-%'
                 {grade_filter}
             """, params).fetchall()
 
             periods = c.execute("""
                 SELECT period_start FROM reporting_periods
-                WHERE period_start >= %s AND period_start <= %s
+                WHERE period_start >= ? AND period_start <= ?
                 ORDER BY period_start
             """, (current_period, future_end.isoformat())).fetchall()
             period_list = [p["period_start"] for p in periods]
@@ -183,10 +179,9 @@ def run_special_rtc_maintenance():
                 for period in period_list:
                     days = bh_by_period[period]
                     c.execute("""
-                        INSERT INTO allocations
+                        INSERT OR IGNORE INTO allocations
                             (horizon_person_number, rtc_id, period_start, days, last_updated)
-                        VALUES (%s, %s, %s, %s, %s)
-                        ON CONFLICT DO NOTHING
+                        VALUES (?, ?, ?, ?, ?)
                     """, (pid, rtc_id, period, days, now))
                     if c.rowcount:
                         staff_added += 1
@@ -195,7 +190,7 @@ def run_special_rtc_maintenance():
 
             c.execute("""
                 DELETE FROM allocations
-                WHERE rtc_id = %s AND period_start < %s
+                WHERE rtc_id = ? AND period_start < ?
             """, (rtc_id, cutoff_period))
 
     conn.commit()

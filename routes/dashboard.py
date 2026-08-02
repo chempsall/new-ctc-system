@@ -81,7 +81,7 @@ def api_teams():
         rows = conn.execute("""
             SELECT DISTINCT job_function
             FROM staff
-            WHERE job_function IS NOT NULL AND department = %s
+            WHERE job_function IS NOT NULL AND department = ?
             ORDER BY job_function
         """, (department,)).fetchall()
     else:
@@ -107,8 +107,8 @@ def api_staff():
             SELECT horizon_person_number, name, job_title,
                    job_function, department
             FROM staff
-            WHERE department = %s AND (end_date IS NULL OR end_date > %s)
-            AND horizon_person_number NOT LIKE 'GENERIC-%%!_%%' ESCAPE '!'
+            WHERE department = ? AND (end_date IS NULL OR end_date > ?)
+            AND horizon_person_number NOT GLOB 'GENERIC-*_*'
             ORDER BY name
         """, (department, today)).fetchall()
     else:
@@ -116,8 +116,8 @@ def api_staff():
             SELECT horizon_person_number, name, job_title,
                    job_function, department
             FROM staff
-            WHERE (end_date IS NULL OR end_date > %s)
-            AND horizon_person_number NOT LIKE 'GENERIC-%%!_%%' ESCAPE '!'
+            WHERE (end_date IS NULL OR end_date > ?)
+            AND horizon_person_number NOT GLOB 'GENERIC-*_*'
             ORDER BY name
         """, (today,)).fetchall()
     conn.close()
@@ -151,7 +151,7 @@ def api_project():
                project_manager, project_status, project_type,
                task_start_date, task_end_date
         FROM projects
-        WHERE project_number = %s AND task_order_number = %s
+        WHERE project_number = ? AND task_order_number = ?
         AND project_status NOT IN ('Placeholder', 'Pending')
     """, (project_number, task_order_number)).fetchone()
 
@@ -167,7 +167,7 @@ def api_project():
                project_organisation, project_customer, project_director,
                project_manager, project_status, project_type
         FROM projects
-        WHERE project_number = %s
+        WHERE project_number = ?
         AND project_status NOT IN ('Placeholder', 'Pending')
         ORDER BY last_imported DESC
         LIMIT 1

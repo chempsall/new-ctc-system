@@ -1,93 +1,30 @@
 """
 database.py
-Creates and initialises the PostgreSQL database.
-Connection configuration comes from config.py (RF_DATABASE_URL).
+Creates and initialises the SQLite database.
+All path configuration comes from config.py.
 
-Run directly to create a fresh schema:
+Run directly to create a fresh database:
     python database.py
 """
 
-import psycopg2
-import psycopg2.extras
+import sqlite3
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 import config
 
-DATABASE_URL = config.DATABASE_URL
-
-
-class ChainableCursor(psycopg2.extras.RealDictCursor):
-    """
-    RealDictCursor whose execute()/executemany() return the cursor itself,
-    matching sqlite3's chainable convention:
-
-        c.execute(sql, params).fetchone()
-
-    psycopg2 cursors return None from execute(), which breaks every
-    chained call site in the codebase; this restores the contract.
-    """
-
-    def execute(self, sql, params=None):
-        # params must stay None when absent: psycopg2 only %-interpolates
-        # when a params sequence is supplied, and no-param queries may
-        # legitimately contain literal % (e.g. LIKE 'GENERIC-%').
-        super().execute(sql, params)
-        return self
-
-    def executemany(self, sql, seq):
-        super().executemany(sql, seq)
-        return self
-
-
-class Connection:
-    """
-    Thin wrapper around a psycopg2 connection that preserves the
-    sqlite3 calling convention used throughout the codebase:
-
-        conn.execute(sql, params).fetchall()
-        c = conn.cursor(); c.execute(sql, params).fetchone()
-
-    psycopg2 connections have no .execute() — only cursors do — so this
-    wrapper creates a cursor per execute() call and returns it. All
-    cursors are ChainableCursor (a RealDictCursor), so both the chained
-    calling style and row["column_name"] access work exactly as sqlite3
-    Row/Cursor did.
-    """
-
-    def __init__(self, raw):
-        self._raw = raw
-
-    def cursor(self):
-        return self._raw.cursor(cursor_factory=ChainableCursor)
-
-    def execute(self, sql, params=None):
-        cur = self.cursor()
-        cur.execute(sql, params)
-        return cur
-
-    def commit(self):
-        self._raw.commit()
-
-    def rollback(self):
-        self._raw.rollback()
-
-    def close(self):
-        self._raw.close()
-
-    @property
-    def closed(self):
-        return self._raw.closed
+DB_PATH = config.SQLITE_PATH
 
 
 def get_connection():
-    if not DATABASE_URL or not DATABASE_URL.startswith("postgresql"):
-        raise RuntimeError(
-            "RF_DATABASE_URL must be a postgresql:// connection string. "
-            f"Current value: {DATABASE_URL!r}"
-        )
-    raw = psycopg2.connect(DATABASE_URL,
-                           cursor_factory=psycopg2.extras.RealDictCursor)
-    return Connection(raw)
+    if DB_PATH is None:
+        raise RuntimeError("SQLITE_PATH is not set. Check RF_DATABASE_URL in .env")
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
 
 
 from contextlib import contextmanager
@@ -95,30 +32,26 @@ from contextlib import contextmanager
 @contextmanager
 def db():
     """Context manager for database connections.
-    Rolls back on error (a psycopg2 connection that hits an error is in
-    an aborted state until rollback) and always closes.
+    Ensures connections are always closed even if an exception occurs.
     Usage: with db() as conn:
     """
     conn = get_connection()
     try:
         yield conn
-    except Exception:
-        conn.rollback()
-        raise
     finally:
         conn.close()
-
 
 def ensure_periods_through(conn, target_date):
     """
     Extend reporting_periods so that target_date's month exists.
-    Safe to call multiple times — uses ON CONFLICT DO NOTHING.
+    Safe to call multiple times — uses INSERT OR IGNORE.
     """
     from datetime import date as _date
     from dateutil.relativedelta import relativedelta as _rd
     c = conn.cursor()
-    c.execute("SELECT MAX(period_start) AS m FROM reporting_periods")
-    last = c.fetchone()["m"]
+    last = c.execute(
+        "SELECT MAX(period_start) FROM reporting_periods"
+    ).fetchone()[0]
     current = (_date.fromisoformat(last) + _rd(months=1)) if last \
               else _date.today().replace(day=1)
     if isinstance(target_date, str):
@@ -126,10 +59,9 @@ def ensure_periods_through(conn, target_date):
     target = target_date.replace(day=1)
     while current <= target:
         nxt = current + _rd(months=1)
-        c.execute("""INSERT INTO reporting_periods
+        c.execute("""INSERT OR IGNORE INTO reporting_periods
                      (period_start, period_end, working_days, label)
-                     VALUES (%s,%s,%s,%s)
-                     ON CONFLICT DO NOTHING""",
+                     VALUES (?,?,?,?)""",
                   (current.isoformat(),
                    (nxt - timedelta(days=1)).isoformat(),
                    25 if current.month in {1, 4, 7, 10} else 20,
@@ -137,20 +69,19 @@ def ensure_periods_through(conn, target_date):
         current = nxt
     conn.commit()
 
-
 def _ensure_column(c, table, column, decl):
     """Add a column to an existing table if it does not already exist.
     Safe to call repeatedly — idempotent.
     """
-    c.execute("""
-        SELECT column_name FROM information_schema.columns
-        WHERE table_name = %s AND column_name = %s
-    """, (table, column))
-    if not c.fetchone():
+    cols = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+    if column not in cols:
         c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
 
 def initialise_database():
+    if DB_PATH is None:
+        raise RuntimeError("No SQLite path configured.")
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = get_connection()
     c = conn.cursor()
 
@@ -184,7 +115,7 @@ def initialise_database():
     # Used for joiners, leavers, and temporary part-time arrangements.
     c.execute("""
         CREATE TABLE IF NOT EXISTS staff_availability (
-            id                      SERIAL PRIMARY KEY,
+            id                      INTEGER PRIMARY KEY AUTOINCREMENT,
             horizon_person_number   TEXT NOT NULL REFERENCES staff(horizon_person_number),
             period_start            TEXT NOT NULL,
             availability_fraction   REAL NOT NULL,
@@ -195,10 +126,11 @@ def initialise_database():
     # ------------------------------------------------------------------
     # PROJECTS
     # Pure Horizon/PAR project identity data.
+    # No financial figures, no department or team columns here.
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS projects (
-            project_id              SERIAL  PRIMARY KEY,
+            project_id              INTEGER PRIMARY KEY AUTOINCREMENT,
             project_number          TEXT    NOT NULL,
             task_order_number       TEXT    NOT NULL,
             project_type            TEXT,
@@ -219,13 +151,29 @@ def initialise_database():
 
     # ------------------------------------------------------------------
     # RTCs  (Resource to Complete)
-    # One row per RTC — one team's resourcing engagement with a
-    # project/task, entered directly via the web interface.
-    # Archived RTCs are hidden by default but never deleted.
+    # One row per RTC. Represents one team's resourcing engagement
+    # with a project/task, entered directly via the web interface.
+    #
+    # Identity notes:
+    #   - rtc_id is the sole, server-assigned identity. No GUIDs, no
+    #     file paths, no external identifiers. Clean and unambiguous.
+    #   - created_by / last_updated_by / last_opened_by are all set
+    #     from get_current_user() in app.py, which is a lightweight
+    #     placeholder now and will be replaced with proper corporate
+    #     auth (e.g. Microsoft SSO) when the system moves to the
+    #     WSP corporate environment.
+    #
+    # Status / lifecycle:
+    #   - last_opened is updated every time any user loads the RTC.
+    #     An RTC not opened in 30+ days is considered "needs review".
+    #   - is_archived is set by the admin Supersede action, which
+    #     targets RTCs with no future allocations AND last_opened
+    #     more than 30 days ago. Archived RTCs are hidden by default
+    #     but never deleted — their data is permanently preserved.
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS rtcs (
-            rtc_id          SERIAL  PRIMARY KEY,
+            rtc_id          INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id      INTEGER NOT NULL REFERENCES projects(project_id),
             department      TEXT    NOT NULL,
             start_date      TEXT    NOT NULL,
@@ -251,7 +199,7 @@ def initialise_database():
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS allocations (
-            allocation_id           SERIAL  PRIMARY KEY,
+            allocation_id           INTEGER PRIMARY KEY AUTOINCREMENT,
             horizon_person_number   TEXT    NOT NULL REFERENCES staff(horizon_person_number),
             rtc_id                  INTEGER NOT NULL REFERENCES rtcs(rtc_id) ON DELETE CASCADE,
             period_start            TEXT    NOT NULL,
@@ -267,7 +215,7 @@ def initialise_database():
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS reporting_periods (
-            period_id       SERIAL PRIMARY KEY,
+            period_id       INTEGER PRIMARY KEY AUTOINCREMENT,
             period_start    TEXT NOT NULL UNIQUE,
             period_end      TEXT NOT NULL,
             working_days    INTEGER NOT NULL,
@@ -280,7 +228,7 @@ def initialise_database():
     # ------------------------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS import_log (
-            log_id          SERIAL  PRIMARY KEY,
+            log_id          INTEGER PRIMARY KEY AUTOINCREMENT,
             import_type     TEXT    NOT NULL,
             filename        TEXT,
             started_at      TEXT    NOT NULL,
@@ -315,7 +263,7 @@ def initialise_database():
         ON allocations(horizon_person_number, period_start)
     """)
 
-    # Column migrations — no-ops on a fresh schema, safe on an old one
+    # Column migrations — safe for pre-existing databases
     _ensure_column(c, "rtcs", "notes",       "TEXT")
     _ensure_column(c, "rtcs", "source_file", "TEXT")
     _ensure_column(c, "rtcs", "auto_linked", "INTEGER NOT NULL DEFAULT 0")
@@ -331,12 +279,12 @@ def initialise_database():
             last_updated TEXT
         )
     """)
-
+    
     _seed_reporting_periods(c)
     _seed_generic_staff(c)
     conn.commit()
     conn.close()
-    print(f"Database initialised ({DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'postgresql'})")
+    print(f"Database initialised at {DB_PATH}")
 
 
 def _seed_reporting_periods(c):
@@ -347,10 +295,9 @@ def _seed_reporting_periods(c):
         m   = current.month
         nxt = current + relativedelta(months=1)
         c.execute("""
-            INSERT INTO reporting_periods
+            INSERT OR IGNORE INTO reporting_periods
                 (period_start, period_end, working_days, label)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
+            VALUES (?, ?, ?, ?)
         """, (current.isoformat(), (nxt - timedelta(days=1)).isoformat(),
               25 if m in QUARTER_START else 20,
               current.strftime("%b-%Y")))
@@ -380,11 +327,10 @@ def _seed_generic_staff(c):
     ]
     for horizon_id, name, job_title in generics:
         c.execute("""
-            INSERT INTO staff (
+            INSERT OR IGNORE INTO staff (
                 horizon_person_number, name, job_title,
                 job_function, department, availability, last_imported
-            ) VALUES (%s, %s, %s, 'Generic', '_GENERIC', 1.0, 'seeded')
-            ON CONFLICT DO NOTHING
+            ) VALUES (?, ?, ?, 'Generic', '_GENERIC', 1.0, 'seeded')
         """, (horizon_id, name, job_title))
 
 
