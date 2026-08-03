@@ -1,4 +1,7 @@
-CTCs should be editable from the Projects slider - the same way as they are from the RTC page.
+I think it's time you examined the repo and had a good look through the code. You should focus on "dead" code (leftover from earlier development versions), concurrency issues, and speed.
+
+
+
 
 Can we have a HR extract for staff_list and what would it look like?
 
