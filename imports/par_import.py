@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import get_connection
 import config
 
+from psycopg2.extras import execute_values
 
 # ---------------------------------------------------------------------------
 # Column mapping: our field name -> PAR column header
@@ -266,21 +267,28 @@ def _parse_workbook(wb_source):
 # ---------------------------------------------------------------------------
 
 def _upsert_projects(data_rows, now):
-    """Upsert all rows into projects table. Returns (inserted, updated, errors)."""
-    conn     = get_connection()
-    c        = conn.cursor()
-    inserted = updated = 0
-    errors   = []
+    """Upsert all rows into projects table. Returns (inserted, updated, errors).
+
+    Batched with execute_values + ON CONFLICT DO UPDATE. Rows are de-duplicated
+    by (project_number, task_order_number) keeping the LAST occurrence, which
+    matches the old row-by-row 'last write wins' behaviour and avoids
+    ON CONFLICT's 'cannot affect row a second time' error when the PAR file
+    contains the same project/task on more than one line. Inserted vs updated
+    is counted from RETURNING xmax (0 = fresh insert).
+    """
+    conn   = get_connection()
+    c      = conn.cursor()
+    errors = []
+    by_key = {}   # (proj, task) -> tuple; later rows overwrite earlier (last wins)
 
     for d in data_rows + INDIRECT_ROWS:
         proj_num = _clean(d.get("project_number"))
         task_num = _clean(d.get("task_number"))
-
         if not proj_num or not task_num:
             errors.append("Skipped: missing project_number or task_number")
             continue
-
-        vals = (
+        by_key[(proj_num, task_num)] = (
+            proj_num, task_num,
             _clean(d.get("project_type")),
             _clean(d.get("project_name")),
             _clean(d.get("task_name")),
@@ -295,34 +303,38 @@ def _upsert_projects(data_rows, now):
             now,
         )
 
-        existing = c.execute("""
-            SELECT project_id FROM projects
-            WHERE project_number = %s AND task_order_number = %s
-        """, (proj_num, task_num)).fetchone()
+    tuples = list(by_key.values())
+    if not tuples:
+        conn.close()
+        return 0, 0, errors
 
-        if existing:
-            c.execute("""
-                UPDATE projects SET
-                    project_type=%s, project_name=%s, task_name=%s,
-                    project_organisation=%s, project_customer=%s,
-                    project_status=%s, project_director=%s, project_manager=%s,
-                    task_start_date=%s, task_end_date=%s, reporting_period=%s,
-                    last_imported=%s
-                WHERE project_id=%s
-            """, vals + (existing["project_id"],))
-            updated += 1
-        else:
-            c.execute("""
-                INSERT INTO projects (
-                    project_number, task_order_number,
-                    project_type, project_name, task_name,
-                    project_organisation, project_customer, project_status,
-                    project_director, project_manager,
-                    task_start_date, task_end_date, reporting_period,
-                    last_imported
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (proj_num, task_num) + vals)
-            inserted += 1
+    result = execute_values(c, """
+        INSERT INTO projects (
+            project_number, task_order_number,
+            project_type, project_name, task_name,
+            project_organisation, project_customer, project_status,
+            project_director, project_manager,
+            task_start_date, task_end_date, reporting_period,
+            last_imported
+        ) VALUES %s
+        ON CONFLICT (project_number, task_order_number) DO UPDATE SET
+            project_type=EXCLUDED.project_type,
+            project_name=EXCLUDED.project_name,
+            task_name=EXCLUDED.task_name,
+            project_organisation=EXCLUDED.project_organisation,
+            project_customer=EXCLUDED.project_customer,
+            project_status=EXCLUDED.project_status,
+            project_director=EXCLUDED.project_director,
+            project_manager=EXCLUDED.project_manager,
+            task_start_date=EXCLUDED.task_start_date,
+            task_end_date=EXCLUDED.task_end_date,
+            reporting_period=EXCLUDED.reporting_period,
+            last_imported=EXCLUDED.last_imported
+        RETURNING (xmax = 0) AS inserted
+    """, tuples, page_size=1000, fetch=True)
+
+    inserted = sum(1 for r in result if r["inserted"])
+    updated  = len(result) - inserted
 
     conn.commit()
     conn.close()
