@@ -99,9 +99,13 @@ def _clean(val):
     if isinstance(val, str):
         v = val.strip().lstrip("'").strip()
         return v if v else None
-    # openpyxl returns numeric cells (project_number, task_order_number) as
-    # int/float; those DB columns are TEXT and PostgreSQL will not compare
-    # text = integer. Coerce every non-null value to a stripped string.
+    # Numeric cells arrive as int (openpyxl) or float (calamine). Both feed
+    # TEXT columns, and PostgreSQL won't compare text = integer, so coerce to
+    # string. A whole-number float ('41867.0') must become '41867', not
+    # '41867.0' — otherwise project/task numbers stop matching. This makes
+    # _clean correct regardless of which Excel reader produced the value.
+    if isinstance(val, float) and val.is_integer():
+        return str(int(val))
     return str(val).strip() or None
 
 
@@ -225,13 +229,12 @@ def _parse_workbook(wb_source):
     """
     Parse PAR workbook. Returns list of dicts, filtered to Active projects only.
     """
+    from python_calamine import CalamineWorkbook
     if isinstance(wb_source, (str, Path)):
-        wb = openpyxl.load_workbook(str(wb_source), read_only=True, data_only=True)
+        cw = CalamineWorkbook.from_path(str(wb_source))
     else:
-        wb = openpyxl.load_workbook(wb_source, read_only=True, data_only=True)
-
-    ws   = wb[wb.sheetnames[0]]
-    rows = list(ws.iter_rows(values_only=True))
+        cw = CalamineWorkbook.from_filelike(wb_source)
+    rows = [tuple(r) for r in cw.get_sheet_by_index(0).to_python()]
     if len(rows) < 2:
         return []
 

@@ -61,9 +61,11 @@ def _clean(val):
     if isinstance(val, str):
         v = val.strip()
         return v if v else None
-    # openpyxl returns numeric cells as int/float; the DB columns these feed
-    # (horizon_person_number etc.) are TEXT, and PostgreSQL will not compare
-    # text = integer. Coerce every non-null value to a stripped string.
+    # Numeric cells arrive as int or float. Both feed TEXT columns, and a
+    # whole-number float ('10010050.0') must become '10010050', not
+    # '10010050.0', or person numbers stop matching.
+    if isinstance(val, float) and val.is_integer():
+        return str(int(val))
     return str(val).strip() or None
 
 
