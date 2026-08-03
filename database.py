@@ -85,10 +85,12 @@ def get_connection():
             "RF_DATABASE_URL must be a postgresql:// connection string. "
             f"Current value: {DATABASE_URL!r}"
         )
-    raw = psycopg2.connect(DATABASE_URL,
-                           cursor_factory=psycopg2.extras.RealDictCursor)
+    raw = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    # Force UTF-8 on the client link regardless of the OS/client locale.
+    # Without this, a WIN1252-defaulted Windows client can fail to encode
+    # non-Western characters (e.g. 'ş') even when the database is UTF-8.
+    raw.set_client_encoding("UTF8")
     return Connection(raw)
-
 
 from contextlib import contextmanager
 
