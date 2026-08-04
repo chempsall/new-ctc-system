@@ -301,7 +301,8 @@ def api_get_rtc(rtc_id):
     rtc = c.execute("""
         SELECT r.*, p.project_number, p.task_order_number, p.project_name,
                p.task_name, p.project_organisation, p.project_customer,
-               p.project_director, p.project_manager, p.project_status
+               p.project_director, p.project_manager, p.project_status,
+               p.project_type
         FROM rtcs r
         JOIN projects p ON p.project_id = r.project_id
         WHERE r.rtc_id = %s
@@ -359,6 +360,18 @@ def api_get_rtc(rtc_id):
         people[pid]["allocations"][row["period_start"]] = row["days"]
 
     rtc_dict = dict(rtc)
+    # Derive horizon_status so the editor can offer 'Convert to a Live Project'
+    # on opportunities (same rule as the list endpoint).
+    _ptype = (rtc["project_type"] or "").strip()
+    _pstat = (rtc["project_status"] or "").strip().lower()
+    if _pstat == "active" and _ptype == "UK Direct":
+        rtc_dict["horizon_status"] = "linked"
+    elif _pstat == "active" and _ptype == "UK Opportunity":
+        rtc_dict["horizon_status"] = "opportunity"
+    elif _pstat == "active":
+        rtc_dict["horizon_status"] = "other"
+    else:
+        rtc_dict["horizon_status"] = "norecord"
     rtc_dict["display_project_number"] = display_number(rtc["project_number"] or "")
     rtc_dict["display_task_order"]     = display_number(rtc["task_order_number"] or "")
     rtc_dict["is_placeholder_number"]  = (is_suffixed(rtc["project_number"] or "") or
@@ -941,3 +954,80 @@ def api_link_horizon(rtc_id):
     conn.close()
     summary_module.mark_dirty()
     return jsonify({"status": "ok", "project_id": real_project["project_id"]})
+
+
+@rtcs_bp.route("/api/rtcs/<int:rtc_id>/convert-to-live", methods=["POST"])
+def api_convert_to_live(rtc_id):
+    """
+    Converts an opportunity RTC to a live project.
+
+    The PM supplies only the new Project Number + Task Order; every other
+    field comes from the PAR data. The conversion is refused unless all of:
+      1. a project with that number+task exists in the current data,
+      2. it is genuinely live (Active + not UK Opportunity), and
+      3. it is not already linked to another RTC.
+    On success the RTC is re-pointed to the live project; its allocations
+    (keyed to rtc_id) follow automatically. The old opportunity project row
+    is left intact — unlike placeholder linking, it is real PAR data.
+    """
+    data = request.get_json(silent=True, force=True) or {}
+    proj_num   = (data.get("project_number")    or "").strip()
+    task_order = (data.get("task_order_number") or "").strip()
+    if not proj_num or not task_order:
+        return jsonify({"error": "Project Number and Task Order Number are required."}), 400
+
+    conn = database.get_connection()
+    c    = conn.cursor()
+
+    rtc = c.execute("SELECT project_id FROM rtcs WHERE rtc_id = %s", (rtc_id,)).fetchone()
+    if not rtc:
+        conn.close()
+        return jsonify({"error": f"RTC {rtc_id} not found"}), 404
+
+    target = c.execute("""
+        SELECT project_id, project_type, project_status, project_organisation
+        FROM projects
+        WHERE project_number = %s AND task_order_number = %s
+    """, (proj_num, task_order)).fetchone()
+
+    # Rule 1 — must exist in current data
+    if not target:
+        conn.close()
+        return jsonify({"error":
+            "No live project with that Project Number and Task Order was found "
+            "in the latest Horizon data. If the project has only just been "
+            "created, it will be available after the next overnight refresh."}), 404
+
+    # Rule 2 — must be a genuine live project, not another opportunity
+    ptype = (target["project_type"]   or "").strip()
+    pstat = (target["project_status"] or "").strip().lower()
+    if not (pstat == "active" and ptype != "UK Opportunity"):
+        conn.close()
+        return jsonify({"error":
+            "That project is an opportunity, not a live project. "
+            "It cannot be the target of a conversion."}), 409
+
+    # Rule 3 — must not already be linked to another RTC
+    if target["project_id"] != rtc["project_id"]:
+        other = c.execute(
+            "SELECT COUNT(*) AS n FROM rtcs WHERE project_id = %s",
+            (target["project_id"],)).fetchone()["n"]
+        if other > 0:
+            conn.close()
+            return jsonify({"error":
+                "That project is already linked to an existing RTC."}), 409
+
+    # All checks pass — re-point the RTC. Allocations follow (keyed to rtc_id).
+    now  = datetime.now(timezone.utc).isoformat()
+    user = get_current_user()
+    c.execute("""
+        UPDATE rtcs SET project_id = %s, last_updated_by = %s, last_updated_at = %s,
+                        department = COALESCE(%s, department)
+        WHERE rtc_id = %s
+    """, (target["project_id"], user, now,
+          target["project_organisation"] or None, rtc_id))
+
+    conn.commit()
+    conn.close()
+    summary_module.mark_dirty()
+    return jsonify({"status": "ok", "project_id": target["project_id"]})

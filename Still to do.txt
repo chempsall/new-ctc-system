@@ -1,3 +1,22 @@
+STARTING the PostgreSQL server
+$PG = "C:\Users\UKCMH001\Dev\pgsql\bin"
+& "$PG\pg_ctl.exe" -D C:\Users\UKCMH001\Dev\pgdata -l C:\Users\UKCMH001\Dev\pgdata\log.txt start
+
+Expect: server started.
+Then confirm it's actually up:
+& "$PG\psql.exe" -U postgres -c "SELECT 1;"
+
+(1 row) = running and ready. Connection refused = it didn't start; check the log at C:\Users\UKCMH001\Dev\pgdata\log.txt.
+
+
+STOPPING the PostgreSQL server
+$PG = "C:\Users\UKCMH001\Dev\pgsql\bin"
+& "$PG\pg_ctl.exe" -D C:\Users\UKCMH001\Dev\pgdata stop
+Expect: server stopped.
+
+
+
+
 I think it's time you examined the repo and had a good look through the code. You should focus on "dead" code (leftover from earlier development versions), concurrency issues, and speed.
 
 
