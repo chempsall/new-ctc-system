@@ -15,37 +15,45 @@ $PG = "C:\Users\UKCMH001\Dev\pgsql\bin"
 Expect: server stopped.
 
 
+KNOWN ISSUES
+When converting from a prospect to a live project a confirmation box showing the details being
+imported would be useful.
 
+If I open a not linked project and it finds Project Number it updates the other fields.
+It seems like they are updated with "Horizon record not found" but if the project number is found
+then most fields can be completed (name, customer, PD, PM)
 
-I think it's time you examined the repo and had a good look through the code. You should focus on "dead" code (leftover from earlier development versions), concurrency issues, and speed.
+Active Projects this month spills over lines on a laptop screen and looks weird.
 
-
-
-
-Can we have a HR extract for staff_list and what would it look like?
+Configuration on Admin page is gibberish
 
 Edge case - more than one PD (is the same possible for PM?)
 
-
-
-
-With a correct Project Number and task number but before the Horizon records are available it shows "Not linked" (as expected). However, when the Horizon record is available it doesn't automatically link (debatable how desirable this is) AND required me to delete the task order number and re-insert it before it would link.
-
+With a correct Project Number and task number but before the Horizon records are
+available it shows "Not linked" (as expected). However, when the Horizon record
+is available it doesn't automatically link (debatable how desirable this is)
+AND required me to delete the task order number and re-insert it before it would link.
 
 Ading a project that lives in another department still lists 010117 as home.
 
-
 Default sort order for the three pages?
 
+Staff leavers on RTCs — when a staff member leaves, future allocations should be
+automatically transferred to their generic grade equivalent and they should be
+removed from RTCs. Past allocations remain unchanged for audit purposes.
+
+Name changes — when a staff member's name changes, project_manager and project_director text
+fields on existing project rows are not automatically updated. Consider storing Horizon
+person numbers for PM/PD instead of plain text names.
+
+How do we handle changes of PD or PM? For instance if one of them leaves and is
+replaced by somebody else.
 
 
+NEXT STEPS
+Can we have a HR extract for staff_list and what would it look like?
+
+How do we handle name changes? For instance, if somebody gets married?
 
 
-
-Post-alpha:
-Staff leavers on RTCs — when a staff member leaves, future allocations should be automatically transferred to their generic grade equivalent and they should be removed from RTCs. Past allocations remain unchanged for audit purposes.
-
-
-Post-alpha:
-Name changes — when a staff member's name changes, project_manager and project_director text fields on existing project rows are not automatically updated. Consider storing Horizon person numbers for PM/PD instead of plain text names.
 

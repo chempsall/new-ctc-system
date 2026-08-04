@@ -419,8 +419,8 @@ def admin_config():
     rtc_count     = c.execute("SELECT COUNT(*) AS n FROM rtcs WHERE is_archived = 0").fetchone()["n"]
     project_count = c.execute("SELECT COUNT(*) AS n FROM projects").fetchone()["n"]
     bh_count      = c.execute("SELECT COUNT(*) AS n FROM bank_holidays").fetchone()["n"]
-    last_staff    = (c.execute("SELECT MAX(last_imported) FROM staff").fetchone() or [None])[0]
-    last_par      = (c.execute("SELECT MAX(last_imported) FROM projects").fetchone() or [None])[0]
+    last_staff    = c.execute("SELECT MAX(last_imported) AS m FROM staff").fetchone()["m"]
+    last_par      = c.execute("SELECT MAX(last_imported) AS m FROM projects").fetchone()["m"]
     conn.close()
 
     def fmt_dt(dt):
