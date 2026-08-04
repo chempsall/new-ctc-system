@@ -956,56 +956,77 @@ def api_link_horizon(rtc_id):
     return jsonify({"status": "ok", "project_id": real_project["project_id"]})
 
 
-@rtcs_bp.route("/api/rtcs/<int:rtc_id>/convert-to-live", methods=["POST"])
-def api_convert_to_live(rtc_id):
+@rtcs_bp.route("/api/rtcs/<int:rtc_id>/convert-to-live/preview", methods=["POST"])
+def api_convert_to_live_preview(rtc_id):
     """
-    Converts an opportunity RTC to a live project.
-
-    The PM supplies only the new Project Number + Task Order; every other
-    field comes from the PAR data. The conversion is refused unless all of:
-      1. a project with that number+task exists in the current data,
-      2. it is genuinely live (Active + not UK Opportunity), and
-      3. it is not already linked to another RTC.
-    On success the RTC is re-pointed to the live project; its allocations
-    (keyed to rtc_id) follow automatically. The old opportunity project row
-    is left intact — unlike placeholder linking, it is real PAR data.
+    Dry run for a conversion. Applies exactly the same rules as the real
+    conversion but changes nothing — returns the target project's details so
+    the PM can confirm they have typed the right numbers before committing.
     """
     data = request.get_json(silent=True, force=True) or {}
     proj_num   = (data.get("project_number")    or "").strip()
     task_order = (data.get("task_order_number") or "").strip()
-    if not proj_num or not task_order:
-        return jsonify({"error": "Project Number and Task Order Number are required."}), 400
 
     conn = database.get_connection()
     c    = conn.cursor()
+    target, err = _conversion_target(c, rtc_id, proj_num, task_order)
+    if err:
+        conn.close()
+        return err
+    conn.close()
+    return jsonify({
+        "status": "ok",
+        "project": {
+            "project_number":       target["project_number"],
+            "task_order_number":    target["task_order_number"],
+            "project_name":         target["project_name"],
+            "task_name":            target["task_name"],
+            "project_customer":     target["project_customer"],
+            "project_director":     target["project_director"],
+            "project_manager":      target["project_manager"],
+            "project_organisation": target["project_organisation"],
+            "project_type":         target["project_type"],
+        },
+    })
+
+
+def _conversion_target(c, rtc_id, proj_num, task_order):
+    """
+    Shared validation for convert-to-live. Returns (target_row, None) when the
+    conversion is allowed, or (None, flask_response) describing the refusal.
+    Used by both the preview and the real conversion so the two can never
+    disagree about what is permitted.
+    """
+    if not proj_num or not task_order:
+        return None, (jsonify({
+            "error": "Project Number and Task Order Number are required."}), 400)
 
     rtc = c.execute("SELECT project_id FROM rtcs WHERE rtc_id = %s", (rtc_id,)).fetchone()
     if not rtc:
-        conn.close()
-        return jsonify({"error": f"RTC {rtc_id} not found"}), 404
+        return None, (jsonify({"error": f"RTC {rtc_id} not found"}), 404)
 
     target = c.execute("""
-        SELECT project_id, project_type, project_status, project_organisation
+        SELECT project_id, project_number, task_order_number, project_name,
+               task_name, project_customer, project_director, project_manager,
+               project_type, project_status, project_organisation
         FROM projects
         WHERE project_number = %s AND task_order_number = %s
     """, (proj_num, task_order)).fetchone()
 
     # Rule 1 — must exist in current data
     if not target:
-        conn.close()
-        return jsonify({"error":
+        return None, (jsonify({"error":
             "No live project with that Project Number and Task Order was found "
             "in the latest Horizon data. If the project has only just been "
-            "created, it will be available after the next overnight refresh."}), 404
+            "created, it will be available after the next overnight refresh."}), 404)
 
     # Rule 2 — must be a genuine live project, not another opportunity
     ptype = (target["project_type"]   or "").strip()
     pstat = (target["project_status"] or "").strip().lower()
     if not (pstat == "active" and ptype != "UK Opportunity"):
-        conn.close()
-        return jsonify({"error":
+        return None, (jsonify({"error":
             "That project is an opportunity, not a live project. "
-            "It cannot be the target of a conversion."}), 409
+            "It cannot be the target of a conversion."}), 409)
 
     # Rule 3 — must not already be linked to another RTC
     if target["project_id"] != rtc["project_id"]:
@@ -1013,11 +1034,36 @@ def api_convert_to_live(rtc_id):
             "SELECT COUNT(*) AS n FROM rtcs WHERE project_id = %s",
             (target["project_id"],)).fetchone()["n"]
         if other > 0:
-            conn.close()
-            return jsonify({"error":
-                "That project is already linked to an existing RTC."}), 409
+            return None, (jsonify({"error":
+                "That project is already linked to an existing RTC."}), 409)
 
-    # All checks pass — re-point the RTC. Allocations follow (keyed to rtc_id).
+    return target, None
+
+
+@rtcs_bp.route("/api/rtcs/<int:rtc_id>/convert-to-live", methods=["POST"])
+def api_convert_to_live(rtc_id):
+    """
+    Converts an opportunity RTC to a live project.
+
+    The PM supplies only the new Project Number + Task Order; every other
+    field comes from the PAR data. Validation is shared with the preview
+    endpoint (see _conversion_target) and re-run here, so a stale preview
+    cannot be used to force through a conversion that is no longer valid.
+    On success the RTC is re-pointed to the live project; its allocations
+    (keyed to rtc_id) follow automatically. The old opportunity project row
+    is left intact — unlike placeholder linking, it is real PAR data.
+    """
+    data = request.get_json(silent=True, force=True) or {}
+    proj_num   = (data.get("project_number")    or "").strip()
+    task_order = (data.get("task_order_number") or "").strip()
+
+    conn = database.get_connection()
+    c    = conn.cursor()
+    target, err = _conversion_target(c, rtc_id, proj_num, task_order)
+    if err:
+        conn.close()
+        return err
+
     now  = datetime.now(timezone.utc).isoformat()
     user = get_current_user()
     c.execute("""

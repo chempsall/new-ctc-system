@@ -192,7 +192,7 @@ const realStaff = staff.filter(ps => !ps.id?.startsWith("GENERIC-") && (ps.capac
   const activeRtcs = allRtcs.filter(r => (r.current_month_days || 0) > 0);
   document.getElementById("metric-projects").textContent = activeRtcs.length;
   const totalEl = document.getElementById("metric-projects-total");
-  if (totalEl) totalEl.textContent = `${allRtcs.length} total`;
+  if (totalEl) totalEl.textContent = `this month · ${allRtcs.length} total`;
   document.getElementById("metric-over").textContent     = overCount;
   document.getElementById("metric-norec").textContent    = noRecProj;
 

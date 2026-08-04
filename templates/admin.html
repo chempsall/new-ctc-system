@@ -197,24 +197,31 @@
       <div class="admin-action" style="flex-direction:column;align-items:flex-start;gap:8px">
         <div style="display:flex;align-items:baseline;gap:12px">
           <div class="admin-action__name">WSP Resource Forecast Tool</div>
-          <div style="font-size:12px;font-weight:600;color:var(--text-secondary)">Version 0.9.0 — Alpha</div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-secondary)">Version {{ app_version }} — Alpha</div>
         </div>
-        <div style="font-size:12px;color:var(--text-secondary);line-height:1.8;width:100%">
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead><tr style="border-bottom:0.5px solid var(--border)">
-              <th style="text-align:left;padding:4px 12px 4px 0;color:var(--text-tertiary);font-weight:500;width:80px">Version</th>
-              <th style="text-align:left;padding:4px 12px 4px 0;color:var(--text-tertiary);font-weight:500;width:100px">Date</th>
-              <th style="text-align:left;padding:4px 0;color:var(--text-tertiary);font-weight:500">Changes</th>
-            </tr></thead>
-            <tbody>
-              <tr style="border-bottom:0.5px solid var(--border)">
-                <td style="padding:4px 12px 4px 0;vertical-align:top;color:var(--text-secondary)">0.9.0</td>
-                <td style="padding:4px 12px 4px 0;vertical-align:top;color:var(--text-secondary)">Aug 2026</td>
-                <td style="padding:4px 0;color:var(--text-secondary)">Alpha release. Projects, People, Department, and Team pages. CTC importer. Nightly jobs including staff leavers, special RTC maintenance, and archiving. Summary cache with Chart.js charts.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <details style="width:100%">
+          <summary style="cursor:pointer;font-size:12px;color:var(--text-tertiary);user-select:none;padding:2px 0;list-style:none">
+            &#9656; Show revision history
+          </summary>
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.8;width:100%;margin-top:8px">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead><tr style="border-bottom:0.5px solid var(--border)">
+                <th style="text-align:left;padding:4px 12px 4px 0;color:var(--text-tertiary);font-weight:500;width:80px">Version</th>
+                <th style="text-align:left;padding:4px 12px 4px 0;color:var(--text-tertiary);font-weight:500;width:100px">Date</th>
+                <th style="text-align:left;padding:4px 0;color:var(--text-tertiary);font-weight:500">Changes</th>
+              </tr></thead>
+              <tbody>
+                {% for rel in changelog %}
+                <tr style="border-bottom:0.5px solid var(--border)">
+                  <td style="padding:4px 12px 4px 0;vertical-align:top;color:var(--text-secondary)">{{ rel.version }}</td>
+                  <td style="padding:4px 12px 4px 0;vertical-align:top;color:var(--text-secondary)">{{ rel.date }}</td>
+                  <td style="padding:4px 0;color:var(--text-secondary)">{{ rel.changes }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
       </div>
     </div>
 

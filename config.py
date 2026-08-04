@@ -41,6 +41,36 @@ ENV = os.environ.get("RF_ENV", "development").lower()
 BASE_DIR = Path(os.environ.get("RF_BASE_DIR", Path(__file__).parent.resolve()))
 
 # ---------------------------------------------------------------------------
+# Version & changelog
+# Single source of truth for the version shown on the admin page. To publish a
+# release, add a new dict to the TOP of CHANGELOG (newest first) — no HTML
+# editing required. APP_VERSION is derived from the newest entry.
+# ---------------------------------------------------------------------------
+CHANGELOG = [
+    {
+        "version": "0.9.1",
+        "date":    "Aug 2026",
+        "changes": (
+            "Migrated to PostgreSQL for safe concurrent editing. Nightly import "
+            "reduced from ~10 minutes to ~30 seconds (batched upsert plus a "
+            "faster Excel parser). Added Convert-to-Live for opportunity RTCs. "
+            "UTF-8 hardening for non-Western characters."
+        ),
+    },
+    {
+        "version": "0.9.0",
+        "date":    "Jul 2026",
+        "changes": (
+            "For internal testing. Projects, People, Department, and Team pages."
+            "CTC importer. Nightly jobs including staff leavers, special RTC "
+            "maintenance, and archiving. Summary cache with Chart.js charts."
+        ),
+    },
+]
+
+APP_VERSION = CHANGELOG[0]["version"]
+
+# ---------------------------------------------------------------------------
 # Database
 # ---------------------------------------------------------------------------
 # Development: SQLite file in the data/ subfolder

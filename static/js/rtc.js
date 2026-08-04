@@ -402,7 +402,7 @@ function closePopup() {
 
 // ── Convert opportunity → live project ────────────────────────────────────────
 
-function openConvertDialog() {
+function openConvertDialog(prefillNum, prefillTask) {
   showPopup(
     'Convert to a Live Project',
     `This converts the opportunity to a live project and moves its forecast
@@ -411,14 +411,14 @@ function openConvertDialog() {
      the Horizon (PAR) data.
      <div class="rtc-convert-fields">
        <label class="rtc-field__label" for="convert-proj-number">Project Number</label>
-       <input class="rtc-field__input" id="convert-proj-number" placeholder="e.g. UK0041867" autocomplete="off">
+       <input class="rtc-field__input" id="convert-proj-number" placeholder="e.g. UK0041867" autocomplete="off" value="${esc(prefillNum || '')}">
        <label class="rtc-field__label" for="convert-task-order">Task Order Number</label>
-       <input class="rtc-field__input" id="convert-task-order" placeholder="e.g. 9081" autocomplete="off">
+       <input class="rtc-field__input" id="convert-task-order" placeholder="e.g. 9081" autocomplete="off" value="${esc(prefillTask || '')}">
        <div class="rtc-horizon-msg rtc-horizon-msg--notfound hidden" id="convert-error"></div>
      </div>`,
     [
       { label: 'Cancel', secondary: true, action: closePopup },
-      { label: 'Convert', action: submitConvert },
+      { label: 'Continue', action: submitConvert },
     ]
   );
   setTimeout(() => document.getElementById('convert-proj-number')?.focus(), 50);
@@ -433,6 +433,58 @@ async function submitConvert() {
   if (!pn || !to) { showErr('Please enter both a Project Number and a Task Order Number.'); return; }
   if (errEl) errEl.classList.add('hidden');
 
+  // Step 1 — dry run. Nothing is changed; we fetch the target's details so the
+  // PM can check they have typed the right numbers before committing.
+  try {
+    const r = await fetch(`/api/rtcs/${RTC_ID}/convert-to-live/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_number: pn, task_order_number: to }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showErr(d.error || 'Could not check those numbers. Please try again.'); return; }
+    showConvertConfirm(pn, to, d.project);
+  } catch (e) {
+    showErr('Could not check those numbers — a network or server error occurred.');
+  }
+}
+
+function showConvertConfirm(pn, to, p) {
+  const row = (label, value) => `
+    <tr>
+      <td style="padding:3px 12px 3px 0;color:var(--text-tertiary);white-space:nowrap;vertical-align:top">${esc(label)}</td>
+      <td style="padding:3px 0;color:var(--text-primary);font-weight:500">${esc(value || '—')}</td>
+    </tr>`;
+  showPopup(
+    'Confirm conversion',
+    `This RTC will be converted to the live project below, and its forecast
+     will move across unchanged.
+     <div style="margin-top:12px;padding:10px 12px;background:var(--bg-subtle,#f6f7f9);
+                 border:1px solid var(--border);border-radius:var(--radius-sm)">
+       <table style="border-collapse:collapse;font-size:12px;width:100%">
+         ${row('Project number', p.project_number)}
+         ${row('Task order',     p.task_order_number)}
+         ${row('Project name',   p.project_name)}
+         ${row('Task name',      p.task_name)}
+         ${row('Customer',       p.project_customer)}
+         ${row('Project Director', p.project_director)}
+         ${row('Project Manager',  p.project_manager)}
+       </table>
+     </div>
+     <div style="margin-top:12px;font-size:12px;color:var(--amber-dark,#8a5a00)">
+       <strong>Check these details carefully.</strong> Conversion cannot be undone.
+     </div>
+     <div class="rtc-horizon-msg rtc-horizon-msg--notfound hidden" id="convert-error2"></div>`,
+    [
+      { label: 'Back', secondary: true, action: () => openConvertDialog(pn, to) },
+      { label: 'Confirm — convert now', action: () => commitConvert(pn, to) },
+    ]
+  );
+}
+
+async function commitConvert(pn, to) {
+  const errEl = document.getElementById('convert-error2');
+  const showErr = (msg) => { if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); } };
   setSaveStatus('saving');
   try {
     const r = await fetch(`/api/rtcs/${RTC_ID}/convert-to-live`, {
@@ -457,6 +509,7 @@ async function submitConvert() {
     showErr('Conversion failed — a network or server error occurred.');
   }
 }
+
 
 // ── Grid rendering ────────────────────────────────────────────────────────────
 
@@ -977,7 +1030,7 @@ function onNotesChange() {
 
 function wireEvents() {
   // Convert-to-live button (shown only on opportunities)
-  document.getElementById('convert-to-live-btn')?.addEventListener('click', openConvertDialog);
+  document.getElementById('convert-to-live-btn')?.addEventListener('click', () => openConvertDialog());
 
   // Add staff search
   const search   = document.getElementById('staff-search');

@@ -28,7 +28,9 @@ admin_bp = Blueprint("admin", __name__)
 
 @admin_bp.route("/admin")
 def admin_index():
-    return render_template("admin.html")
+    return render_template("admin.html",
+                           app_version=config.APP_VERSION,
+                           changelog=config.CHANGELOG)
 
 
 @admin_bp.route("/admin/rtcs/<int:rtc_id>", methods=["DELETE"])
