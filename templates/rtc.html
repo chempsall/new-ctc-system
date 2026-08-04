@@ -70,6 +70,18 @@
       background: var(--amber-light); color: var(--amber-dark);
       border: 1px solid var(--amber);
     }
+    .rtc-badge--opportunity {
+      background: var(--blue-light, #e5effb); color: var(--blue-dark, #1a4d80);
+      border: 1px solid var(--blue, #2C72C7);
+    }
+    .btn--convert {
+      margin-left: 10px; font-size: 11px; padding: 4px 12px;
+      background: var(--blue, #2C72C7); color: #fff; border: none;
+      border-radius: var(--radius-sm); cursor: pointer;
+    }
+    .btn--convert:hover { filter: brightness(1.07); }
+    .rtc-convert-fields { margin-top: 14px; display: flex; flex-direction: column; gap: 4px; }
+    .rtc-convert-fields .rtc-field__input { margin-bottom: 8px; }
     .rtc-header-fields {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -405,6 +417,8 @@
       <div class="rtc-header-top">
         <span class="rtc-header-title" id="header-title">Loading…</span>
         <span class="rtc-badge hidden" id="horizon-badge"></span>
+        <button class="btn btn--convert hidden" id="convert-to-live-btn"
+                type="button">Convert to a Live Project</button>
       </div>
       <div class="rtc-header-fields" id="header-fields"></div>
       <div class="rtc-horizon-msg hidden" id="horizon-msg"></div>

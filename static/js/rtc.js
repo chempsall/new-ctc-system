@@ -114,15 +114,24 @@ function renderHeader() {
   document.getElementById('header-title').textContent =
     rtc.project_name || 'No project name';
 
-  // Badge
+  // Badge (+ Convert button for opportunities)
+  const isOpportunity = rtc.horizon_status === 'opportunity';
   const badge = document.getElementById('horizon-badge');
+  const convertBtn = document.getElementById('convert-to-live-btn');
   badge.classList.remove('hidden');
-  if (isLinked) {
-    badge.className = 'rtc-badge rtc-badge--linked';
-    badge.textContent = 'Linked to Horizon';
+  if (isOpportunity) {
+    badge.className = 'rtc-badge rtc-badge--opportunity';
+    badge.textContent = 'Opportunity';
+    if (convertBtn) convertBtn.classList.remove('hidden');
   } else {
-    badge.className = 'rtc-badge rtc-badge--placeholder';
-    badge.textContent = 'Not linked to Horizon';
+    if (convertBtn) convertBtn.classList.add('hidden');
+    if (isLinked) {
+      badge.className = 'rtc-badge rtc-badge--linked';
+      badge.textContent = 'Linked to Horizon';
+    } else {
+      badge.className = 'rtc-badge rtc-badge--placeholder';
+      badge.textContent = 'Not linked to Horizon';
+    }
   }
 
   // Fields
@@ -388,6 +397,65 @@ function showPopup(title, body, buttons) {
 
 function closePopup() {
   document.getElementById('horizon-popup').classList.add('hidden');
+}
+
+
+// ── Convert opportunity → live project ────────────────────────────────────────
+
+function openConvertDialog() {
+  showPopup(
+    'Convert to a Live Project',
+    `This converts the opportunity to a live project and moves its forecast
+     across unchanged. Enter the live Horizon <strong>Project Number</strong>
+     and <strong>Task Order Number</strong> — all other details are taken from
+     the Horizon (PAR) data.
+     <div class="rtc-convert-fields">
+       <label class="rtc-field__label" for="convert-proj-number">Project Number</label>
+       <input class="rtc-field__input" id="convert-proj-number" placeholder="e.g. UK0041867" autocomplete="off">
+       <label class="rtc-field__label" for="convert-task-order">Task Order Number</label>
+       <input class="rtc-field__input" id="convert-task-order" placeholder="e.g. 9081" autocomplete="off">
+       <div class="rtc-horizon-msg rtc-horizon-msg--notfound hidden" id="convert-error"></div>
+     </div>`,
+    [
+      { label: 'Cancel', secondary: true, action: closePopup },
+      { label: 'Convert', action: submitConvert },
+    ]
+  );
+  setTimeout(() => document.getElementById('convert-proj-number')?.focus(), 50);
+}
+
+async function submitConvert() {
+  const pn = document.getElementById('convert-proj-number')?.value.trim();
+  const to = document.getElementById('convert-task-order')?.value.trim();
+  const errEl = document.getElementById('convert-error');
+  const showErr = (msg) => { if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); } };
+
+  if (!pn || !to) { showErr('Please enter both a Project Number and a Task Order Number.'); return; }
+  if (errEl) errEl.classList.add('hidden');
+
+  setSaveStatus('saving');
+  try {
+    const r = await fetch(`/api/rtcs/${RTC_ID}/convert-to-live`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_number: pn, task_order_number: to }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) {
+      setSaveStatus('saved');
+      closePopup();
+      // Reload so every field refreshes from the now-live PAR data.
+      await loadRtc();
+      renderHeader();
+      renderGrid();
+    } else {
+      setSaveStatus('error');
+      showErr(d.error || 'Conversion failed. Please check the numbers and try again.');
+    }
+  } catch (e) {
+    setSaveStatus('error');
+    showErr('Conversion failed — a network or server error occurred.');
+  }
 }
 
 // ── Grid rendering ────────────────────────────────────────────────────────────
@@ -908,6 +976,9 @@ function onNotesChange() {
 // ── Wire events ───────────────────────────────────────────────────────────────
 
 function wireEvents() {
+  // Convert-to-live button (shown only on opportunities)
+  document.getElementById('convert-to-live-btn')?.addEventListener('click', openConvertDialog);
+
   // Add staff search
   const search   = document.getElementById('staff-search');
   const dropdown = document.getElementById('staff-dropdown');
