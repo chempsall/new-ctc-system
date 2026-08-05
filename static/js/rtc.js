@@ -119,6 +119,8 @@ function renderHeader() {
   const badge = document.getElementById('horizon-badge');
   const convertBtn = document.getElementById('convert-to-live-btn');
   badge.classList.remove('hidden');
+  const linkBtn = document.getElementById('link-horizon-btn');
+  if (linkBtn) linkBtn.classList.add('hidden');
   if (isOpportunity) {
     badge.className = 'rtc-badge rtc-badge--opportunity';
     badge.textContent = 'Opportunity';
@@ -131,6 +133,7 @@ function renderHeader() {
     } else {
       badge.className = 'rtc-badge rtc-badge--placeholder';
       badge.textContent = 'Not linked to Horizon';
+      if (linkBtn) linkBtn.classList.remove('hidden');
     }
   }
 
@@ -152,18 +155,8 @@ function renderHeader() {
   } else {
     // Editable inputs for placeholder fields
     container.innerHTML = `
-      <div class="rtc-field">
-        <span class="rtc-field__label">Project number</span>
-        <input class="rtc-field__input" id="field-proj-number"
-               value="${esc(rtc.display_project_number || rtc.project_number || '')}"
-               placeholder="e.g. UK0041867">
-      </div>
-      <div class="rtc-field">
-        <span class="rtc-field__label">Task order</span>
-        <input class="rtc-field__input" id="field-task-order"
-                value="${esc(rtc.display_task_order || rtc.task_order_number || '')}"
-               placeholder="e.g. 9081">
-      </div>
+      ${field('Project number', rtc.display_project_number || rtc.project_number || '—')}
+      ${field('Task order',     rtc.display_task_order    || rtc.task_order_number || '—')}
       <div class="rtc-field">
         <span class="rtc-field__label">Project name</span>
         <input class="rtc-field__input" id="field-proj-name"
@@ -196,24 +189,6 @@ function renderHeader() {
       </div>
       ${field('Department', rtc.department || '—')}
     `;
-
-    // Wire up lookup trigger on blur of project number + task order
-    const triggerLookup = () => {
-      const pn = document.getElementById('field-proj-number')?.value.trim();
-      const to = document.getElementById('field-task-order')?.value.trim();
-      if (pn && to) horizonLookup(pn, to);
-    };
-    document.getElementById('field-proj-number')?.addEventListener('blur', () => {
-      const pn = document.getElementById('field-proj-number')?.value.trim();
-      const toEl = document.getElementById('field-task-order');
-      const to = toEl?.value.trim();
-      // Auto-fill task order with "2" for proposal project numbers
-      if (pn && /^\d{4}UK/i.test(pn) && toEl && !to) {
-        toEl.value = '2';
-      }
-      if (to || (/^\d{4}UK/i.test(pn) && !to)) triggerLookup();
-    });
-    document.getElementById('field-task-order')?.addEventListener('blur', triggerLookup);
 
     // Wire up save on blur of manual fields
     ['field-proj-name','field-task-name','field-customer','field-pd','field-pm']
@@ -250,47 +225,103 @@ async function saveHeaderFields() {
   } catch(e) { setSaveStatus('error'); }
 }
 
-// ── Horizon lookup (placeholder header) ──────────────────────────────────────
+function openLinkDialog(prefillNum, prefillTask) {
+  showPopup(
+    'Link to Horizon',
+    `Enter the Horizon <strong>Project Number</strong> and
+     <strong>Task Order Number</strong> for this RTC. The project and task
+     details will be taken from the Horizon (PAR) data.
+     <div class="rtc-convert-fields">
+       <label class="rtc-field__label" for="link-proj-number">Project Number</label>
+       <input class="rtc-field__input" id="link-proj-number" placeholder="e.g. UK0041867" autocomplete="off" value="${esc(prefillNum || '')}">
+       <label class="rtc-field__label" for="link-task-order">Task Order Number</label>
+       <input class="rtc-field__input" id="link-task-order" placeholder="e.g. 9081" autocomplete="off" value="${esc(prefillTask || '')}">
+       <div class="rtc-horizon-msg rtc-horizon-msg--notfound hidden" id="link-entry-error"></div>
+     </div>`,
+    [
+      { label: 'Cancel', secondary: true, action: closePopup },
+      { label: 'Continue', action: submitLinkLookup },
+    ]
+  );
+  setTimeout(() => document.getElementById('link-proj-number')?.focus(), 50);
+}
 
-async function horizonLookup(projNum, taskOrder) {
+async function submitLinkLookup() {
+  const pn = document.getElementById('link-proj-number')?.value.trim();
+  const to = document.getElementById('link-task-order')?.value.trim();
+  const errEl = document.getElementById('link-entry-error');
+  const showErr = (m) => { if (errEl) { errEl.textContent = m; errEl.classList.remove('hidden'); } };
+  if (!pn || !to) { showErr('Please enter both a Project Number and a Task Order Number.'); return; }
+  if (errEl) errEl.classList.add('hidden');
+  await openLinkConfirm(pn, to, showErr);
+}
+
+async function openLinkConfirm(pn, to, onError) {
+  const msgEl = document.getElementById('horizon-msg');
   try {
-    const r = await fetch(
-      `/api/project?project_number=${encodeURIComponent(projNum)}&task_order_number=${encodeURIComponent(taskOrder)}`
-    );
-    const d = await r.json();
-
-    const msgEl = document.getElementById('horizon-msg');
-
-    if (d.match_type === 'full' || d.match_type === 'project_only') {
-      msgEl.className = 'rtc-horizon-msg rtc-horizon-msg--found';
-      if (d.match_type === 'project_only') {
-        msgEl.innerHTML = `<strong>Project found in Horizon</strong> — this task order is not yet in PAR. Project-level details have been auto-filled and will update automatically when the task order appears in the next PAR import.`;
-        // PATCH the RTC with the real project number + task order so
-        // _relink_pending_rtcs can match it when the task order lands in PAR
-        fetch(`/api/rtcs/${RTC_ID}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            project_number:    projNum,
-            task_order_number: taskOrder,
-          }),
-        }).then(async r => {
-          if (r.ok) { await loadRtc(); renderHeader(); }
-        }).catch(() => {});
-      } else {
-        window._horizonMatch = d;
-        msgEl.innerHTML = `<strong>Horizon record found:</strong> ${esc(d.project_name || '')}
-          <button class="btn btn--sm" style="margin-left:12px" onclick="confirmHorizonLink(window._horizonMatch)">
-            Confirm link
-          </button>`;
+    const r = await fetch(`/api/rtcs/${RTC_ID}/link-horizon/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_number: pn, task_order_number: to }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const msg = d.error || 'Could not link to that record.';
+      if (onError) { onError(msg); return; }
+      if (msgEl) {
+        msgEl.className = 'rtc-horizon-msg rtc-horizon-msg--notfound';
+        msgEl.textContent = msg;
+        msgEl.classList.remove('hidden');
       }
-      msgEl.classList.remove('hidden');
-    } else {
+      return;
+    }
+    showLinkConfirm(pn, to, d.project);
+  } catch (e) {
+    if (msgEl) {
       msgEl.className = 'rtc-horizon-msg rtc-horizon-msg--notfound';
-      msgEl.textContent = 'No Horizon record found for this project number and task order.';
+      msgEl.textContent = 'Could not check that record — a network or server error occurred.';
       msgEl.classList.remove('hidden');
     }
-  } catch(e) { console.error('Horizon lookup failed', e); }
+  }
+}
+
+function showLinkConfirm(pn, to, p) {
+  const row = (label, value) => `
+    <tr>
+      <td style="padding:3px 12px 3px 0;color:var(--text-tertiary);white-space:nowrap;vertical-align:top">${esc(label)}</td>
+      <td style="padding:3px 0;color:var(--text-primary);font-weight:500">${esc(value || '—')}</td>
+    </tr>`;
+  const isOpp = (p.project_type || '').trim() === 'UK Opportunity';
+  showPopup(
+    'Confirm Horizon link',
+    `This RTC will be linked to the Horizon record below, and its details will
+     be taken from the Horizon (PAR) data.
+     <div style="margin-top:12px;padding:10px 12px;background:var(--bg-subtle,#f6f7f9);
+                 border:1px solid var(--border);border-radius:var(--radius-sm)">
+       <table style="border-collapse:collapse;font-size:12px;width:100%">
+         ${row('Project number',   p.project_number)}
+         ${row('Task order',       p.task_order_number)}
+         ${row('Project name',     p.project_name)}
+         ${row('Task name',        p.task_name)}
+         ${row('Customer',         p.project_customer)}
+         ${row('Project Director', p.project_director)}
+         ${row('Project Manager',  p.project_manager)}
+         ${row('Type',             p.project_type)}
+       </table>
+     </div>
+     ${isOpp ? `<div style="margin-top:10px;font-size:12px;color:var(--text-secondary)">
+        This is an <strong>opportunity</strong>. When it becomes a live project you can
+        convert it using the <em>Convert to a Live Project</em> button.</div>` : ''}
+     <div style="margin-top:12px;font-size:12px;color:var(--amber-dark,#8a5a00)">
+       <strong>Check these details carefully.</strong> Linking cannot be undone.
+     </div>
+     <div class="rtc-horizon-msg rtc-horizon-msg--notfound hidden" id="link-error"></div>`,
+    [
+      { label: 'Back', secondary: true, action: () => openLinkDialog(pn, to) },
+      { label: 'Confirm — link now', action: () => confirmHorizonLink({
+          project_number: pn, task_order_number: to }) },
+    ]
+  );
 }
 
 async function confirmHorizonLink(matchData) {
@@ -306,14 +337,29 @@ async function confirmHorizonLink(matchData) {
     });
     if (r.ok) {
       setSaveStatus('saved');
+      closePopup();
       // Reload and re-render header in linked mode
       await loadRtc();
       renderHeader();
+      renderGrid();
       document.getElementById('horizon-msg').classList.add('hidden');
     } else {
       setSaveStatus('error');
+      const d = await r.json().catch(() => ({}));
+      const errEl = document.getElementById('link-error');
+      if (errEl) {
+        errEl.textContent = d.error || 'Linking failed. Please check the numbers and try again.';
+        errEl.classList.remove('hidden');
+      }
     }
-  } catch(e) { setSaveStatus('error'); }
+  } catch(e) {
+    setSaveStatus('error');
+    const errEl = document.getElementById('link-error');
+    if (errEl) {
+      errEl.textContent = 'Linking failed — a network or server error occurred.';
+      errEl.classList.remove('hidden');
+    }
+  }
 }
 
 // ── Horizon check on load ─────────────────────────────────────────────────────
@@ -359,9 +405,9 @@ async function checkHorizon() {
          Click Confirm to link this RTC and update the project details automatically.`,
         [
           { label: 'Cancel', secondary: true, action: closePopup },
-          { label: 'Confirm', action: async () => {
+          { label: 'Review details', action: () => {
             closePopup();
-            await confirmHorizonLink(d.match);
+            openLinkConfirm(d.match.project_number, d.match.task_order_number);
           }},
         ]
       );
@@ -369,8 +415,11 @@ async function checkHorizon() {
       // No match — remind user to update placeholder
       showPopup(
         '⚠ Action required: Link to Horizon',
-        'This RTC is not linked to a Horizon record. Time allocated to it will not generate revenue.<br><br>Once the project number and task order are available, enter them in the fields above and the system will link this RTC automatically.',
-        [{ label: 'I understand — I will update this when the details are available', action: closePopup }]
+        'This RTC is not linked to a Horizon record. Time allocated to it will not generate revenue.<br><br>Once the project number and task order are available, use the <strong>Link to Horizon</strong> button to link this RTC.',
+        [
+          { label: 'Not yet — I will do this later', secondary: true, action: closePopup },
+          { label: 'Link to Horizon now', action: () => { closePopup(); openLinkDialog(); } },
+        ]
       );
     }
   } catch(e) { console.error('Horizon check failed', e); }
@@ -1031,6 +1080,7 @@ function onNotesChange() {
 function wireEvents() {
   // Convert-to-live button (shown only on opportunities)
   document.getElementById('convert-to-live-btn')?.addEventListener('click', () => openConvertDialog());
+  document.getElementById('link-horizon-btn')?.addEventListener('click', () => openLinkDialog());
 
   // Add staff search
   const search   = document.getElementById('staff-search');

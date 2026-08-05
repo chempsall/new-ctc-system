@@ -35,7 +35,12 @@ const state = {
   },
   sort: {
     projects: { col: "this_month", dir: "desc" },
-    staff:    { col: "status",     dir: "asc"  },
+    // null = no user sort, so the staff list keeps its base ordering (generic
+    // staff grouped by grade, then real staff alphabetically). This matches
+    // what resetFilters() restores. The previous default of "status" was not a
+    // valid staff sort key, so applySort ignored it and fell through to the
+    // same result — this states the intent instead of relying on that.
+    staff:    { col: null,         dir: "asc"  },
   },
 };
 
@@ -1117,7 +1122,7 @@ function renderStaffTable() {
       `<th class="sortable" onclick="toggleSort('staff','name')" style="min-width:180px">
          Name / Title / Function <span id="sort-staff-name"></span>
        </th>` +
-      cols.map(p => `<th style="text-align:center;min-width:72px;white-space:nowrap;cursor:pointer"
+      cols.map(p => `<th class="sortable" style="text-align:center;min-width:72px"
                          onclick="toggleSort('staff','period_${p}')">${escHtml(p)}
                          <span id="sort-staff-period_${p}"></span></th>`).join("") ;
   }

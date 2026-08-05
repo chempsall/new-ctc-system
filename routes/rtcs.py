@@ -897,24 +897,18 @@ def api_link_horizon(rtc_id):
     conn = database.get_connection()
     c    = conn.cursor()
 
-    real_project = c.execute("""
-        SELECT project_id, project_name, task_name, project_customer,
-               project_director, project_manager, project_organisation
-        FROM projects
-        WHERE project_number = %s AND task_order_number = %s
-        AND project_status != 'Placeholder'
-    """, (proj_num, task_order)).fetchone()
-
-    if not real_project:
+    # Same validation as the preview (and the same already-linked guard the
+    # conversion path uses), so a mistyped number cannot attach this RTC to a
+    # project another RTC already owns.
+    real_project, err = _target_project(
+        c, rtc_id, proj_num, task_order, require_live=False)
+    if err:
         conn.close()
-        return jsonify({"error": "Project not found in PAR data"}), 404
+        return err
 
     rtc = c.execute(
         "SELECT project_id FROM rtcs WHERE rtc_id = %s", (rtc_id,)
     ).fetchone()
-    if not rtc:
-        conn.close()
-        return jsonify({"error": "RTC not found"}), 404
 
     old_project_id = rtc["project_id"]
     now  = datetime.now(timezone.utc).isoformat()
@@ -956,6 +950,41 @@ def api_link_horizon(rtc_id):
     return jsonify({"status": "ok", "project_id": real_project["project_id"]})
 
 
+@rtcs_bp.route("/api/rtcs/<int:rtc_id>/link-horizon/preview", methods=["POST"])
+def api_link_horizon_preview(rtc_id):
+    """
+    Dry run for linking a placeholder RTC to a Horizon record. Applies the same
+    rules as the real link but changes nothing, returning the target's details
+    so the PM can confirm the numbers before committing. An opportunity is a
+    valid target here (unlike conversion), since placeholder -> opportunity ->
+    live is the normal progression.
+    """
+    data = request.get_json(silent=True, force=True) or {}
+    conn = database.get_connection()
+    c    = conn.cursor()
+    target, err = _target_project(
+        c, rtc_id,
+        (data.get("project_number")    or "").strip(),
+        (data.get("task_order_number") or "").strip(),
+        require_live=False)
+    conn.close()
+    if err:
+        return err
+    return jsonify({
+        "status": "ok",
+        "project": {
+            "project_number":    target["project_number"],
+            "task_order_number": target["task_order_number"],
+            "project_name":      target["project_name"],
+            "task_name":         target["task_name"],
+            "project_customer":  target["project_customer"],
+            "project_director":  target["project_director"],
+            "project_manager":   target["project_manager"],
+            "project_type":      target["project_type"],
+        },
+    })
+
+
 @rtcs_bp.route("/api/rtcs/<int:rtc_id>/convert-to-live/preview", methods=["POST"])
 def api_convert_to_live_preview(rtc_id):
     """
@@ -969,7 +998,7 @@ def api_convert_to_live_preview(rtc_id):
 
     conn = database.get_connection()
     c    = conn.cursor()
-    target, err = _conversion_target(c, rtc_id, proj_num, task_order)
+    target, err = _target_project(c, rtc_id, proj_num, task_order, require_live=True)
     if err:
         conn.close()
         return err
@@ -990,12 +1019,19 @@ def api_convert_to_live_preview(rtc_id):
     })
 
 
-def _conversion_target(c, rtc_id, proj_num, task_order):
+def _target_project(c, rtc_id, proj_num, task_order, require_live=True):
     """
-    Shared validation for convert-to-live. Returns (target_row, None) when the
-    conversion is allowed, or (None, flask_response) describing the refusal.
-    Used by both the preview and the real conversion so the two can never
-    disagree about what is permitted.
+    Shared validation for placeholder linking and opportunity conversion.
+    Returns (target_row, None) when permitted, else (None, flask_response).
+
+    require_live=True  (convert-to-live): the target must be a genuine live
+                       project; an opportunity is refused.
+    require_live=False (placeholder link): any real PAR row is acceptable,
+                       including an opportunity, since placeholder ->
+                       opportunity -> live is the normal progression.
+
+    Both paths reject a target already linked to a different RTC, so a mistyped
+    number cannot silently attach this RTC to someone else's project.
     """
     if not proj_num or not task_order:
         return None, (jsonify({
@@ -1011,22 +1047,24 @@ def _conversion_target(c, rtc_id, proj_num, task_order):
                project_type, project_status, project_organisation
         FROM projects
         WHERE project_number = %s AND task_order_number = %s
+          AND project_status != 'Placeholder'
     """, (proj_num, task_order)).fetchone()
 
     # Rule 1 — must exist in current data
     if not target:
         return None, (jsonify({"error":
-            "No live project with that Project Number and Task Order was found "
-            "in the latest Horizon data. If the project has only just been "
-            "created, it will be available after the next overnight refresh."}), 404)
+            "No project with that Project Number and Task Order was found in "
+            "the latest Horizon data. If it has only just been created, it "
+            "will be available after the next overnight refresh."}), 404)
 
-    # Rule 2 — must be a genuine live project, not another opportunity
-    ptype = (target["project_type"]   or "").strip()
-    pstat = (target["project_status"] or "").strip().lower()
-    if not (pstat == "active" and ptype != "UK Opportunity"):
-        return None, (jsonify({"error":
-            "That project is an opportunity, not a live project. "
-            "It cannot be the target of a conversion."}), 409)
+    # Rule 2 — conversion only: must be a live project, not another opportunity
+    if require_live:
+        ptype = (target["project_type"]   or "").strip()
+        pstat = (target["project_status"] or "").strip().lower()
+        if not (pstat == "active" and ptype != "UK Opportunity"):
+            return None, (jsonify({"error":
+                "That project is an opportunity, not a live project. "
+                "It cannot be the target of a conversion."}), 409)
 
     # Rule 3 — must not already be linked to another RTC
     if target["project_id"] != rtc["project_id"]:
@@ -1059,7 +1097,7 @@ def api_convert_to_live(rtc_id):
 
     conn = database.get_connection()
     c    = conn.cursor()
-    target, err = _conversion_target(c, rtc_id, proj_num, task_order)
+    target, err = _target_project(c, rtc_id, proj_num, task_order, require_live=True)
     if err:
         conn.close()
         return err
