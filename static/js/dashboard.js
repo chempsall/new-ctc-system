@@ -1821,19 +1821,30 @@ async function triggerProjectLookup(projNum, taskNum) {
 
     if (d.match_type === "full") {
       // Exact match — auto-fill everything, no manual fields needed
-      document.getElementById("rtc-lookup-name").textContent = d.project_name     || "\u2014";
-      document.getElementById("rtc-lookup-task").textContent = d.task_name        || "\u2014";
-      document.getElementById("rtc-lookup-pm").textContent   = d.project_manager  || "\u2014";
-      document.getElementById("rtc-lookup-pd").textContent   = d.project_director || "\u2014";
+      document.getElementById("rtc-lookup-customer").textContent = d.project_customer     || "\u2014";
+      document.getElementById("rtc-lookup-name").textContent     = d.project_name         || "\u2014";
+      document.getElementById("rtc-lookup-task").textContent     = d.task_name            || "\u2014";
+      document.getElementById("rtc-lookup-pd").textContent       = d.project_director     || "\u2014";
+      document.getElementById("rtc-lookup-pm").textContent       = d.project_manager      || "\u2014";
+      document.getElementById("rtc-lookup-dept").textContent     = d.project_organisation || "\u2014";
       resultEl.classList.remove("hidden");
       placeholderEl.classList.add("hidden");
       manualFields.classList.add("hidden");
+      // Everything is known and unchangeable, so the department control adds
+      // nothing — it is shown in the summary above instead. The select keeps
+      // its value (it is still submitted) but is hidden rather than frozen.
+      document.getElementById("rtc-department-field")?.classList.add("hidden");
+      // Both identifiers are confirmed by the lookup, so neither is editable.
+      // A typo is corrected by cancelling and starting again, which keeps the
+      // reviewed details and the numbers that produced them in step.
+      _setFieldLocked("rtc-proj-number", null, true);
+      _setFieldLocked("rtc-task-number", null, true);
       // Department comes from PAR. PD/PM are NOT sent for a full match — the
       // project row already exists with Horizon's values and the backend
       // ignores anything supplied here — so hide the dropdowns rather than
       // asking for a choice that would be discarded. PAR's PD/PM are already
       // displayed read-only in the lookup result above.
-      _autoFillDepartment(d.project_organisation);
+      _autoFillDepartment(d.project_organisation, true);
       document.getElementById("rtc-pdpm-group")?.classList.add("hidden");
 
     } else if (d.match_type === "project_only") {
@@ -1858,7 +1869,12 @@ async function triggerProjectLookup(projNum, taskNum) {
       _setFieldLocked("rtc-proj-name", d.project_name || "", true);
       _setFieldLocked("rtc-customer",  d.project_customer || "", true);
       _setFieldLocked("rtc-task-name", "", false);   // the one field to complete
-      _autoFillDepartment(d.project_organisation);
+      document.getElementById("rtc-department-field")?.classList.remove("hidden");
+      // Both identifiers are confirmed; correcting them means cancelling and
+      // starting again.
+      _setFieldLocked("rtc-proj-number", null, true);
+      _setFieldLocked("rtc-task-number", null, true);
+      _autoFillDepartment(d.project_organisation, true);
       // A new project row is created for this task order, so PD/PM are stored.
       // They are inherited from the matched project and locked for the same
       // reason as the other fields.
@@ -1870,6 +1886,11 @@ async function triggerProjectLookup(projNum, taskNum) {
       // No match at all — full placeholder, all fields manual
       resultEl.classList.add("hidden");
       // Nothing is known, so every field is the user's to complete.
+      document.getElementById("rtc-department-field")?.classList.remove("hidden");
+      _setFieldLocked("rtc-proj-number", null, false);
+      _setFieldLocked("rtc-task-number", null, false);
+      const deptSel = document.getElementById("rtc-department");
+      if (deptSel) deptSel.disabled = false;
       _setFieldLocked("rtc-proj-name", null, false);
       _setFieldLocked("rtc-task-name", null, false);
       _setFieldLocked("rtc-customer",  null, false);
@@ -1887,7 +1908,7 @@ async function triggerProjectLookup(projNum, taskNum) {
   } catch(e) { console.error("Project lookup failed:", e); }
 }
 
-function _autoFillDepartment(organisation) {
+function _autoFillDepartment(organisation, locked) {
   if (!organisation) return;
   const sel = document.getElementById("rtc-department");
   const existing = [...sel.options].some(opt => opt.value === organisation);
@@ -1905,6 +1926,9 @@ function _autoFillDepartment(organisation) {
   sel.value = organisation;
   // Trigger the onchange to populate PD/PM dropdowns
   sel.dispatchEvent(new Event("change"));
+  // Horizon is authoritative for the department, so it must not be changed
+  // by hand once a record has supplied it.
+  if (locked !== undefined) sel.disabled = !!locked;
 }
 
 function _setFieldLocked(id, value, locked) {
@@ -1940,7 +1964,11 @@ function _preselectPerson(selectId, name, locked) {
 
 function clearProjectLookup() {
   document.getElementById("rtc-pdpm-group")?.classList.remove("hidden");
-  ["rtc-proj-name", "rtc-task-name", "rtc-customer"].forEach(id =>
+  document.getElementById("rtc-department-field")?.classList.remove("hidden");
+  const _dept = document.getElementById("rtc-department");
+  if (_dept) _dept.disabled = false;
+  ["rtc-proj-name", "rtc-task-name", "rtc-customer",
+   "rtc-proj-number", "rtc-task-number"].forEach(id =>
     _setFieldLocked(id, null, false));
   ["rtc-pd", "rtc-pm"].forEach(id => {
     const el = document.getElementById(id);

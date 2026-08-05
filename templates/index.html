@@ -277,7 +277,7 @@
 
       <!-- Row 1: Horizon lookup -->
       <div class="form-row" style="align-items:start">
-        <div class="form-group">
+        <div class="form-group" id="rtc-department-group">
           <label class="form-label" for="rtc-department">
             Project number <span class="form-required">*</span>
           </label>
@@ -296,6 +296,10 @@
       <!-- Lookup result: shown when a real Horizon record is found -->
       <div class="form-lookup-result hidden" id="rtc-lookup-result">
         <div class="form-lookup-row">
+          <span class="form-lookup-label">Customer</span>
+          <span class="form-lookup-value" id="rtc-lookup-customer">—</span>
+        </div>
+        <div class="form-lookup-row">
           <span class="form-lookup-label">Project</span>
           <span class="form-lookup-value" id="rtc-lookup-name">—</span>
         </div>
@@ -304,12 +308,16 @@
           <span class="form-lookup-value" id="rtc-lookup-task">—</span>
         </div>
         <div class="form-lookup-row">
+          <span class="form-lookup-label">PD</span>
+          <span class="form-lookup-value" id="rtc-lookup-pd">—</span>
+        </div>
+        <div class="form-lookup-row">
           <span class="form-lookup-label">PM</span>
           <span class="form-lookup-value" id="rtc-lookup-pm">—</span>
         </div>
         <div class="form-lookup-row">
-          <span class="form-lookup-label">PD</span>
-          <span class="form-lookup-value" id="rtc-lookup-pd">—</span>
+          <span class="form-lookup-label">Department</span>
+          <span class="form-lookup-value" id="rtc-lookup-dept">—</span>
         </div>
       </div>
 
@@ -378,17 +386,13 @@
             <input type="hidden" id="rtc-start-date">
           </div>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="rtc-pdpm-group">
           <label class="form-label" for="rtc-pd">
             Project Director <span class="form-required">*</span>
           </label>
           <select class="form-input" id="rtc-pd">
             <option value="">Select department first…</option>
           </select>
-          <label class="form-checkbox-label" style="margin-top:6px">
-            <input type="checkbox" id="rtc-pd-external">
-            Project director from another department?
-          </label>
           <div style="margin-top:12px">
             <label class="form-label" for="rtc-pm">
               Project Manager <span class="form-required">*</span>
@@ -396,10 +400,6 @@
             <select class="form-input" id="rtc-pm">
               <option value="">Select department first…</option>
             </select>
-            <label class="form-checkbox-label" style="margin-top:6px">
-              <input type="checkbox" id="rtc-pm-external">
-              Project manager from another department?
-            </label>
           </div>
         </div>
       </div>
