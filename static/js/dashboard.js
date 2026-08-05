@@ -1903,23 +1903,6 @@ async function triggerProjectLookup(projNum, taskNum) {
       _preselectPerson("rtc-pd", d.project_director, true);
       _preselectPerson("rtc-pm", d.project_manager, true);
 
-    } else if (d.match_type === "inactive") {
-      // The project exists in Horizon but is not Active. Forecasting against a
-      // closed, cancelled or on-hold project is not permitted, and offering a
-      // placeholder here would let a real but dead project number through.
-      _lookupBlocked = true;
-      resultEl.classList.add("hidden");
-      manualFields.classList.add("hidden");
-      document.getElementById("rtc-pdpm-group")?.classList.add("hidden");
-      document.getElementById("rtc-department-field")?.classList.add("hidden");
-      placeholderEl.innerHTML =
-        `<strong>This project is not active in Horizon.</strong> `
-        + `${esc(d.project_name || "The project")} has the status `
-        + `<strong>${esc(d.project_status || "unknown")}</strong>, so an RTC `
-        + `cannot be created against it. Please check the project number and `
-        + `task order, or use a project that is currently active.`;
-      placeholderEl.classList.remove("hidden");
-
     } else {
       // No match at all — full placeholder, all fields manual
       _lookupBlocked = false;
@@ -1938,8 +1921,12 @@ async function triggerProjectLookup(projNum, taskNum) {
         const el = document.getElementById(id);
         if (el) el.disabled = false;
       });
-      placeholderEl.innerHTML = "<strong>No Horizon record found.</strong> Please complete all the "
-        + "fields below \u2014 they will be overwritten automatically once the Horizon record "
+      // Only Active projects are imported from PAR, so "not found" also covers
+      // a project that exists in Horizon but is closed, cancelled or on hold.
+      placeholderEl.innerHTML = "<strong>No active Horizon record found.</strong> If this project "
+        + "exists in Horizon but is closed, cancelled or on hold, an RTC cannot be created "
+        + "against it \u2014 check the project number and task order. Otherwise complete the "
+        + "fields below; they will be overwritten automatically once the Horizon record "
         + "becomes available and is linked to this RTC.";
       placeholderEl.classList.remove("hidden");
       manualFields.classList.remove("hidden");

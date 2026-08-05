@@ -144,10 +144,9 @@ def api_project():
 
     conn = database.get_connection()
 
-    # Try exact match first. Only an Active project may be forecast against —
-    # a closed, cancelled or on-hold project is reported back as "inactive" so
-    # the user is told why rather than being offered a placeholder against a
-    # real but dead project number.
+    # Try exact match first. Note the PAR importer only stores Active projects,
+    # so a closed/cancelled/on-hold project is simply absent here and falls
+    # through to "no match" — the modal's wording covers that case.
     row = conn.execute("""
         SELECT project_number, task_order_number, project_name, task_name,
                project_organisation, project_customer, project_director,
@@ -160,20 +159,23 @@ def api_project():
 
     if row:
         result = dict(row)
-        result["match_type"] = ("full"
-                                if (row["project_status"] or "").strip().lower() == "active"
-                                else "inactive")
+        result["match_type"] = "full"
         # One PAR project/task = one RTC. Report an existing (non-archived) RTC
         # so the modal can say so up front rather than failing on submit.
+        # One PAR project/task = one RTC, archived or not. An archived RTC still
+        # holds that project's history, so a second must not be created — the
+        # user is sent to the archived one instead (adding allocations to it
+        # reactivates it automatically). Prefer a live RTC if somehow both exist.
         existing = conn.execute("""
-            SELECT r.rtc_id
+            SELECT r.rtc_id, r.is_archived
             FROM rtcs r
             JOIN projects p ON p.project_id = r.project_id
             WHERE p.project_number = %s AND p.task_order_number = %s
-              AND r.is_archived = 0
+            ORDER BY r.is_archived, r.rtc_id
             LIMIT 1
         """, (project_number, task_order_number)).fetchone()
-        result["existing_rtc_id"] = existing["rtc_id"] if existing else None
+        result["existing_rtc_id"]       = existing["rtc_id"] if existing else None
+        result["existing_rtc_archived"] = bool(existing["is_archived"]) if existing else False
         conn.close()
         return jsonify(result)
 
@@ -185,7 +187,7 @@ def api_project():
         FROM projects
         WHERE project_number = %s
         AND project_status NOT IN ('Placeholder', 'Pending')
-        ORDER BY (LOWER(project_status) = 'active') DESC, last_imported DESC
+        ORDER BY last_imported DESC
         LIMIT 1
     """, (project_number,)).fetchone()
 
@@ -193,9 +195,7 @@ def api_project():
 
     if row:
         result = dict(row)
-        result["match_type"] = ("project_only"
-                                if (row["project_status"] or "").strip().lower() == "active"
-                                else "inactive")
+        result["match_type"]        = "project_only"
         result["task_order_number"] = task_order_number
         result["task_name"]         = None   # unknown — must be entered manually
         result["task_start_date"]   = None
