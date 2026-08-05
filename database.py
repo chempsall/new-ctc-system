@@ -1,395 +1,208 @@
 """
-database.py
-Creates and initialises the PostgreSQL database.
-Connection configuration comes from config.py (RF_DATABASE_URL).
-
-Run directly to create a fresh schema:
-    python database.py
+routes/dashboard.py
+Page routes and the read-only data endpoints the dashboard uses:
+summary, staff, project lookup.
 """
 
-import psycopg2
-import psycopg2.extras
-from datetime import date, timedelta
-from dateutil.relativedelta import relativedelta
-import config
+import json
+from datetime import datetime, timezone
 
-DATABASE_URL = config.DATABASE_URL
+from flask import Blueprint, jsonify, request, render_template, Response
 
+import database
+import summary as summary_module
 
-class ChainableCursor(psycopg2.extras.RealDictCursor):
-    """
-    RealDictCursor whose execute()/executemany() return the cursor itself,
-    matching sqlite3's chainable convention:
-
-        c.execute(sql, params).fetchone()
-
-    psycopg2 cursors return None from execute(), which breaks every
-    chained call site in the codebase; this restores the contract.
-    """
-
-    def execute(self, sql, params=None):
-        # params must stay None when absent: psycopg2 only %-interpolates
-        # when a params sequence is supplied, and no-param queries may
-        # legitimately contain literal % (e.g. LIKE 'GENERIC-%').
-        super().execute(sql, params)
-        return self
-
-    def executemany(self, sql, seq):
-        super().executemany(sql, seq)
-        return self
+dashboard_bp = Blueprint("dashboard", __name__)
 
 
-class Connection:
-    """
-    Thin wrapper around a psycopg2 connection that preserves the
-    sqlite3 calling convention used throughout the codebase:
-
-        conn.execute(sql, params).fetchall()
-        c = conn.cursor(); c.execute(sql, params).fetchone()
-
-    psycopg2 connections have no .execute() — only cursors do — so this
-    wrapper creates a cursor per execute() call and returns it. All
-    cursors are ChainableCursor (a RealDictCursor), so both the chained
-    calling style and row["column_name"] access work exactly as sqlite3
-    Row/Cursor did.
-    """
-
-    def __init__(self, raw):
-        self._raw = raw
-
-    def cursor(self):
-        return self._raw.cursor(cursor_factory=ChainableCursor)
-
-    def execute(self, sql, params=None):
-        cur = self.cursor()
-        cur.execute(sql, params)
-        return cur
-
-    def commit(self):
-        self._raw.commit()
-
-    def rollback(self):
-        self._raw.rollback()
-
-    def close(self):
-        self._raw.close()
-
-    @property
-    def closed(self):
-        return self._raw.closed
+@dashboard_bp.route("/")
+def index():
+    return render_template("index.html")
 
 
-def get_connection():
-    if not DATABASE_URL or not DATABASE_URL.startswith("postgresql"):
-        raise RuntimeError(
-            "RF_DATABASE_URL must be a postgresql:// connection string. "
-            f"Current value: {DATABASE_URL!r}"
-        )
-    raw = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    # Force UTF-8 on the client link regardless of the OS/client locale.
-    # Without this, a WIN1252-defaulted Windows client can fail to encode
-    # non-Western characters (e.g. 'ş') even when the database is UTF-8.
-    raw.set_client_encoding("UTF8")
-    return Connection(raw)
-
-from contextlib import contextmanager
-
-@contextmanager
-def db():
-    """Context manager for database connections.
-    Rolls back on error (a psycopg2 connection that hits an error is in
-    an aborted state until rollback) and always closes.
-    Usage: with db() as conn:
-    """
-    conn = get_connection()
-    try:
-        yield conn
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+@dashboard_bp.route("/rtc/<int:rtc_id>")
+def rtc_editor(rtc_id):
+    """Serves the RTC editing screen."""
+    return render_template("rtc.html", rtc_id=rtc_id)
 
 
-def ensure_periods_through(conn, target_date):
-    """
-    Extend reporting_periods so that target_date's month exists.
-    Safe to call multiple times — uses ON CONFLICT DO NOTHING.
-    """
-    from datetime import date as _date
-    from dateutil.relativedelta import relativedelta as _rd
-    c = conn.cursor()
-    c.execute("SELECT MAX(period_start) AS m FROM reporting_periods")
-    last = c.fetchone()["m"]
-    current = (_date.fromisoformat(last) + _rd(months=1)) if last \
-              else _date.today().replace(day=1)
-    if isinstance(target_date, str):
-        target_date = _date.fromisoformat(target_date)
-    target = target_date.replace(day=1)
-    while current <= target:
-        nxt = current + _rd(months=1)
-        c.execute("""INSERT INTO reporting_periods
-                     (period_start, period_end, working_days, label)
-                     VALUES (%s,%s,%s,%s)
-                     ON CONFLICT DO NOTHING""",
-                  (current.isoformat(),
-                   (nxt - timedelta(days=1)).isoformat(),
-                   25 if current.month in {1, 4, 7, 10} else 20,
-                   current.strftime("%b-%Y")))
-        current = nxt
-    conn.commit()
+@dashboard_bp.route("/api/summary")
+def api_summary():
+    """Pre-built summary JSON — the only endpoint the dashboard calls on load."""
+    cached = summary_module.get_cached()
+    if not cached:
+        summary_module.build()
+        cached = summary_module.get_cached()
+    if not cached:
+        return jsonify({"error": "Summary not yet available"}), 503
+
+    payload = (cached["payload"]
+               if isinstance(cached["payload"], str)
+               else json.dumps(cached["payload"]))
+
+    etag = cached["generated_at"]
+    if request.headers.get("If-None-Match") == etag:
+        return "", 304
+    response = Response(payload, mimetype="application/json")
+    response.headers["X-Generated-At"] = etag
+    response.headers["ETag"] = etag
+    return response
 
 
-def _ensure_column(c, table, column, decl):
-    """Add a column to an existing table if it does not already exist.
-    Safe to call repeatedly — idempotent.
-    """
-    c.execute("""
-        SELECT column_name FROM information_schema.columns
-        WHERE table_name = %s AND column_name = %s
-    """, (table, column))
-    if not c.fetchone():
-        c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+# NOTE: /api/offices, /api/departments, /api/teams and /api/job-functions
+# have no remaining callers in the frontend (the dashboard builds these
+# lists from the summary payload). They are retained here unchanged for
+# one release in case anything external calls them; see the review notes
+# for the recommendation to delete them.
 
-
-def initialise_database():
-    conn = get_connection()
-    c = conn.cursor()
-
-    # ------------------------------------------------------------------
-    # STAFF
-    # Populated from the staff list Excel file (interim solution).
-    # Future: direct Horizon API connection.
-    #
-    # job_title    = Horizon's technical grade field
-    #                e.g. "Lead Professional, Mechanical Engineering"
-    # job_function = discipline, derived from job title suffix
-    #                e.g. "Mechanical Engineering"
-    # department   = Horizon cost centre e.g. "UK010117"
-    # ------------------------------------------------------------------
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS staff (
-            horizon_person_number   TEXT PRIMARY KEY,
-            name                    TEXT NOT NULL,
-            job_title               TEXT,
-            job_function            TEXT,
-            line_manager            TEXT,
-            department              TEXT,
-            availability            REAL NOT NULL DEFAULT 1.0,
-            start_date              TEXT,
-            end_date                TEXT,
-            last_imported           TEXT
-        )
-    """)
-
-    # Per-period availability overrides.
-    # Used for joiners, leavers, and temporary part-time arrangements.
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS staff_availability (
-            id                      SERIAL PRIMARY KEY,
-            horizon_person_number   TEXT NOT NULL REFERENCES staff(horizon_person_number),
-            period_start            TEXT NOT NULL,
-            availability_fraction   REAL NOT NULL,
-            UNIQUE(horizon_person_number, period_start)
-        )
-    """)
-
-    # ------------------------------------------------------------------
-    # PROJECTS
-    # Pure Horizon/PAR project identity data.
-    # ------------------------------------------------------------------
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS projects (
-            project_id              SERIAL  PRIMARY KEY,
-            project_number          TEXT    NOT NULL,
-            task_order_number       TEXT    NOT NULL,
-            project_type            TEXT,
-            project_name            TEXT,
-            task_name               TEXT,
-            project_organisation    TEXT,
-            project_customer        TEXT,
-            project_status          TEXT,
-            project_director        TEXT,
-            project_manager         TEXT,
-            task_start_date         TEXT,
-            task_end_date           TEXT,
-            reporting_period        TEXT,
-            last_imported           TEXT,
-            UNIQUE(project_number, task_order_number)
-        )
-    """)
-
-    # ------------------------------------------------------------------
-    # RTCs  (Resource to Complete)
-    # One row per RTC — one team's resourcing engagement with a
-    # project/task, entered directly via the web interface.
-    # Archived RTCs are hidden by default but never deleted.
-    # ------------------------------------------------------------------
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS rtcs (
-            rtc_id          SERIAL  PRIMARY KEY,
-            project_id      INTEGER NOT NULL REFERENCES projects(project_id),
-            department      TEXT    NOT NULL,
-            start_date      TEXT    NOT NULL,
-            created_by      TEXT,
-            created_at      TEXT,
-            last_updated_by TEXT,
-            last_updated_at TEXT,
-            last_opened_by  TEXT,
-            last_opened     TEXT,
-            is_archived     INTEGER NOT NULL DEFAULT 0,
-            auto_linked     INTEGER NOT NULL DEFAULT 0,
-            source_file     TEXT,
-            notes           TEXT,
-            last_edited_by  TEXT,
-            last_edited_at  TEXT
-        )
-    """)
-
-    # ------------------------------------------------------------------
-    # ALLOCATIONS
-    # One row per person x RTC x month. The core resourcing data.
-    # Cascade-deletes when the parent RTC is deleted.
-    # ------------------------------------------------------------------
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS allocations (
-            allocation_id           SERIAL  PRIMARY KEY,
-            horizon_person_number   TEXT    NOT NULL REFERENCES staff(horizon_person_number),
-            rtc_id                  INTEGER NOT NULL REFERENCES rtcs(rtc_id) ON DELETE CASCADE,
-            period_start            TEXT    NOT NULL,
-            days                    REAL    NOT NULL DEFAULT 0,
-            last_updated            TEXT    NOT NULL,
-            UNIQUE(horizon_person_number, rtc_id, period_start)
-        )
-    """)
-
-    # ------------------------------------------------------------------
-    # REPORTING PERIODS
-    # Pre-seeded calendar of months with working-day counts.
-    # ------------------------------------------------------------------
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS reporting_periods (
-            period_id       SERIAL PRIMARY KEY,
-            period_start    TEXT NOT NULL UNIQUE,
-            period_end      TEXT NOT NULL,
-            working_days    INTEGER NOT NULL,
-            label           TEXT NOT NULL UNIQUE
-        )
-    """)
-
-    # ------------------------------------------------------------------
-    # AUDIT / CACHE
-    # ------------------------------------------------------------------
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS import_log (
-            log_id          SERIAL  PRIMARY KEY,
-            import_type     TEXT    NOT NULL,
-            filename        TEXT,
-            started_at      TEXT    NOT NULL,
-            completed_at    TEXT,
-            rows_processed  INTEGER DEFAULT 0,
-            rows_inserted   INTEGER DEFAULT 0,
-            rows_updated    INTEGER DEFAULT 0,
-            errors          TEXT
-        )
-    """)
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS summary_cache (
-            cache_id        INTEGER PRIMARY KEY CHECK (cache_id = 1),
-            generated_at    TEXT    NOT NULL,
-            payload         TEXT    NOT NULL
-        )
-    """)
-
-    conn.commit()
-    c.execute("""
-        CREATE INDEX IF NOT EXISTS idx_allocations_rtc
-        ON allocations(rtc_id, period_start)
-    """)
-    c.execute("""
-        CREATE INDEX IF NOT EXISTS idx_allocations_period
-        ON allocations(period_start)
-    """)
-
-    c.execute("""
-        CREATE INDEX IF NOT EXISTS idx_allocations_person
-        ON allocations(horizon_person_number, period_start)
-    """)
-
-    # Column migrations — no-ops on a fresh schema, safe on an old one
-    _ensure_column(c, "rtcs", "notes",       "TEXT")
-    _ensure_column(c, "rtcs", "source_file", "TEXT")
-    _ensure_column(c, "rtcs", "auto_linked", "INTEGER NOT NULL DEFAULT 0")
-    _ensure_column(c, "staff", "line_manager",  "TEXT")
-    _ensure_column(c, "rtcs", "last_edited_by", "TEXT")
-    _ensure_column(c, "rtcs", "last_edited_at", "TEXT")
-
-    # Bank holidays cache
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS bank_holidays (
-            date        TEXT PRIMARY KEY,
-            days        INTEGER NOT NULL DEFAULT 1,
-            last_updated TEXT
-        )
-    """)
-
-    _seed_reporting_periods(c)
-    _seed_generic_staff(c)
-    conn.commit()
+@dashboard_bp.route("/api/offices")
+@dashboard_bp.route("/api/departments")
+def api_offices():
+    """Returns distinct departments from staff."""
+    conn = database.get_connection()
+    rows = conn.execute("""
+        SELECT DISTINCT department
+        FROM staff
+        WHERE department IS NOT NULL
+        ORDER BY department
+    """).fetchall()
     conn.close()
-    print(f"Database initialised ({DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'postgresql'})")
+    return jsonify([{"office_name": r["department"],
+                     "department":  r["department"]} for r in rows])
 
 
-def _seed_reporting_periods(c):
-    QUARTER_START = {1, 4, 7, 10}
-    current = date(2025, 1, 1)
-    end     = date(2030, 12, 1)
-    while current <= end:
-        m   = current.month
-        nxt = current + relativedelta(months=1)
-        c.execute("""
-            INSERT INTO reporting_periods
-                (period_start, period_end, working_days, label)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
-        """, (current.isoformat(), (nxt - timedelta(days=1)).isoformat(),
-              25 if m in QUARTER_START else 20,
-              current.strftime("%b-%Y")))
-        current = nxt
+@dashboard_bp.route("/api/teams")
+@dashboard_bp.route("/api/job-functions")
+def api_teams():
+    """Returns distinct job functions from staff."""
+    department = request.args.get("office") or request.args.get("department")
+    conn = database.get_connection()
+    if department:
+        rows = conn.execute("""
+            SELECT DISTINCT job_function
+            FROM staff
+            WHERE job_function IS NOT NULL AND department = %s
+            ORDER BY job_function
+        """, (department,)).fetchall()
+    else:
+        rows = conn.execute("""
+            SELECT DISTINCT job_function
+            FROM staff
+            WHERE job_function IS NOT NULL
+            ORDER BY job_function
+        """).fetchall()
+    conn.close()
+    return jsonify([{"team_name":    r["job_function"],
+                     "job_function": r["job_function"]} for r in rows])
 
-def _seed_generic_staff(c):
+
+@dashboard_bp.route("/api/staff")
+def api_staff():
+    """Staff list for RTC staff picker."""
+    department = request.args.get("office") or request.args.get("department")
+    today = datetime.now(timezone.utc).date().isoformat()
+    conn = database.get_connection()
+    if department:
+        rows = conn.execute("""
+            SELECT horizon_person_number, name, job_title,
+                   job_function, department
+            FROM staff
+            WHERE department = %s AND (end_date IS NULL OR end_date > %s)
+            AND horizon_person_number NOT LIKE 'GENERIC-%%!_%%' ESCAPE '!'
+            ORDER BY name
+        """, (department, today)).fetchall()
+    else:
+        rows = conn.execute("""
+            SELECT horizon_person_number, name, job_title,
+                   job_function, department
+            FROM staff
+            WHERE (end_date IS NULL OR end_date > %s)
+            AND horizon_person_number NOT LIKE 'GENERIC-%%!_%%' ESCAPE '!'
+            ORDER BY name
+        """, (today,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@dashboard_bp.route("/api/project")
+def api_project():
     """
-    Generic placeholder staff for use in RTCs when a specific person
-    hasn't been identified yet. Available across all departments.
-    Identified by department = '_GENERIC'.
+    Returns project metadata for a given project_number + task_order_number.
+    Called by the RTC modal when project details are entered.
+
+    Returns one of three shapes:
+      { "match_type": "full", ...fields }   — exact project+task match found
+      { "match_type": "project_only", ...fields, "task_name": null }
+                                            — project found, task order unknown
+      {}                                    — project number not found at all
     """
-    generics = [
-        ("GENERIC-UK-DIRECTOR", "UK Director", "P7 - Director"),
-        ("GENERIC-UK-TECHNICAL-DIRECTOR", "UK Technical Director", "P6 - Technical Director"),
-        ("GENERIC-UK-ASSOCIATE-DIRECTOR", "UK Associate/Associate Director", "P5 - Associate/Associate Director"),
-        ("GENERIC-UK-PRINCIPAL-ENGINEER", "UK Principal Engineer/Consultant", "P4 - Principal Engineer/Consultant"),
-        ("GENERIC-UK-SENIOR-ENGINEER", "UK Senior Engineer/Consultant", "P3 - Senior Engineer/Consultant"),
-        ("GENERIC-UK-ENGINEER", "UK Engineer/Consultant", "P2 - Engineer/Consultant"),
-        ("GENERIC-UK-GRADUATE-ENGINEER", "UK Graduate/Assistant Engineer/Consultant", "P1 - Graduate/Assistant Engineer/Consultant"),
-        ("GENERIC-UK-UNDERGRADUATE-ENGINEER", "UK Undergraduate Engineer", "P0 - Undergraduate Engineer/Consultant"),
-        ("GENERIC-UK-SENIOR-TECHNICIAN", "UK Senior Technician", "T4 - Senior Technician"),
-        ("GENERIC-UK-EXPERIENCED-TECHNICIAN", "UK Experienced Technician", "T3 - Experienced Technician"),
-        ("GENERIC-UK-INTERMEDIATE-TECHNICIAN", "UK Intermediate Technician", "T2 - Intermediate Technician"),
-        ("GENERIC-UK-ASSISTANT-TECHNICIAN", "UK Assistant Technician", "T1 - Assistant Technician"),
-        ("GENERIC-UK-TECHNICIAN-IN-TRAINING", "UK Technician in Training", "T0 - Technician in Training"),
-        ("GENERIC-UK-DOCUMENT-CONTROL", "UK Document Control", "P3 - Senior Engineer/Consultant"),
-    ]
-    for horizon_id, name, job_title in generics:
-        c.execute("""
-            INSERT INTO staff (
-                horizon_person_number, name, job_title,
-                job_function, department, availability, last_imported
-            ) VALUES (%s, %s, %s, 'Generic', '_GENERIC', 1.0, 'seeded')
-            ON CONFLICT DO NOTHING
-        """, (horizon_id, name, job_title))
+    project_number    = request.args.get("project_number", "").strip()
+    task_order_number = request.args.get("task_order_number", "").strip()
 
+    if not project_number or not task_order_number:
+        return jsonify({})
 
-if __name__ == "__main__":
-    config.summary()
-    initialise_database()
+    conn = database.get_connection()
+
+    # Try exact match first. Only an Active project may be forecast against —
+    # a closed, cancelled or on-hold project is reported back as "inactive" so
+    # the user is told why rather than being offered a placeholder against a
+    # real but dead project number.
+    row = conn.execute("""
+        SELECT project_number, task_order_number, project_name, task_name,
+               project_organisation, project_customer, project_director,
+               project_manager, project_status, project_type,
+               task_start_date, task_end_date
+        FROM projects
+        WHERE project_number = %s AND task_order_number = %s
+        AND project_status NOT IN ('Placeholder', 'Pending')
+    """, (project_number, task_order_number)).fetchone()
+
+    if row:
+        result = dict(row)
+        result["match_type"] = ("full"
+                                if (row["project_status"] or "").strip().lower() == "active"
+                                else "inactive")
+        # One PAR project/task = one RTC, archived or not. An archived RTC still
+        # holds that project's history, so a second must not be created — the
+        # user is sent to the archived one instead (adding allocations to it
+        # reactivates it automatically). Prefer a live RTC if somehow both exist.
+        existing = conn.execute("""
+            SELECT r.rtc_id, r.is_archived
+            FROM rtcs r
+            JOIN projects p ON p.project_id = r.project_id
+            WHERE p.project_number = %s AND p.task_order_number = %s
+            ORDER BY r.is_archived, r.rtc_id
+            LIMIT 1
+        """, (project_number, task_order_number)).fetchone()
+        result["existing_rtc_id"]       = existing["rtc_id"] if existing else None
+        result["existing_rtc_archived"] = bool(existing["is_archived"]) if existing else False
+        conn.close()
+        return jsonify(result)
+
+    # Try project-number-only match — known project, unknown task order
+    row = conn.execute("""
+        SELECT project_number, project_name,
+               project_organisation, project_customer, project_director,
+               project_manager, project_status, project_type
+        FROM projects
+        WHERE project_number = %s
+        AND project_status NOT IN ('Placeholder', 'Pending')
+        ORDER BY (LOWER(project_status) = 'active') DESC, last_imported DESC
+        LIMIT 1
+    """, (project_number,)).fetchone()
+
+    conn.close()
+
+    if row:
+        result = dict(row)
+        result["match_type"] = ("project_only"
+                                if (row["project_status"] or "").strip().lower() == "active"
+                                else "inactive")
+        result["task_order_number"] = task_order_number
+        result["task_name"]         = None   # unknown — must be entered manually
+        result["task_start_date"]   = None
+        result["task_end_date"]     = None
+        return jsonify(result)
+
+    return jsonify({})

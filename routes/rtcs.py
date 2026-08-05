@@ -196,6 +196,29 @@ def api_create_rtc():
 
     project_id = get_or_create_project(c, data, now)
 
+    # One PAR project/task = one RTC, archived or not. Without this, two people
+    # forecasting the same task would both succeed and the days would be counted
+    # twice; and an archived RTC still holds that project's history, so a second
+    # would split it. Adding allocations to an archived RTC reactivates it.
+    clash = c.execute("""
+        SELECT rtc_id, is_archived FROM rtcs
+        WHERE project_id = %s
+        ORDER BY is_archived, rtc_id
+        LIMIT 1
+    """, (project_id,)).fetchone()
+    if clash:
+        conn.rollback()
+        conn.close()
+        archived = bool(clash["is_archived"])
+        return jsonify({
+            "error": ("An archived RTC already exists for that project and task "
+                      "order. Open it and add allocations to reactivate it."
+                      if archived else
+                      "An RTC already exists for that project and task order."),
+            "existing_rtc_id": clash["rtc_id"],
+            "existing_rtc_archived": archived,
+        }), 409
+
     c.execute("""
         INSERT INTO rtcs (project_id, department, start_date,
                           created_by, created_at,

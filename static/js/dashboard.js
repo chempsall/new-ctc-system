@@ -1820,6 +1820,26 @@ async function triggerProjectLookup(projNum, taskNum) {
     const manualFields  = document.getElementById("rtc-manual-fields");
 
     if (d.match_type === "full") {
+      // One PAR project/task = one RTC. If one already exists, point the user
+      // at it rather than letting them create a second and double-count.
+      if (d.existing_rtc_id) {
+        _lookupBlocked = true;
+        resultEl.classList.add("hidden");
+        manualFields.classList.add("hidden");
+        document.getElementById("rtc-pdpm-group")?.classList.add("hidden");
+        document.getElementById("rtc-department-field")?.classList.add("hidden");
+        const _link = `<a href="/rtc/${encodeURIComponent(d.existing_rtc_id)}">`
+          + `${d.existing_rtc_archived ? "Open the archived RTC" : "Open the existing RTC"}</a>`;
+        placeholderEl.innerHTML = d.existing_rtc_archived
+          ? `<strong>An archived RTC already exists for this project and task order.</strong> `
+            + `Its history belongs to that RTC, so a second one cannot be created. `
+            + `${_link} and add allocations to it — that reactivates it automatically.`
+          : `<strong>An RTC already exists for this project and task order.</strong> `
+            + `Time is forecast against it there, so a second RTC cannot be created. `
+            + `${_link}.`;
+        placeholderEl.classList.remove("hidden");
+        return;
+      }
       // Exact match — auto-fill everything, no manual fields needed
       document.getElementById("rtc-lookup-customer").textContent = d.project_customer     || "\u2014";
       document.getElementById("rtc-lookup-name").textContent     = d.project_name         || "\u2014";
@@ -1844,6 +1864,7 @@ async function triggerProjectLookup(projNum, taskNum) {
       // ignores anything supplied here — so hide the dropdowns rather than
       // asking for a choice that would be discarded. PAR's PD/PM are already
       // displayed read-only in the lookup result above.
+      _lookupBlocked = false;
       _autoFillDepartment(d.project_organisation, true);
       document.getElementById("rtc-pdpm-group")?.classList.add("hidden");
 
@@ -1882,8 +1903,26 @@ async function triggerProjectLookup(projNum, taskNum) {
       _preselectPerson("rtc-pd", d.project_director, true);
       _preselectPerson("rtc-pm", d.project_manager, true);
 
+    } else if (d.match_type === "inactive") {
+      // The project exists in Horizon but is not Active. Forecasting against a
+      // closed, cancelled or on-hold project is not permitted, and offering a
+      // placeholder here would let a real but dead project number through.
+      _lookupBlocked = true;
+      resultEl.classList.add("hidden");
+      manualFields.classList.add("hidden");
+      document.getElementById("rtc-pdpm-group")?.classList.add("hidden");
+      document.getElementById("rtc-department-field")?.classList.add("hidden");
+      placeholderEl.innerHTML =
+        `<strong>This project is not active in Horizon.</strong> `
+        + `${esc(d.project_name || "The project")} has the status `
+        + `<strong>${esc(d.project_status || "unknown")}</strong>, so an RTC `
+        + `cannot be created against it. Please check the project number and `
+        + `task order, or use a project that is currently active.`;
+      placeholderEl.classList.remove("hidden");
+
     } else {
       // No match at all — full placeholder, all fields manual
+      _lookupBlocked = false;
       resultEl.classList.add("hidden");
       // Nothing is known, so every field is the user's to complete.
       document.getElementById("rtc-department-field")?.classList.remove("hidden");
@@ -1962,7 +2001,10 @@ function _preselectPerson(selectId, name, locked) {
   }, 50);
 }
 
+let _lookupBlocked = false;
+
 function clearProjectLookup() {
+  _lookupBlocked = false;
   document.getElementById("rtc-pdpm-group")?.classList.remove("hidden");
   document.getElementById("rtc-department-field")?.classList.remove("hidden");
   const _dept = document.getElementById("rtc-department");
@@ -1999,6 +2041,9 @@ async function submitRtcModal() {
     !isProjectOnly;
 
   const errors = [];
+  if (_lookupBlocked) {
+    errors.push("This project is not active in Horizon, so an RTC cannot be created against it.");
+  }
   if (!projNum)   errors.push("Project number is required.");
   if (!taskNum && isFullMatch)errors.push("Task order number is required.");
   if (!startDate) errors.push("Start month is required.");

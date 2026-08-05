@@ -277,8 +277,8 @@
 
       <!-- Row 1: Horizon lookup -->
       <div class="form-row" style="align-items:start">
-        <div class="form-group" id="rtc-department-group">
-          <label class="form-label" for="rtc-department">
+        <div class="form-group">
+          <label class="form-label" for="rtc-proj-number">
             Project number <span class="form-required">*</span>
           </label>
           <input class="form-input" type="text" id="rtc-proj-number"
@@ -365,12 +365,14 @@
       <!-- Row: Department / PD -->
       <div class="form-row" style="align-items:start">
         <div class="form-group">
-          <label class="form-label" for="rtc-department">
-            Department <span class="form-required">*</span>
-          </label>
-          <select class="form-input" id="rtc-department">
-            <option value="">Select department…</option>
-          </select>
+          <div id="rtc-department-field">
+            <label class="form-label" for="rtc-department">
+              Department <span class="form-required">*</span>
+            </label>
+            <select class="form-input" id="rtc-department">
+              <option value="">Select department…</option>
+            </select>
+          </div>
           <div style="margin-top:2px">
             <label class="form-label">
               Start month <span class="form-required">*</span>

@@ -144,7 +144,10 @@ def api_project():
 
     conn = database.get_connection()
 
-    # Try exact match first
+    # Try exact match first. Only an Active project may be forecast against —
+    # a closed, cancelled or on-hold project is reported back as "inactive" so
+    # the user is told why rather than being offered a placeholder against a
+    # real but dead project number.
     row = conn.execute("""
         SELECT project_number, task_order_number, project_name, task_name,
                project_organisation, project_customer, project_director,
@@ -156,9 +159,22 @@ def api_project():
     """, (project_number, task_order_number)).fetchone()
 
     if row:
-        conn.close()
         result = dict(row)
-        result["match_type"] = "full"
+        result["match_type"] = ("full"
+                                if (row["project_status"] or "").strip().lower() == "active"
+                                else "inactive")
+        # One PAR project/task = one RTC. Report an existing (non-archived) RTC
+        # so the modal can say so up front rather than failing on submit.
+        existing = conn.execute("""
+            SELECT r.rtc_id
+            FROM rtcs r
+            JOIN projects p ON p.project_id = r.project_id
+            WHERE p.project_number = %s AND p.task_order_number = %s
+              AND r.is_archived = 0
+            LIMIT 1
+        """, (project_number, task_order_number)).fetchone()
+        result["existing_rtc_id"] = existing["rtc_id"] if existing else None
+        conn.close()
         return jsonify(result)
 
     # Try project-number-only match — known project, unknown task order
@@ -169,7 +185,7 @@ def api_project():
         FROM projects
         WHERE project_number = %s
         AND project_status NOT IN ('Placeholder', 'Pending')
-        ORDER BY last_imported DESC
+        ORDER BY (LOWER(project_status) = 'active') DESC, last_imported DESC
         LIMIT 1
     """, (project_number,)).fetchone()
 
@@ -177,7 +193,9 @@ def api_project():
 
     if row:
         result = dict(row)
-        result["match_type"]        = "project_only"
+        result["match_type"] = ("project_only"
+                                if (row["project_status"] or "").strip().lower() == "active"
+                                else "inactive")
         result["task_order_number"] = task_order_number
         result["task_name"]         = None   # unknown — must be entered manually
         result["task_start_date"]   = None
