@@ -7,6 +7,7 @@ protected by require_admin (bearer token).
 import json
 import logging
 from datetime import datetime, timezone, timedelta, date
+import re
 from pathlib import Path
 
 from dateutil.relativedelta import relativedelta
@@ -400,7 +401,21 @@ def admin_log():
         with open(log_file, encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
         if errors_only:
-            lines = [l for l in lines if " ERROR " in l or " WARNING " in l]
+            # A logged exception spans several lines: the record itself carries
+            # the level, but its traceback continuation lines do not. Filtering
+            # on the level alone would therefore show "Nightly step failed: X"
+            # and hide the actual error. Keep each matching record together
+            # with the continuation lines that belong to it.
+            record_start = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s")
+            kept, keeping = [], False
+            for l in lines:
+                if record_start.match(l):
+                    keeping = (" ERROR " in l or " WARNING " in l)
+                    if keeping:
+                        kept.append(l)
+                elif keeping:
+                    kept.append(l)          # traceback / continuation line
+            lines = kept
         lines = [l.rstrip() for l in lines[-n:][::-1]]
         return jsonify({"lines": lines, "total": len(lines)})
     except Exception as e:

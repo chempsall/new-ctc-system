@@ -186,9 +186,15 @@ def relink_pending_rtcs(conn=None):
         JOIN projects p ON p.project_id = r.project_id
         WHERE p.project_status IN ('Placeholder', 'Pending')
         AND r.is_archived = 0
+        ORDER BY r.rtc_id
     """).fetchall()
 
-    linked = 0
+    linked  = 0
+    skipped = 0
+    # Projects claimed during this run, so two pending RTCs matching the same
+    # project cannot both link to it. Ordered by rtc_id above, so the RTC
+    # created first wins and later ones are skipped.
+    claimed = set()
     for row in pending:
         rtc_id   = row["rtc_id"]
         proj_num = (row["project_number"] or "").split("_")[0].strip()
@@ -204,6 +210,23 @@ def relink_pending_rtcs(conn=None):
         """, (proj_num, task_num)).fetchone()
 
         if match:
+            target_id = match["project_id"]
+
+            # Guard: never attach this RTC to a project another RTC already
+            # owns (mirrors the manual link/convert rules), and never let two
+            # pending RTCs claim the same project in one run.
+            already = c.execute(
+                "SELECT COUNT(*) AS n FROM rtcs WHERE project_id = %s AND rtc_id != %s",
+                (target_id, rtc_id)).fetchone()["n"]
+            if already > 0 or target_id in claimed:
+                skipped += 1
+                logger.warning(
+                    f"Auto-relink skipped: RTC {rtc_id} matches "
+                    f"{proj_num}/{task_num} but that project is already linked "
+                    f"to another RTC. Left unlinked for manual review.")
+                continue
+            claimed.add(target_id)
+
             # Store old project_id for orphan cleanup
             old_proj_row = c.execute(
                 "SELECT project_id FROM rtcs WHERE rtc_id = %s", (rtc_id,)
@@ -213,23 +236,28 @@ def relink_pending_rtcs(conn=None):
                 UPDATE rtcs SET project_id = %s, last_updated_at = %s,
                                auto_linked = 1
                 WHERE rtc_id = %s
-            """, (match["project_id"], now, rtc_id))
+            """, (target_id, now, rtc_id))
             linked += 1
             # Delete orphan Pending project row if nothing else references it
-            if old_project_id and old_project_id != match["project_id"]:
+            if old_project_id and old_project_id != target_id:
                 other_refs = c.execute(
-                    "SELECT COUNT(*) FROM rtcs WHERE project_id = %s",
+                    "SELECT COUNT(*) AS n FROM rtcs WHERE project_id = %s",
                     (old_project_id,)
                 ).fetchone()["n"]
                 if other_refs == 0:
                     c.execute(
-                        "DELETE FROM projects WHERE project_id = %s AND project_status = 'Pending'",
+                        "DELETE FROM projects WHERE project_id = %s "
+                        "AND project_status IN ('Pending', 'Placeholder')",
                         (old_project_id,)
                     )
 
     if linked:
         conn.commit()
         logger.info(f"Auto-relinked {linked} RTC(s) to Horizon")
+    if skipped:
+        logger.warning(
+            f"Auto-relink: {skipped} RTC(s) skipped because the matching "
+            f"project is already linked to another RTC")
     if close_after:
         conn.close()
     return linked
@@ -326,44 +354,90 @@ def archive_old_rtcs(conn=None):
     return count
 
 
+def _run_step(name, fn, *args, **kwargs):
+    """
+    Runs one nightly step in isolation.
+
+    Any exception is logged with its traceback and swallowed, so a single
+    failing step cannot abort the ones that follow. Each step opens its own
+    database connection, so a failure in one leaves the others unaffected.
+    Returns (ok, result).
+    """
+    try:
+        return True, fn(*args, **kwargs)
+    except Exception:
+        logger.exception(f"Nightly step failed: {name}")
+        return False, None
+
+
 def nightly_imports():
     """
-    Runs at the configured time (default midnight).
+    Runs at the configured time (default 08:00).
     Re-imports staff and PAR data then rebuilds the summary cache.
+
+    Every step is isolated: if one fails it is logged with a traceback and the
+    remainder still run, so (for example) a relink error cannot prevent the
+    summary cache from being rebuilt. Any failures are summarised at the end.
     """
     logger.info("Nightly import starting")
+    failed = []
 
+    def step(name, fn, *args, **kwargs):
+        ok, result = _run_step(name, fn, *args, **kwargs)
+        if not ok:
+            failed.append(name)
+        return ok, result
+
+    # --- Staff list -------------------------------------------------------
     if config.STAFF_LIST_PATH and Path(config.STAFF_LIST_PATH).exists():
-        r = staff_import.run(str(config.STAFF_LIST_PATH))
-        logger.info(f"Staff list: {r['rows_processed']} rows, "
-                    f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
+        ok, r = step("staff import", staff_import.run, str(config.STAFF_LIST_PATH))
+        if ok:
+            logger.info(f"Staff list: {r['rows_processed']} rows, "
+                        f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
     else:
         logger.warning(f"Staff list: path not found ({config.STAFF_LIST_PATH})")
 
-    r = par_import.run()
-    logger.info(f"PAR import: {r['rows_processed']} rows, "
-                f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
+    # --- PAR --------------------------------------------------------------
+    ok, r = step("PAR import", par_import.run)
+    if ok:
+        logger.info(f"PAR import: {r['rows_processed']} rows, "
+                    f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
 
-    refresh_linked_rtcs()
+    # --- Linking ----------------------------------------------------------
+    step("refresh linked RTCs", refresh_linked_rtcs)
 
-    relinked = relink_pending_rtcs()
-    if relinked:
+    ok, relinked = step("relink pending RTCs", relink_pending_rtcs)
+    if ok and relinked:
         logger.info(f"Re-linked {relinked} pending RTC(s) to Horizon")
 
-    run_special_rtc_maintenance()
+    # --- Maintenance ------------------------------------------------------
+    step("special RTC maintenance", run_special_rtc_maintenance)
+    step("process leavers", process_leavers)
 
-    process_leavers()
-
-    archived = archive_old_rtcs()
-    if archived:
+    ok, archived = step("archive old RTCs", archive_old_rtcs)
+    if ok and archived:
         logger.info(f"Nightly archive: {archived} RTC(s) archived")
 
-    summary_module.build()
-    logger.info("Summary cache rebuilt")
+    # --- Summary ----------------------------------------------------------
+    ok, _ = step("summary rebuild", summary_module.build)
+    if ok:
+        logger.info("Summary cache rebuilt")
 
-    # Ensure reporting periods stay 3 years ahead
-    conn = database.get_connection()
-    database.ensure_periods_through(conn, date.today() + relativedelta(years=3))
-    conn.close()
-    logger.info("Reporting periods extended through 3 years ahead")
-    logger.info("Nightly import complete")
+    # --- Reporting periods ------------------------------------------------
+    def _extend_periods():
+        conn = database.get_connection()
+        try:
+            database.ensure_periods_through(conn, date.today() + relativedelta(years=3))
+        finally:
+            conn.close()
+
+    ok, _ = step("extend reporting periods", _extend_periods)
+    if ok:
+        logger.info("Reporting periods extended through 3 years ahead")
+
+    if failed:
+        logger.warning(
+            f"Nightly import complete with {len(failed)} failed step(s): "
+            f"{', '.join(failed)}. See the traceback(s) above.")
+    else:
+        logger.info("Nightly import complete")
