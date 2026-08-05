@@ -21,16 +21,10 @@ Logging enhancements
 
 Edge case - more than one PD (is the same possible for PM?)
 
-Adding a project that lives in another department still lists 010117 as home.
 
 Staff leavers on RTCs — when a staff member leaves, future allocations should be
 automatically transferred to their generic grade equivalent and they should be
 removed from RTCs. Past allocations remain unchanged for audit purposes.
-
-Name changes — when a staff member's name changes, project_manager and project_director text
-fields on existing project rows are not automatically updated. Consider storing Horizon
-person numbers for PM/PD instead of plain text names.
-
 
 
 NEXT STEPS

@@ -189,6 +189,31 @@ def api_create_rtc():
     if missing:
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
 
+    # Normalise and reject blank/whitespace-only identifiers. The form trims,
+    # but the API must not rely on that.
+    data["project_number"]    = (data.get("project_number")    or "").strip()
+    data["task_order_number"] = (data.get("task_order_number") or "").strip()
+    if not data["project_number"] or not data["task_order_number"]:
+        return jsonify({
+            "error": "Project number and task order number cannot be blank."}), 400
+
+    # Indirect/special RTCs (AL&PH, Training, Day Release) are created and
+    # maintained by the nightly job, one per person. A hand-made one would sit
+    # alongside them and be treated as a real project.
+    if data["project_number"] in SPECIAL_PROJECT_NUMBERS:
+        return jsonify({
+            "error": (f"{data['project_number']} is an indirect RTC maintained "
+                      "automatically by the system and cannot be created here.")}), 400
+
+    # A forecast starting more than a year out is almost always a typo.
+    try:
+        _start = datetime.strptime(data["start_date"][:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return jsonify({"error": "Start date is not a valid date."}), 400
+    if _start > date.today() + relativedelta(months=12):
+        return jsonify({
+            "error": "Start month cannot be more than 12 months in the future."}), 400
+
     user = get_current_user()
     now  = datetime.now(timezone.utc).isoformat()
     conn = database.get_connection()

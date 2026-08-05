@@ -1847,6 +1847,10 @@ async function triggerProjectLookup(projNum, taskNum) {
       document.getElementById("rtc-lookup-pd").textContent       = d.project_director     || "\u2014";
       document.getElementById("rtc-lookup-pm").textContent       = d.project_manager      || "\u2014";
       document.getElementById("rtc-lookup-dept").textContent     = d.project_organisation || "\u2014";
+      // Flag a bid so nobody mistakes speculative work for a won job.
+      const _isOpp = (d.project_type || "").trim() === "UK Opportunity";
+      document.getElementById("rtc-lookup-opportunity")
+        ?.classList.toggle("hidden", !_isOpp);
       resultEl.classList.remove("hidden");
       placeholderEl.classList.add("hidden");
       manualFields.classList.add("hidden");
@@ -1869,45 +1873,53 @@ async function triggerProjectLookup(projNum, taskNum) {
       document.getElementById("rtc-pdpm-group")?.classList.add("hidden");
 
     } else if (d.match_type === "project_only") {
-      // Project known, task order new — auto-fill project-level fields,
-      // but show task name as the only required manual entry
-      document.getElementById("rtc-lookup-name").textContent = d.project_name     || "\u2014";
-      document.getElementById("rtc-lookup-task").textContent = "New task \u2014 enter name below";
-      document.getElementById("rtc-lookup-pm").textContent   = d.project_manager  || "\u2014";
-      document.getElementById("rtc-lookup-pd").textContent   = d.project_director || "\u2014";
+      // The project is known; only the task name is genuinely unknown. Present
+      // it exactly like a full match — the same summary box — with a single
+      // field for the one thing the user has to supply.
+      document.getElementById("rtc-lookup-customer").textContent = d.project_customer     || "\u2014";
+      document.getElementById("rtc-lookup-name").textContent     = d.project_name         || "\u2014";
+      document.getElementById("rtc-lookup-task").textContent     = "New task \u2014 enter the name below";
+      document.getElementById("rtc-lookup-pd").textContent       = d.project_director     || "\u2014";
+      document.getElementById("rtc-lookup-pm").textContent       = d.project_manager      || "\u2014";
+      document.getElementById("rtc-lookup-dept").textContent     = d.project_organisation || "\u2014";
+      const _isOppPO = (d.project_type || "").trim() === "UK Opportunity";
+      document.getElementById("rtc-lookup-opportunity")
+        ?.classList.toggle("hidden", !_isOppPO);
       resultEl.classList.remove("hidden");
 
-      // Show a more specific message
-      placeholderEl.innerHTML = "<strong>Project found in Horizon \u2014 task order not yet available.</strong> "
-        + "The task name below will be updated automatically when this task order appears in the next PAR import. "
-        + "All other details have been auto-filled and can be adjusted if needed.";
+      placeholderEl.innerHTML = "<strong>This task order is not in Horizon yet.</strong> "
+        + "Everything else has been taken from the project. The task name will be "
+        + "updated automatically when the task order appears in the next import.";
       placeholderEl.classList.remove("hidden");
 
-      // Everything is taken from the matched project except the task name,
-      // which is the only genuinely unknown field. The inherited values are
-      // shown but locked, so they cannot drift from Horizon.
-      manualFields.classList.remove("hidden");
-      _setFieldLocked("rtc-proj-name", d.project_name || "", true);
+      // Values still have to be submitted (a new project row is created for
+      // this task order), so they are set but not shown — the summary box
+      // above is the presentation.
+      _lookupBlocked = false;
+      _setFieldLocked("rtc-proj-name", d.project_name     || "", true);
       _setFieldLocked("rtc-customer",  d.project_customer || "", true);
-      _setFieldLocked("rtc-task-name", "", false);   // the one field to complete
-      document.getElementById("rtc-department-field")?.classList.remove("hidden");
-      // Both identifiers are confirmed; correcting them means cancelling and
-      // starting again.
+      _setFieldLocked("rtc-task-name", "", false);
       _setFieldLocked("rtc-proj-number", null, true);
       _setFieldLocked("rtc-task-number", null, true);
       _autoFillDepartment(d.project_organisation, true);
-      // A new project row is created for this task order, so PD/PM are stored.
-      // They are inherited from the matched project and locked for the same
-      // reason as the other fields.
-      document.getElementById("rtc-pdpm-group")?.classList.remove("hidden");
       _preselectPerson("rtc-pd", d.project_director, true);
       _preselectPerson("rtc-pm", d.project_manager, true);
 
+      // Show only the task name field; the rest are known.
+      manualFields.classList.remove("hidden");
+      document.getElementById("rtc-proj-name-group")?.classList.add("hidden");
+      document.getElementById("rtc-customer-row")?.classList.add("hidden");
+      document.getElementById("rtc-pdpm-group")?.classList.add("hidden");
+      document.getElementById("rtc-department-field")?.classList.add("hidden");
+
     } else {
       // No match at all — full placeholder, all fields manual
+      document.getElementById("rtc-lookup-opportunity")?.classList.add("hidden");
       _lookupBlocked = false;
       resultEl.classList.add("hidden");
       // Nothing is known, so every field is the user's to complete.
+      document.getElementById("rtc-proj-name-group")?.classList.remove("hidden");
+      document.getElementById("rtc-customer-row")?.classList.remove("hidden");
       document.getElementById("rtc-department-field")?.classList.remove("hidden");
       _setFieldLocked("rtc-proj-number", null, false);
       _setFieldLocked("rtc-task-number", null, false);
@@ -1991,6 +2003,8 @@ function _preselectPerson(selectId, name, locked) {
 let _lookupBlocked = false;
 
 function clearProjectLookup() {
+  document.getElementById("rtc-proj-name-group")?.classList.remove("hidden");
+  document.getElementById("rtc-customer-row")?.classList.remove("hidden");
   _lookupBlocked = false;
   document.getElementById("rtc-pdpm-group")?.classList.remove("hidden");
   document.getElementById("rtc-department-field")?.classList.remove("hidden");
@@ -2028,6 +2042,14 @@ async function submitRtcModal() {
     !isProjectOnly;
 
   const errors = [];
+  // A forecast starting more than a year out is almost always a typo.
+  if (startDate) {
+    const limit = new Date();
+    limit.setMonth(limit.getMonth() + 12);
+    if (new Date(startDate) > limit) {
+      errors.push("Start month cannot be more than 12 months in the future.");
+    }
+  }
   if (_lookupBlocked) {
     errors.push("This project is not active in Horizon, so an RTC cannot be created against it.");
   }

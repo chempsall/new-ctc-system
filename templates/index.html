@@ -319,6 +319,13 @@
           <span class="form-lookup-label">Department</span>
           <span class="form-lookup-value" id="rtc-lookup-dept">—</span>
         </div>
+        <div class="form-lookup-opportunity hidden" id="rtc-lookup-opportunity"
+             style="margin-top:8px;padding:6px 8px;border-radius:4px;
+                    background:var(--blue-light,#e5effb);color:var(--blue-dark,#1a4d80);
+                    font-size:12px">
+          <strong>This is an opportunity, not a live project.</strong>
+          Convert it to a live project once it is won.
+        </div>
       </div>
 
       <!-- Placeholder notice + manual fields: shown when no Horizon record found.
@@ -335,7 +342,7 @@
       <!-- Manual project details — only shown for placeholders -->
       <div class="hidden" id="rtc-manual-fields">
         <div class="form-row">
-          <div class="form-group">
+          <div class="form-group" id="rtc-proj-name-group">
             <label class="form-label" for="rtc-proj-name">
               Project name <span class="form-required">*</span>
             </label>
@@ -350,7 +357,7 @@
                    placeholder="Enter task name" autocomplete="off">
           </div>
         </div>
-        <div class="form-row">
+        <div class="form-row" id="rtc-customer-row">
           <div class="form-group">
             <label class="form-label" for="rtc-customer">
               Project customer <span class="form-required">*</span>
