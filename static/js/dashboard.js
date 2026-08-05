@@ -1686,8 +1686,6 @@ function openRtcModal(mode) {
   document.getElementById("rtc-department").value  = "";
   document.getElementById("rtc-pd").value           = "";
   document.getElementById("rtc-pm").value           = "";
-  document.getElementById("rtc-pd-external").checked = false;
-  document.getElementById("rtc-pm-external").checked = false;
   clearProjectLookup();
   document.getElementById("rtc-form-error").textContent = "";
   document.getElementById("rtc-form-error").classList.add("hidden");
@@ -1713,25 +1711,9 @@ function openRtcModal(mode) {
 
   // Wire department change -> repopulate PD/PM
   document.getElementById("rtc-department").onchange = () => {
-    const dept       = document.getElementById("rtc-department").value;
-    const pdExternal = document.getElementById("rtc-pd-external").checked;
-    const pmExternal = document.getElementById("rtc-pm-external").checked;
-    populatePersonDropdown("rtc-pd", pdExternal ? null : dept);
-    populatePersonDropdown("rtc-pm", pmExternal ? null : dept);
-  };
-
-  // Wire PD external checkbox
-  document.getElementById("rtc-pd-external").onchange = () => {
-    const dept       = document.getElementById("rtc-department").value;
-    const pdExternal = document.getElementById("rtc-pd-external").checked;
-    populatePersonDropdown("rtc-pd", pdExternal ? null : dept);
-  };
-
-  // Wire PM external checkbox
-  document.getElementById("rtc-pm-external").onchange = () => {
-    const dept       = document.getElementById("rtc-department").value;
-    const pmExternal = document.getElementById("rtc-pm-external").checked;
-    populatePersonDropdown("rtc-pm", pmExternal ? null : dept);
+    const dept = document.getElementById("rtc-department").value;
+    populatePersonDropdown("rtc-pd", dept);
+    populatePersonDropdown("rtc-pm", dept);
   };
 
   document.getElementById("rtc-modal-overlay").classList.remove("hidden");
@@ -1745,10 +1727,20 @@ function populatePersonDropdown(selectId, department) {
   sel.innerHTML = `<option value="">${label}</option>`;
 
   const staff = state.summary?.staff || [];
+  sel.disabled = false;
 
   // Real staff — filtered by department if specified, generics excluded
   const real = staff.filter(s => s.department !== "_GENERIC" &&
     (!department || s.department === department));
+
+  // A project can belong to a department this app holds no staff for (its
+  // people are outside the scope of this deployment). Offering an empty list
+  // or generic placeholders would be misleading, so say so plainly instead.
+  if (department && real.length === 0) {
+    sel.innerHTML = '<option value="">Department staff not available</option>';
+    sel.disabled = true;
+    return;
+  }
 
   [...real].sort((a, b) => (a.name || "").localeCompare(b.name || "")).forEach(s => {
     const opt = document.createElement("option");
@@ -1836,10 +1828,13 @@ async function triggerProjectLookup(projNum, taskNum) {
       resultEl.classList.remove("hidden");
       placeholderEl.classList.add("hidden");
       manualFields.classList.add("hidden");
-      // Auto-fill department if it matches a known department
+      // Department comes from PAR. PD/PM are NOT sent for a full match — the
+      // project row already exists with Horizon's values and the backend
+      // ignores anything supplied here — so hide the dropdowns rather than
+      // asking for a choice that would be discarded. PAR's PD/PM are already
+      // displayed read-only in the lookup result above.
       _autoFillDepartment(d.project_organisation);
-      _preselectPerson("rtc-pd", d.project_director);
-      _preselectPerson("rtc-pm", d.project_manager);
+      document.getElementById("rtc-pdpm-group")?.classList.add("hidden");
 
     } else if (d.match_type === "project_only") {
       // Project known, task order new — auto-fill project-level fields,
@@ -1856,22 +1851,33 @@ async function triggerProjectLookup(projNum, taskNum) {
         + "All other details have been auto-filled and can be adjusted if needed.";
       placeholderEl.classList.remove("hidden");
 
-      // Show only the task name field; pre-fill the others from PAR data
+      // Everything is taken from the matched project except the task name,
+      // which is the only genuinely unknown field. The inherited values are
+      // shown but locked, so they cannot drift from Horizon.
       manualFields.classList.remove("hidden");
-      if (document.getElementById("rtc-proj-name"))
-        document.getElementById("rtc-proj-name").value = d.project_name || "";
-      if (document.getElementById("rtc-task-name"))
-        document.getElementById("rtc-task-name").value = "";  // only unknown field
-      if (document.getElementById("rtc-customer"))
-        document.getElementById("rtc-customer").value  = d.project_customer || "";
+      _setFieldLocked("rtc-proj-name", d.project_name || "", true);
+      _setFieldLocked("rtc-customer",  d.project_customer || "", true);
+      _setFieldLocked("rtc-task-name", "", false);   // the one field to complete
       _autoFillDepartment(d.project_organisation);
-      // Pre-select PD and PM in their dropdowns once dept is set
-      _preselectPerson("rtc-pd", d.project_director);
-      _preselectPerson("rtc-pm", d.project_manager);
+      // A new project row is created for this task order, so PD/PM are stored.
+      // They are inherited from the matched project and locked for the same
+      // reason as the other fields.
+      document.getElementById("rtc-pdpm-group")?.classList.remove("hidden");
+      _preselectPerson("rtc-pd", d.project_director, true);
+      _preselectPerson("rtc-pm", d.project_manager, true);
 
     } else {
       // No match at all — full placeholder, all fields manual
       resultEl.classList.add("hidden");
+      // Nothing is known, so every field is the user's to complete.
+      _setFieldLocked("rtc-proj-name", null, false);
+      _setFieldLocked("rtc-task-name", null, false);
+      _setFieldLocked("rtc-customer",  null, false);
+      document.getElementById("rtc-pdpm-group")?.classList.remove("hidden");
+      ["rtc-pd", "rtc-pm"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = false;
+      });
       placeholderEl.innerHTML = "<strong>No Horizon record found.</strong> Please complete all the "
         + "fields below \u2014 they will be overwritten automatically once the Horizon record "
         + "becomes available and is linked to this RTC.";
@@ -1884,28 +1890,62 @@ async function triggerProjectLookup(projNum, taskNum) {
 function _autoFillDepartment(organisation) {
   if (!organisation) return;
   const sel = document.getElementById("rtc-department");
-  for (const opt of sel.options) {
-    if (opt.value === organisation) {
-      sel.value = organisation;
-      // Trigger the onchange to populate PD/PM dropdowns
-      sel.dispatchEvent(new Event("change"));
-      break;
-    }
+  const existing = [...sel.options].some(opt => opt.value === organisation);
+  if (!existing) {
+    // The dropdown is built from departments already present in the summary
+    // (i.e. ones with staff or RTCs). A project belonging to another
+    // department is therefore missing from the list, which previously left
+    // the field blank and unselectable. project_organisation comes from PAR
+    // and is authoritative, so add it as an option rather than dropping it.
+    const opt = document.createElement("option");
+    opt.value = organisation;
+    opt.textContent = organisation;
+    sel.appendChild(opt);
   }
+  sel.value = organisation;
+  // Trigger the onchange to populate PD/PM dropdowns
+  sel.dispatchEvent(new Event("change"));
 }
 
-function _preselectPerson(selectId, name) {
+function _setFieldLocked(id, value, locked) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (value !== null && value !== undefined) el.value = value;
+  el.readOnly = !!locked;
+  // Make an inherited value visibly non-editable rather than merely inert.
+  el.style.background = locked ? "var(--grey-100, #f2f2f2)" : "";
+}
+
+function _preselectPerson(selectId, name, locked) {
   if (!name) return;
   const sel = document.getElementById(selectId);
   // Wait a tick for populatePersonDropdown to finish
   setTimeout(() => {
-    for (const opt of sel.options) {
-      if (opt.value === name) { sel.value = name; break; }
+    const existing = [...sel.options].some(opt => opt.value === name);
+    if (!existing) {
+      // The PD/PM named on the Horizon record is not in this app's staff list
+      // — typically because the project belongs to another department whose
+      // people are out of scope here. PAR is authoritative, so show the name
+      // instead of leaving the field empty (which would fail validation and
+      // block creation of a perfectly valid RTC).
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      sel.appendChild(opt);
     }
+    sel.value = name;
+    if (locked !== undefined) sel.disabled = !!locked;
   }, 50);
 }
 
 function clearProjectLookup() {
+  document.getElementById("rtc-pdpm-group")?.classList.remove("hidden");
+  ["rtc-proj-name", "rtc-task-name", "rtc-customer"].forEach(id =>
+    _setFieldLocked(id, null, false));
+  ["rtc-pd", "rtc-pm"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
   document.getElementById("rtc-lookup-result")?.classList.add("hidden");
   document.getElementById("rtc-lookup-placeholder")?.classList.add("hidden");
   document.getElementById("rtc-manual-fields")?.classList.add("hidden");
@@ -1935,8 +1975,12 @@ async function submitRtcModal() {
   if (!taskNum && isFullMatch)errors.push("Task order number is required.");
   if (!startDate) errors.push("Start month is required.");
   if (!dept)      errors.push("Cost centre is required.");
-  if (!pd)        errors.push("Project Director is required.");
-  if (!pm)        errors.push("Project Manager is required.");
+  // On a full Horizon match the project row already exists and the backend
+  // ignores any PD/PM sent, so they are neither shown nor required.
+  if (!(isFullMatch && !isProjectOnly)) {
+    if (!pd)      errors.push("Project Director is required.");
+    if (!pm)      errors.push("Project Manager is required.");
+  }
 
   // For project_only: task name is the only unknown field
   if (isProjectOnly && !taskName) {
