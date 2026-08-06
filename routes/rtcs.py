@@ -13,6 +13,11 @@ from flask import Blueprint, jsonify, request
 import database
 import summary as summary_module
 from services.identity import get_current_user
+
+
+def _names(value):
+    """Lower-cased individual names from a ";"-separated PAR person field."""
+    return [n.strip().lower() for n in (value or "").split(";") if n.strip()]
 from services.projects import get_or_create_project
 from services.special_rtcs import SPECIAL_PROJECT_NUMBERS
 from services.projects import display_number, is_suffixed, is_placeholder
@@ -109,8 +114,11 @@ def api_rtcs():
     for r in rows:
         row = dict(r)
         if dept   and row["department"] != dept:           continue
-        if pm     and pm.lower() not in (row["project_manager"] or "").lower():  continue
-        if pd_arg and pd_arg.lower() not in (row["project_director"] or "").lower(): continue
+        # A PAR project can name several directors or managers, separated by
+        # ";". Compare against each name in turn rather than as a substring of
+        # the whole value, so "Smith, A" does not also match "Smith, Andrew".
+        if pm and pm.lower() not in _names(row["project_manager"]):     continue
+        if pd_arg and pd_arg.lower() not in _names(row["project_director"]): continue
         if search:
             q = search.lower()
             if q not in (row["project_number"]   or "").lower() and \

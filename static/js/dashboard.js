@@ -154,11 +154,24 @@ function buildFilterOptions() {
   const funcs = [...new Set(s.staff.map(p => p.job_function).filter(Boolean))].sort();
   populateSelect("filter-job-function", funcs, "Job Function");
 
-  const pms = [...new Set((s.projects||[]).map(p => p.pm).filter(Boolean))].sort();
+  const pms = [...new Set((s.projects||[]).flatMap(p => splitNames(p.pm)))].sort();
   populateSelect("filter-rtc-pm", pms, "Project Manager");
 
-  const pds = [...new Set((s.projects||[]).map(p => p.director).filter(Boolean))].sort();
+  const pds = [...new Set((s.projects||[]).flatMap(p => splitNames(p.director)))].sort();
   populateSelect("filter-rtc-pd", pds, "Project Director");
+}
+
+// A PAR project can name more than one director or manager, separated by ";".
+// These split the combined value so each person can be listed and matched
+// individually. Exact comparison per name avoids "Smith, A" matching
+// "Smith, Andrew" the way a plain substring test would.
+function splitNames(value) {
+  return (value || "").split(";").map(n => n.trim()).filter(Boolean);
+}
+
+function nameMatches(value, selected) {
+  if (!selected) return true;
+  return splitNames(value).some(n => n.toLowerCase() === selected.toLowerCase());
 }
 
 function populateSelect(id, values, allLabel) {
@@ -388,8 +401,8 @@ function renderDeptSummary() {
   const allRtcs = state.mgmtRtcs || state.rtcs;
   const rtcs = allRtcs.filter(r =>
     (!dept || r.department === dept) &&
-    (!pd   || r.project_director === pd) &&
-    (!pm   || r.project_manager  === pm)
+    nameMatches(r.project_director, pd) &&
+    nameMatches(r.project_manager,  pm)
   );
   const projsByDept = (s.projects || []).filter(pr => !dept || pr.department === dept);
 
