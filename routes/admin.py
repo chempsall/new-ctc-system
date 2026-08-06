@@ -69,7 +69,8 @@ def admin_import_staff():
         return jsonify({"error": f"File not found: {path}"}), 400
     result = staff_import.run(path)
     summary_module.build()
-    logger.info(f"Admin: staff import completed — {result.get('rows_processed',0)} rows processed, "
+    logger.info(f"Admin: staff import completed — {result.get('filename','unknown file')} — "
+                f"{result.get('rows_processed',0)} rows processed, "
                 f"{result.get('rows_inserted',0)} inserted, {result.get('rows_updated',0)} updated")
     return jsonify(result)
 
@@ -82,7 +83,8 @@ def admin_import_par():
         return jsonify({"error": f"File not found: {path}"}), 400
     result = par_import.run(path)
     summary_module.build()
-    logger.info(f"Admin: PAR import completed — {result.get('rows_processed',0)} rows processed, "
+    logger.info(f"Admin: PAR import completed — {result.get('filename','unknown file')} — "
+                f"{result.get('rows_processed',0)} rows processed, "
                 f"{result.get('rows_inserted',0)} inserted, {result.get('rows_updated',0)} updated")
     return jsonify(result)
 

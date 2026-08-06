@@ -68,7 +68,7 @@ def process_leavers():
 
     # Find leavers with future allocations
     leavers = c.execute("""
-        SELECT DISTINCT s.horizon_person_number, s.job_title, s.name
+        SELECT DISTINCT s.horizon_person_number, s.job_title, s.name, s.end_date
         FROM staff s
         JOIN allocations a ON a.horizon_person_number = s.horizon_person_number
         WHERE s.end_date IS NOT NULL
@@ -87,6 +87,18 @@ def process_leavers():
     for leaver in leavers:
         pid        = leaver["horizon_person_number"]
         job_title  = leaver["job_title"] or ""
+
+        # Transfer from the month AFTER the one they left, not from the current
+        # month: they worked part of their leaving month, so that time stays
+        # with them. Months already past are history and are never rewritten,
+        # hence the later of the two dates.
+        try:
+            _ed = datetime.strptime(str(leaver["end_date"])[:10], "%Y-%m-%d").date()
+            _after_leaving = (_ed.replace(day=1) + relativedelta(months=1)).isoformat()
+        except (ValueError, TypeError):
+            _after_leaving = today
+        cutoff = max(today, _after_leaving)
+
         grade      = _grade_code(job_title)
         base_gid   = GRADE_TO_GENERIC.get(grade) if grade else None
 
@@ -99,7 +111,7 @@ def process_leavers():
             WHERE a.horizon_person_number = %s
             AND a.period_start >= %s
             AND a.days > 0
-        """, (pid, today)).fetchall()
+        """, (pid, cutoff)).fetchall()
 
         for rtc_row in rtcs:
             rtc_id     = rtc_row["rtc_id"]
@@ -111,7 +123,7 @@ def process_leavers():
                     DELETE FROM allocations
                     WHERE horizon_person_number = %s AND rtc_id = %s
                     AND period_start >= %s
-                """, (pid, rtc_id, today))
+                """, (pid, rtc_id, cutoff))
                 zeroed += c.rowcount
             elif base_gid:
                 # Transfer days to the base generic for this grade.
@@ -125,7 +137,7 @@ def process_leavers():
                     SELECT period_start, days FROM allocations
                     WHERE horizon_person_number = %s AND rtc_id = %s
                     AND period_start >= %s AND days > 0
-                """, (pid, rtc_id, today)).fetchall()
+                """, (pid, rtc_id, cutoff)).fetchall()
 
                 for row in future_rows:
                     period = row["period_start"]
@@ -149,7 +161,7 @@ def process_leavers():
                     DELETE FROM allocations
                     WHERE horizon_person_number = %s AND rtc_id = %s
                     AND period_start >= %s
-                """, (pid, rtc_id, today))
+                """, (pid, rtc_id, cutoff))
                 zeroed += c.rowcount
             else:
                 # Unknown grade — just zero out, log a warning
@@ -159,7 +171,7 @@ def process_leavers():
                     UPDATE allocations SET days = 0, last_updated = %s
                     WHERE horizon_person_number = %s AND rtc_id = %s
                     AND period_start >= %s
-                """, (now, pid, rtc_id, today))
+                """, (now, pid, rtc_id, cutoff))
                 zeroed += c.rowcount
 
     conn.commit()
@@ -392,7 +404,8 @@ def nightly_imports():
     if config.STAFF_LIST_PATH and Path(config.STAFF_LIST_PATH).exists():
         ok, r = step("staff import", staff_import.run, str(config.STAFF_LIST_PATH))
         if ok:
-            logger.info(f"Staff list: {r['rows_processed']} rows, "
+            logger.info(f"Staff list: {r.get('filename', 'unknown file')} — "
+                        f"{r['rows_processed']} rows, "
                         f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
     else:
         logger.warning(f"Staff list: path not found ({config.STAFF_LIST_PATH})")
@@ -400,7 +413,8 @@ def nightly_imports():
     # --- PAR --------------------------------------------------------------
     ok, r = step("PAR import", par_import.run)
     if ok:
-        logger.info(f"PAR import: {r['rows_processed']} rows, "
+        logger.info(f"PAR import: {r.get('filename', 'unknown file')} — "
+                    f"{r['rows_processed']} rows, "
                     f"{r['rows_inserted']} inserted, {r['rows_updated']} updated")
 
     # --- Linking ----------------------------------------------------------

@@ -645,10 +645,17 @@ function renderGridBody() {
       `<td class="frozen frozen-4"><span class="rtc-staff-job">${esc(person.job_function || '—')}</span></td>`,
       ...state.periods.map(p => {
         const isPast = p.period_start < TODAY_MONTH;
+        // A leaver keeps their rows for audit, but no further time may be
+        // booked after the month they left. Those cells are shown, not
+        // editable — the server refuses such writes in any case.
+        const hasLeft = person.locked_from && p.period_start >= person.locked_from;
         const days   = person.allocations[p.period_start] ?? 0;
-        const cls    = isPast ? 'rtc-cell rtc-cell--past' : (days === 0 ? 'rtc-cell rtc-cell--zero' : 'rtc-cell');
-        if (isPast) {
-          return `<td class="month-col"><div class="${cls}">${days > 0 ? fmt(days) : ''}</div></td>`;
+        const cls    = isPast ? 'rtc-cell rtc-cell--past'
+                     : hasLeft ? 'rtc-cell rtc-cell--left'
+                     : (days === 0 ? 'rtc-cell rtc-cell--zero' : 'rtc-cell');
+        if (isPast || hasLeft) {
+          const title = hasLeft ? ` title="${esc(person.name)} has left — no further time can be booked"` : '';
+          return `<td class="month-col"><div class="${cls}"${title}>${days > 0 ? fmt(days) : ''}</div></td>`;
         }
         return `<td class="month-col">
           <div class="${cls}"

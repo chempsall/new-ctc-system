@@ -661,8 +661,9 @@
         if (!d.length) { setResult("result-log", "No imports recorded yet.", ""); btn.disabled=false; return; }
         setResult("result-log",
           d.slice(0,10).map(row =>
-            `${row.import_type.padEnd(6)}  ${(row.completed_at||"").slice(0,16).replace("T"," ")}  ` +
-            `${String(row.rows_processed).padStart(4)} rows` +
+            `${row.import_type.padEnd(12)}  ${(row.completed_at||"").slice(0,16).replace("T"," ")}  ` +
+            `${String(row.rows_processed).padStart(7)} rows  ` +
+            `${row.filename || "—"}` +
             (row.errors?.length ? `  ⚠ ${row.errors.length} errors` : "")
           ).join("\n"), "");
       } catch(e) { setResult("result-log", `✗  ${e.message}`, "err"); }

@@ -15,6 +15,24 @@ import summary as summary_module
 from services.identity import get_current_user
 
 
+def _leaver_locked_from(end_date):
+    """
+    First period a leaver may no longer be booked into: the month after the one
+    they left. The leaving month itself stays editable because they worked part
+    of it, and earlier months are historical fact. Returns None for current
+    staff (no end date, or one still in the future).
+    """
+    if not end_date:
+        return None
+    try:
+        ed = datetime.strptime(str(end_date)[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+    if ed >= date.today():
+        return None
+    return (ed.replace(day=1) + relativedelta(months=1)).isoformat()
+
+
 def _names(value):
     """Lower-cased individual names from a ";"-separated PAR person field."""
     return [n.strip().lower() for n in (value or "").split(";") if n.strip()]
@@ -371,7 +389,7 @@ def api_get_rtc(rtc_id):
     # Fetch all allocations for this RTC
     alloc_rows = c.execute("""
         SELECT a.horizon_person_number, a.period_start, a.days,
-               s.name, s.job_title, s.job_function, s.availability
+               s.name, s.job_title, s.job_function, s.availability, s.end_date
         FROM allocations a
         JOIN staff s ON s.horizon_person_number = a.horizon_person_number
         WHERE a.rtc_id = %s
@@ -411,6 +429,10 @@ def api_get_rtc(rtc_id):
                 "name":         row["name"],
                 "job_title":    row["job_title"],
                 "job_function": row["job_function"],
+                # A leaver stays on the RTC for audit, but no further time may
+                # be booked for them after the month they left.
+                "end_date":     row["end_date"],
+                "locked_from":  _leaver_locked_from(row["end_date"]),
                 "allocations":  {},
             }
         people[pid]["allocations"][row["period_start"]] = row["days"]
@@ -459,6 +481,7 @@ def api_update_rtc(rtc_id):
     if not data:
         return jsonify({"error": "No JSON body"}), 400
 
+    rejected_leavers = []
     user = get_current_user()
     now  = datetime.now(timezone.utc).isoformat()
     conn = database.get_connection()
@@ -543,6 +566,15 @@ def api_update_rtc(rtc_id):
         if not is_member:
             continue
 
+        # Guard: a leaver keeps their historical rows for audit, but no further
+        # time may be booked for them after the month they left.
+        locked_from = _leaver_locked_from(
+            (c.execute("SELECT end_date FROM staff WHERE horizon_person_number = %s",
+                       (pid,)).fetchone() or {}).get("end_date"))
+        if locked_from and period >= locked_from:
+            rejected_leavers.append(pid)
+            continue
+
         c.execute("""
             INSERT INTO allocations
                 (horizon_person_number, rtc_id, period_start, days, last_updated)
@@ -569,7 +601,16 @@ def api_update_rtc(rtc_id):
     conn.close()
 
     summary_module.mark_dirty()
-    return jsonify({"status": "ok", "allocations_updated": alloc_count})
+    if rejected_leavers:
+        logger.warning(
+            f"RTC {rtc_id}: refused allocations for leaver(s) "
+            f"{', '.join(sorted(set(rejected_leavers)))} — no time may be booked "
+            f"after the month they left")
+    return jsonify({
+        "status": "ok",
+        "allocations_updated": alloc_count,
+        "rejected_leavers": sorted(set(rejected_leavers)),
+    })
 
 
 @rtcs_bp.route("/api/rtcs/<int:rtc_id>/staff", methods=["POST"])
