@@ -66,7 +66,7 @@ async function loadRtc() {
     state.rtc     = d.rtc;
     state.periods = d.periods;
     if (d.server_period) TODAY_MONTH = d.server_period;
-    const isSpecial = ["ID-06", "ID-04", "IDUK-01"].includes(state.rtc?.project_number);
+    const isSpecial = SPECIAL_RTC_NUMBERS.has(state.rtc?.project_number);
     state.staff   = d.staff.sort((a, b) => {
       if (isSpecial) {
         return (a.name || '').localeCompare(b.name || '');

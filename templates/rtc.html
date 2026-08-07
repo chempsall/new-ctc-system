@@ -496,6 +496,8 @@
 
   <script>
     const RTC_ID = {{ rtc_id }};
+    // Indirect/special project numbers, defined once in services/special_rtcs.py
+    const SPECIAL_RTC_NUMBERS = new Set({{ special_rtc_numbers | tojson }});
   </script>
   <script src="/static/js/common.js"></script>
   <script src="/static/js/rtc.js"></script>

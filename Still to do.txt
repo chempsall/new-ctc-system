@@ -19,12 +19,10 @@ KNOWN ISSUES
 
 Logging enhancements
 
-Edge case - more than one PD (is the same possible for PM?)
+Log in failing (not requesting even though I know it will be replaced)
 
+Special RTC details in three palces. Need a single source of truth.
 
-Staff leavers on RTCs — when a staff member leaves, future allocations should be
-automatically transferred to their generic grade equivalent and they should be
-removed from RTCs. Past allocations remain unchanged for audit purposes.
 
 
 NEXT STEPS

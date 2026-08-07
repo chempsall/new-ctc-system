@@ -11,19 +11,25 @@ from flask import Blueprint, jsonify, request, render_template, Response
 
 import database
 import summary as summary_module
+from services.special_rtcs import SPECIAL_PROJECT_NUMBERS
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
 
 @dashboard_bp.route("/")
 def index():
-    return render_template("index.html")
+    # The indirect/special project numbers are defined once, in
+    # services/special_rtcs.py, and handed to the pages so the browser does not
+    # keep its own copy of the same list.
+    return render_template("index.html",
+                           special_rtc_numbers=sorted(SPECIAL_PROJECT_NUMBERS))
 
 
 @dashboard_bp.route("/rtc/<int:rtc_id>")
 def rtc_editor(rtc_id):
     """Serves the RTC editing screen."""
-    return render_template("rtc.html", rtc_id=rtc_id)
+    return render_template("rtc.html", rtc_id=rtc_id,
+                           special_rtc_numbers=sorted(SPECIAL_PROJECT_NUMBERS))
 
 
 @dashboard_bp.route("/api/summary")

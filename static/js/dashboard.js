@@ -428,7 +428,7 @@ function renderDeptSummary() {
   const statusColour = { current:"#008300", due_review:"#eda100", overdue_review:"#e34948" };
 
   // ── Horizon future days ──────────────────────────────────────────────
-  const SPECIAL = new Set(["ID-06","ID-04","IDUK-01"]);
+  const SPECIAL = SPECIAL_RTC_NUMBERS;
   const linkedDays   = projsByDept.filter(pr => pr.horizon_status==="linked"      && !SPECIAL.has(pr.number)).reduce((sum,pr)=>sum+(pr.future_days||0),0);
   const oppDays      = projsByDept.filter(pr => pr.horizon_status==="opportunity"                             ).reduce((sum,pr)=>sum+(pr.future_days||0),0);
   const unlinkedDays = projsByDept.filter(pr => pr.horizon_status==="norecord"                               ).reduce((sum,pr)=>sum+(pr.future_days||0),0);
@@ -1304,6 +1304,10 @@ function renderProjectTable() {
         if (!m) return 998;
         return (m[1] === "P" ? 0 : 1) * 100 + (99 - parseInt(m[2]));
       };
+      // Special/indirect RTCs (AL&PH, Training, Day Release) list everyone
+      // alphabetically — grade order is meaningless for them, and the RTC page
+      // already does this. Keep the two views consistent.
+      const isSpecialRtc = SPECIAL_RTC_NUMBERS.has(r.project_number);
       const buildStaffList = (apiStaff) => {
         // Convert ISO period_start keys to period labels using summary periods
         const periodMap = {};
@@ -1325,6 +1329,7 @@ function renderProjectTable() {
           })
           .filter(ps => ps.totalDays > 0)
           .sort((a, b) => {
+            if (isSpecialRtc) return (a.name || "").localeCompare(b.name || "");
             if (a.isGeneric && !b.isGeneric) return 1;
             if (!a.isGeneric && b.isGeneric) return -1;
             const ga = gradeSort(a.job_title), gb = gradeSort(b.job_title);
