@@ -48,6 +48,21 @@ BASE_DIR = Path(os.environ.get("RF_BASE_DIR", Path(__file__).parent.resolve()))
 # ---------------------------------------------------------------------------
 CHANGELOG = [
     {
+            "version": "0.9.3",
+            "date":    "Aug 2026",
+            "changes": (
+                "Administrator access hardened: the admin area now has its own password-protected "
+                "sign-in page. Sign-in, failed attempts, and sign-out are logged. "
+                "Added an audit trail recording who created, linked, converted, deleted or re-forecast "
+                "each RTC, identified by project number and name. "
+                "Time can no longer be booked for a leaver after the month they left, "
+                "and their final month's forecast now stays with them rather than transferring to a "
+                "generic role. Project Directors and Managers listed together on one project are now "
+                "handled individually in filters. Start dates beyond twelve months are refused by "
+                "the date picker as well as on save."
+            ),
+        },
+    {
         "version": "0.9.2",
         "date":    "Aug 2026",
         "changes": (

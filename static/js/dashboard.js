@@ -255,12 +255,6 @@ function toggleSort(view, col) {
   if (view === "projects") renderProjectTable();
 }
 
-function sortIndicator(view, col) {
-  const s = state.sort[view];
-  if (s.col !== col) return '<span class="sort-icon">⇅</span>';
-  return `<span class="sort-icon sort-icon--active">${s.dir === "asc" ? "▲" : "▼"}</span>`;
-}
-
 function filteredStaff() {
 
   const f = state.filters;

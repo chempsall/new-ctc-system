@@ -36,14 +36,6 @@ ALLOCATIONS_EDITED = "Allocations changed"
 NOTES_EDITED       = "Notes edited"
 ADMIN_ACTION       = "Admin action"
 
-# Every action, so the admin filter can offer them all rather than only the
-# ones that happen to have occurred so far.
-ALL_ACTIONS = [
-    RTC_CREATED, RTC_DELETED, RTC_ARCHIVED, RTC_RESTORED,
-    RTC_LINKED, RTC_CONVERTED, RTC_DETAILS_EDITED,
-    ALLOCATIONS_EDITED, NOTES_EDITED, ADMIN_ACTION,
-]
-
 # Editing a grid saves in batches as the user tabs between cells, so one
 # sitting produces several requests. Entries for the same person, RTC and
 # action within this window are merged, so the trail reads as "Alice changed
@@ -171,22 +163,4 @@ def _summary(people, periods, net):
     sign = "+" if net >= 0 else ""
     return (f"{len(people)} {'person' if len(people) == 1 else 'people'}, "
             f"{len(periods)} {'period' if len(periods) == 1 else 'periods'}, "
-            f"net {sign}{round(net, 1)} days")
-
-
-def summarise_allocation_changes(changes):
-    """
-    One readable line for a batch of allocation edits.
-
-    The grid saves many cells at once, so an entry per cell would bury
-    everything else. "3 people, 12 periods, net +45.0 days" answers the
-    question people actually ask without the noise.
-    """
-    if not changes:
-        return None
-    people  = {c["person"] for c in changes}
-    net     = sum(c["days"] - c["was"] for c in changes)
-    sign    = "+" if net >= 0 else ""
-    return (f"{len(people)} {'person' if len(people) == 1 else 'people'}, "
-            f"{len(changes)} {'period' if len(changes) == 1 else 'periods'}, "
             f"net {sign}{round(net, 1)} days")

@@ -6,7 +6,7 @@ protected by require_admin (bearer token).
 
 import json
 import logging
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timezone, date
 import re
 from pathlib import Path
 
@@ -154,15 +154,12 @@ def admin_audit():
     Kept separate from /admin/log, which is the diagnostic application log.
     """
     limit  = min(int(request.args.get("n", 200)), 1000)
-    person = (request.args.get("person") or "").strip()
     project = (request.args.get("project") or "").strip()
     action = (request.args.get("action") or "").strip()
 
     sql    = ["SELECT occurred_at, person_name, action, rtc_id, rtc_description, detail",
               "FROM audit_log WHERE 1=1"]
     params = []
-    if person:
-        sql.append("AND person_name = %s"); params.append(person)
     if project:
         # Matched on the description recorded at the time, so a project can be
         # found by its number or name — the internal RTC id means nothing to
@@ -176,19 +173,15 @@ def admin_audit():
     conn = database.get_connection()
     rows  = conn.execute(" ".join(sql), tuple(params)).fetchall()
     total = conn.execute("SELECT COUNT(*) AS n FROM audit_log").fetchone()["n"]
-    # Offer only values that actually appear, so the filters cannot be set to
-    # something that returns nothing.
-    people = [r["person_name"] for r in conn.execute(
-        "SELECT DISTINCT person_name FROM audit_log "
-        "WHERE person_name IS NOT NULL ORDER BY person_name").fetchall()]
+    # Only the values the filter actually offers, so nothing can be chosen
+    # that returns nothing. Person and action lists were dropped with their
+    # filters rather than being built and discarded on every page load.
     projects = [r["rtc_description"] for r in conn.execute(
         "SELECT DISTINCT rtc_description FROM audit_log "
         "WHERE rtc_description IS NOT NULL ORDER BY rtc_description").fetchall()]
-    actions = [r["action"] for r in conn.execute(
-        "SELECT DISTINCT action FROM audit_log ORDER BY action").fetchall()]
     conn.close()
     return jsonify({"entries": [dict(r) for r in rows], "total": total,
-                    "people": people, "projects": projects, "actions": actions})
+                    "projects": projects})
 
 
 @admin_bp.route("/admin/import-log")

@@ -26,7 +26,6 @@ import openpyxl
 from datetime import datetime, timezone, date
 import os
 import sys
-from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import get_connection
