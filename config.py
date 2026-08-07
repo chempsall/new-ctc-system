@@ -56,10 +56,10 @@ CHANGELOG = [
             "locked. A duplicate or archived RTC for the same project and task "
             "order is refused, with a link to the existing one. Indirect RTCs, "
             "blank identifiers and start dates more than twelve months ahead are "
-            "rejected. Opportunities are flagged as bids. Placeholder RTCs are"
-            "linked through a Link to Horizon button with the same confirmation"
-            "step. Nightly import steps are isolated so one failure no longer"
-            "stops the rest, and auto-relinking will not attach an RTC to a"
+            "rejected. Opportunities are flagged as bids. Placeholder RTCs are "
+            "linked through a Link to Horizon button with the same confirmation "
+            "step. Nightly import steps are isolated so one failure no longer "
+            "stops the rest, and auto-relinking will not attach an RTC to a "
             "project another RTC already owns."
         ),
     },
@@ -68,7 +68,7 @@ CHANGELOG = [
         "date":    "Aug 2026",
         "changes": (
             "Migrated to PostgreSQL for safe concurrent editing. Nightly import "
-            "time reduced from ~10 minutes ~2 minutes (batched upsert plus a "
+            "time reduced from ~10 minutes to ~2 minutes (batched upsert plus a "
             "faster Excel parser). Added Convert-to-Live for opportunity RTCs. "
             "UTF-8 hardening for non-Western characters."
         ),
@@ -78,8 +78,8 @@ CHANGELOG = [
         "date":    "Jul 2026",
         "changes": (
             "First working version for internal testing. Projects, People,"
-            "Department, and Team pages. CTC importer. Nightly jobs including"
-            "staff leavers, special RTC maintenance, and archiving."
+            "Department, and Team pages. CTC importer. Nightly jobs including "
+            "staff leavers, special RTC maintenance, and archiving. "
             "Summary cache with Chart.js charts."
         ),
     },

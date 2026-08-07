@@ -12,6 +12,7 @@ from flask import Blueprint, jsonify, request
 
 import database
 import summary as summary_module
+from services import audit
 from services.identity import get_current_user
 
 
@@ -282,6 +283,8 @@ def api_create_rtc():
           user, now, user, now, user, now))
 
     rtc_id = c.fetchone()["rtc_id"]
+    audit.record(audit.RTC_CREATED, rtc_id=rtc_id,
+                 detail=f"Start month {data['start_date'][:7]}", conn=conn)
     conn.commit()
     conn.close()
 
@@ -482,6 +485,7 @@ def api_update_rtc(rtc_id):
         return jsonify({"error": "No JSON body"}), 400
 
     rejected_leavers = []
+    alloc_changes    = []
     user = get_current_user()
     now  = datetime.now(timezone.utc).isoformat()
     conn = database.get_connection()
@@ -575,6 +579,17 @@ def api_update_rtc(rtc_id):
             rejected_leavers.append(pid)
             continue
 
+        # Capture what it was, so the audit entry can state the net effect
+        # rather than just that "something changed".
+        prev = c.execute("""
+            SELECT days FROM allocations
+            WHERE horizon_person_number = %s AND rtc_id = %s AND period_start = %s
+        """, (pid, rtc_id, period)).fetchone()
+        was = float(prev["days"]) if prev else 0.0
+        if float(days) != was:
+            alloc_changes.append({"person": pid, "period": period,
+                                  "was": was, "days": float(days)})
+
         c.execute("""
             INSERT INTO allocations
                 (horizon_person_number, rtc_id, period_start, days, last_updated)
@@ -597,10 +612,18 @@ def api_update_rtc(rtc_id):
         (rtc_id,)
     )
 
+    # Recorded on the same connection, before the commit, so the audit entry
+    # and the change it describes land together or not at all.
+    if alloc_changes:
+        audit.record(audit.ALLOCATIONS_EDITED, rtc_id=rtc_id,
+                     detail=audit.summarise_allocation_changes(alloc_changes),
+                     conn=conn)
+
     conn.commit()
     conn.close()
 
     summary_module.mark_dirty()
+
     if rejected_leavers:
         logger.warning(
             f"RTC {rtc_id}: refused allocations for leaver(s) "
@@ -1006,6 +1029,7 @@ def api_link_horizon(rtc_id):
     rtc = c.execute(
         "SELECT project_id FROM rtcs WHERE rtc_id = %s", (rtc_id,)
     ).fetchone()
+    was_desc = audit.describe_rtc(conn, rtc_id)   # identity before linking
 
     old_project_id = rtc["project_id"]
     now  = datetime.now(timezone.utc).isoformat()
@@ -1033,6 +1057,11 @@ def api_link_horizon(rtc_id):
           real_project["project_director"],
           real_project["project_manager"],
           real_project["project_id"]))
+
+    audit.record(audit.RTC_LINKED, rtc_id=rtc_id,
+                 rtc_description=f"{proj_num}/{task_order} — "
+                                 f"{real_project['project_name'] or ''}".strip(" —"),
+                 detail=f"Linked from placeholder {was_desc}", conn=conn)
 
     # Clean up orphaned placeholder project row
     other_refs = c.execute(
@@ -1201,6 +1230,7 @@ def api_convert_to_live(rtc_id):
 
     now  = datetime.now(timezone.utc).isoformat()
     user = get_current_user()
+    was  = audit.describe_rtc(conn, rtc_id)      # identity before the change
     c.execute("""
         UPDATE rtcs SET project_id = %s, last_updated_by = %s, last_updated_at = %s,
                         department = COALESCE(%s, department)
@@ -1208,6 +1238,8 @@ def api_convert_to_live(rtc_id):
     """, (target["project_id"], user, now,
           target["project_organisation"] or None, rtc_id))
 
+    audit.record(audit.RTC_CONVERTED, rtc_id=rtc_id,
+                 detail=f"From {was} to {proj_num}/{task_order}", conn=conn)
     conn.commit()
     conn.close()
     summary_module.mark_dirty()

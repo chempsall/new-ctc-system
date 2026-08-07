@@ -19,10 +19,6 @@ KNOWN ISSUES
 
 Logging enhancements
 
-Log in failing (not requesting even though I know it will be replaced)
-
-Special RTC details in three palces. Need a single source of truth.
-
 
 
 NEXT STEPS

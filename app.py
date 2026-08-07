@@ -11,7 +11,7 @@ To start the development server:
 """
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
@@ -91,7 +91,8 @@ from services.jobs import nightly_imports
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
-app.permanent_session_lifetime = timedelta(days=31)
+# Sessions are deliberately non-permanent (see routes/auth.py): the cookie
+# lasts only as long as the browser is open, so this lifetime is not used.
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
@@ -101,12 +102,41 @@ app.register_blueprint(admin_bp)
 
 from flask import session, request, redirect
 
+def _expire_admin_outside_admin_area():
+    """
+    Admin rights last only while the user is actually in the admin area.
+
+    is_admin lives in the same signed cookie as the user session, which
+    survives closing a tab (the cookie only dies with the browser). Without
+    this, signing in as an administrator once left the flag set for the rest
+    of the day — a new tab could open /admin with no password. Loading any
+    ordinary page now stands the user back down, which is the same thing the
+    "Back to dashboard" link does.
+
+    Only top-level page loads count: the admin page legitimately fetches
+    non-admin endpoints such as /api/rtcs, and those must not clear the flag
+    mid-use.
+    """
+    if not session.get("is_admin"):
+        return
+    if request.path.startswith("/admin"):
+        return
+    dest = request.headers.get("Sec-Fetch-Dest")
+    is_page = (dest == "document") if dest else \
+              ("text/html" in request.headers.get("Accept", ""))
+    if is_page:
+        session.pop("is_admin", None)
+        logger.info(f"Admin rights stood down on leaving the admin area: "
+                    f"{session.get('user', {}).get('name', 'unknown')}")
+
+
 @app.before_request
 def require_identity():
     endpoint = request.endpoint or ""
     if endpoint.startswith("auth.") or endpoint == "static":
         return
     if "user" in session:
+        _expire_admin_outside_admin_area()
         return
     if request.path.startswith("/api/") or request.path.startswith("/admin/"):
         # fetch() calls must see a status they can handle, not a login page

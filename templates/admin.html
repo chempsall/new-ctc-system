@@ -183,7 +183,9 @@
     <img src="{{ url_for('static', filename='images/wsp-logo.png') }}" alt="WSP">
     <span class="divider"></span>
     <span class="title">Resource Forecast — Admin</span>
-    <a href="/">Back to dashboard</a>
+    <!-- Leaving the admin area ends the elevated session: returning here asks
+         for the admin password again. -->
+    <a href="/admin/signout">Back to dashboard</a>
   </div>
 
   <div class="admin-main">
@@ -425,6 +427,40 @@
     <p class="admin-section-title">Application Log</p>
     <div class="admin-actions" style="margin-bottom:32px">
       <div class="admin-action">
+        <div class="admin-action__name">Audit trail</div>
+        <div>
+          <div class="admin-action__desc">
+            Who changed what, most recent first. Unlike the application log
+            below, these entries are kept permanently and can be filtered by
+            person, RTC or type of change.
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center">
+            <input id="audit-person" placeholder="Person" style="width:150px"
+                   class="form-input" onkeydown="if(event.key==='Enter')loadAudit()">
+            <input id="audit-rtc" placeholder="RTC id" style="width:90px"
+                   class="form-input" onkeydown="if(event.key==='Enter')loadAudit()">
+            <select id="audit-action" class="form-input" style="width:190px">
+              <option value="">All changes</option>
+            </select>
+            <button class="btn btn--sm" onclick="loadAudit()">Show</button>
+          </div>
+          <div id="audit-output" style="margin-top:10px;display:none">
+            <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">
+              <span id="audit-count"></span>
+            </div>
+            <div id="audit-rows" style="
+              font-size:12px;line-height:1.6;
+              background:var(--grey-50);border:1px solid var(--border);
+              border-radius:var(--radius-sm);padding:10px 12px;
+              max-height:400px;overflow-y:auto;
+            "></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-actions" style="margin-bottom:32px">
+      <div class="admin-action">
         <div class="admin-action__name">View log</div>
         <div>
           <div class="admin-action__desc">
@@ -483,10 +519,11 @@
   </div>
 
   <script>
-    const TOKEN = prompt("Enter admin token:") || "";
-
+    // Admin authority comes from the signed session established on the admin
+    // sign-in page, so the token is never held in the browser. Requests are
+    // authorised by the session cookie alone.
     function headers() {
-      return { "Authorization": `Bearer ${TOKEN}`, "Content-Type": "application/json" };
+      return { "Content-Type": "application/json" };
     }
 
     function escHtml(s) {
@@ -615,6 +652,52 @@
     }
 
     // ── IMPORT LOG ────────────────────────────────────────────────────────
+
+    async function loadAudit() {
+      const out = document.getElementById("audit-output");
+      const rows = document.getElementById("audit-rows");
+      const count = document.getElementById("audit-count");
+      out.style.display = "block";
+      rows.textContent = "Loading…";
+      try {
+        const q = new URLSearchParams({ n: 200 });
+        const person = document.getElementById("audit-person").value.trim();
+        const rtc    = document.getElementById("audit-rtc").value.trim();
+        const action = document.getElementById("audit-action").value;
+        if (person) q.set("person", person);
+        if (rtc)    q.set("rtc", rtc);
+        if (action) q.set("action", action);
+        const r = await fetch(`/admin/audit?${q}`, { headers: headers() });
+        const d = await r.json();
+        if (!r.ok) { rows.textContent = `Error: ${d.error}`; return; }
+
+        // Populate the action filter once, from what actually exists.
+        const sel = document.getElementById("audit-action");
+        if (sel.options.length === 1 && d.actions?.length) {
+          d.actions.forEach(a => {
+            const o = document.createElement("option");
+            o.value = a; o.textContent = a; sel.appendChild(o);
+          });
+        }
+        count.textContent = `${d.entries.length} shown of ${d.total} recorded`;
+        if (!d.entries.length) { rows.textContent = "No matching entries."; return; }
+        rows.innerHTML = d.entries.map(e => {
+          const when = (e.occurred_at || "").slice(0, 16).replace("T", " ");
+          const what = e.rtc_description
+            ? `${escHtml(e.rtc_description)}${e.rtc_id ? ` (#${e.rtc_id})` : ""}`
+            : "—";
+          return `<div style="padding:4px 0;border-bottom:0.5px solid var(--border)">
+            <span style="color:var(--text-tertiary)">${when}</span>
+            &nbsp;<strong>${escHtml(e.person_name || "—")}</strong>
+            &nbsp;<span style="color:var(--blue,#2C72C7)">${escHtml(e.action)}</span>
+            &nbsp;${what}
+            ${e.detail ? `<div style="color:var(--text-secondary);font-size:11px;margin-left:2px">${escHtml(e.detail)}</div>` : ""}
+          </div>`;
+        }).join("");
+      } catch (e) {
+        rows.textContent = "Failed to load the audit trail.";
+      }
+    }
 
     async function loadLog(errorsOnly) {
       document.getElementById('btn-log-all').className = errorsOnly ? 'btn btn--sm btn--secondary' : 'btn btn--sm';

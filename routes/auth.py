@@ -3,7 +3,8 @@ routes/auth.py
 Passwordless identity for alpha testing (Option A).
 
 This is identification, not authentication: the user picks who they are
-from the active staff list and a signed session cookie remembers it.
+from the active staff list and a signed session cookie holds it for the
+lifetime of the browser session only.
 Acceptable for a trusted internal network during alpha; the login route
 is the ONLY thing that changes when Entra ID SSO replaces it (Option B) —
 the session shape and get_current_user() stay identical.
@@ -12,7 +13,7 @@ the session shape and get_current_user() stay identical.
 import logging
 from datetime import datetime, timezone
 
-from flask import (Blueprint, render_template, request, redirect,
+from flask import (Blueprint, jsonify, render_template, request, redirect,
                    session, url_for)
 
 import database
@@ -60,7 +61,12 @@ def login_submit():
                                error="Please select your name from the list."), 400
     conn.close()
 
-    session.permanent = True
+    # A browser-session cookie, not a persistent one. Flask's default lifetime
+    # for a permanent session is 31 days, which meant a tester was silently
+    # remembered for a month. Every change is attributed to whoever is signed
+    # in, so people must say who they are each time they open the app rather
+    # than inheriting someone else's identity on a shared machine.
+    session.permanent = False
     session["user"] = {
         "name":          row["name"],
         "person_number": row["horizon_person_number"],
@@ -72,6 +78,24 @@ def login_submit():
     if not nxt.startswith("/") or nxt.startswith("//"):
         nxt = "/"
     return redirect(nxt)
+
+
+@auth_bp.route("/api/session/visit", methods=["POST"])
+def session_visit():
+    """
+    Records the start of a visit.
+
+    A browser that still holds the session does not go through the login page,
+    so opening the app again later would leave no trace of who was using it.
+    The browser reports each new window/tab it opens the app in (tracked with
+    sessionStorage, which is discarded when that window closes), giving one
+    line per visit however long the gap — five minutes or five hours.
+    """
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "Not signed in"}), 401
+    logger.info(f"Visit started: {user.get('name')} ({user.get('person_number')})")
+    return jsonify({"status": "ok"})
 
 
 @auth_bp.route("/logout")

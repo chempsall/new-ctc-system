@@ -53,7 +53,8 @@
           {% endfor %}
         </select>
 
-        <button type="submit" class="login-btn">Continue</button>
+        <button type="submit" class="login-btn" id="login-btn" disabled>Continue</button>
+        <div class="login-hint" id="login-hint">Select your name from the list.</div>
       </form>
 
       <div class="login-note">
@@ -65,22 +66,61 @@
   </div>
 
   <script>
-    // Filter the list as the user types; Enter submits the highlighted match.
+    // Filter the list as the user types. Nothing is ever auto-selected while
+    // more than one person matches: every change is recorded against whoever
+    // signs in, so picking the wrong name must take a deliberate action rather
+    // than an unlucky Enter press. A filter that matches exactly one person is
+    // unambiguous, so that one is selected for convenience.
     const search = document.getElementById("login-search");
     const select = document.getElementById("login-select");
+    const button = document.getElementById("login-btn");
+    const hint   = document.getElementById("login-hint");
     const options = [...select.options];
+
+    function refreshState() {
+      const chosen = !!select.value;
+      button.disabled = !chosen;
+      if (chosen) {
+        const name = select.options[select.selectedIndex]?.textContent || "";
+        hint.textContent = `Signing in as ${name}.`;
+      } else if (select.options.length === 0) {
+        hint.textContent = "No matching name — check the spelling.";
+      } else {
+        hint.textContent = "Select your name from the list.";
+      }
+    }
+
     search.addEventListener("input", () => {
       const q = search.value.toLowerCase();
       select.innerHTML = "";
-      options.filter(o => o.textContent.toLowerCase().includes(q))
-             .forEach(o => select.appendChild(o));
-      if (select.options.length) select.selectedIndex = 0;
+      const matches = options.filter(o => o.textContent.toLowerCase().includes(q));
+      matches.forEach(o => select.appendChild(o));
+      // Only pre-select when there is no ambiguity at all.
+      select.selectedIndex = (matches.length === 1) ? 0 : -1;
+      refreshState();
     });
+
+    select.addEventListener("change", refreshState);
+
     search.addEventListener("keydown", e => {
-      if (e.key === "Enter") { e.preventDefault();
-        if (select.value) select.form.requestSubmit(); }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        // Enter signs in only when one person is unambiguously selected.
+        if (select.value) select.form.requestSubmit();
+      } else if (e.key === "ArrowDown" && select.options.length) {
+        // Let the keyboard reach the list without touching the mouse.
+        e.preventDefault();
+        select.focus();
+        if (select.selectedIndex < 0) select.selectedIndex = 0;
+        refreshState();
+      }
     });
-    select.addEventListener("dblclick", () => select.form.requestSubmit());
+
+    select.addEventListener("dblclick", () => {
+      if (select.value) select.form.requestSubmit();
+    });
+
+    refreshState();
   </script>
 </body>
 </html>

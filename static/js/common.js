@@ -127,3 +127,23 @@ const RF = (() => {
 window.RF      = RF;
 window.esc     = RF.esc;
 window.escHtml = RF.esc;
+
+
+// ---------------------------------------------------------------------------
+// Visit tracking
+// A visit is one browser window with the app open, however long it stays open.
+// Closing the window and opening the app again is a new visit, even seconds
+// later. sessionStorage is scoped to the window and discarded when it closes,
+// which matches that definition exactly — unlike a timer, which would either
+// miss a quick return or invent a visit during a long lunch.
+// ---------------------------------------------------------------------------
+(function reportVisit() {
+  try {
+    if (sessionStorage.getItem("rft_visit")) return;   // already counted
+    sessionStorage.setItem("rft_visit", "1");
+    fetch("/api/session/visit", { method: "POST" }).catch(() => {});
+  } catch (e) {
+    // Private browsing can block sessionStorage; a missing visit line is not
+    // worth breaking the page over.
+  }
+})();

@@ -11,14 +11,17 @@ import re
 from pathlib import Path
 
 from dateutil.relativedelta import relativedelta
-from flask import Blueprint, jsonify, request, render_template
+from flask import (Blueprint, jsonify, request, render_template,
+                   redirect, session, url_for)
 
 import config
 import database
 import summary as summary_module
 from imports import staff_list as staff_import
 from imports import par_import
-from services.identity import get_current_user, require_admin
+from services import audit
+from services.identity import (get_current_user, require_admin,
+                               is_admin, check_admin_token)
 from services.jobs import relink_pending_rtcs, process_leavers
 from services.special_rtcs import run_special_rtc_maintenance
 
@@ -29,9 +32,57 @@ admin_bp = Blueprint("admin", __name__)
 
 @admin_bp.route("/admin")
 def admin_index():
+    # The page itself is gated, not just the endpoints behind it. Previously
+    # anyone signed in could open it and read the log and configuration; only
+    # the actions failed without a token.
+    if not is_admin():
+        return redirect(url_for("admin.admin_signin_page", next=request.path))
     return render_template("admin.html",
                            app_version=config.APP_VERSION,
                            changelog=config.CHANGELOG)
+
+
+@admin_bp.route("/admin/signin", methods=["GET"])
+def admin_signin_page():
+    if is_admin():
+        return redirect("/admin")
+    return render_template("admin_signin.html", error=None)
+
+
+@admin_bp.route("/admin/signin", methods=["POST"])
+def admin_signin_submit():
+    """
+    Verifies the admin token server-side and marks the session as admin, so
+    the token never lives in the page's JavaScript. Both outcomes are logged:
+    a failed attempt is worth seeing.
+    """
+    user = get_current_user()
+    if not config.ADMIN_TOKEN:
+        logger.error("Admin sign-in attempted but RF_ADMIN_TOKEN is not configured")
+        return render_template("admin_signin.html",
+                               error="Admin access is not configured on this server."), 503
+
+    supplied = (request.form.get("token") or "").strip()
+    if not check_admin_token(supplied):
+        logger.warning(f"Admin sign-in FAILED for {user}")
+        return render_template("admin_signin.html",
+                               error="Incorrect admin password."), 403
+
+    session["is_admin"]  = True
+    session["admin_seen"] = datetime.now(timezone.utc).isoformat()
+    logger.info(f"Admin sign-in: {user}")
+    nxt = request.args.get("next") or "/admin"
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = "/admin"
+    return redirect(nxt)
+
+
+@admin_bp.route("/admin/signout", methods=["POST", "GET"])
+def admin_signout():
+    if session.pop("is_admin", None):
+        session.pop("admin_seen", None)
+        logger.info(f"Admin signed out: {get_current_user()}")
+    return redirect("/")
 
 
 @admin_bp.route("/admin/rtcs/<int:rtc_id>", methods=["DELETE"])
@@ -45,6 +96,8 @@ def admin_delete_rtc(rtc_id):
         conn.close()
         return jsonify({"error": f"RTC {rtc_id} not found"}), 404
     project_id = rtc["project_id"]
+    # Describe it before it is gone — afterwards there is nothing to look up.
+    was_desc = audit.describe_rtc(conn, rtc_id)
     c.execute("DELETE FROM allocations WHERE rtc_id = %s", (rtc_id,))
     alloc_count = c.rowcount
     c.execute("DELETE FROM rtcs WHERE rtc_id = %s", (rtc_id,))
@@ -54,6 +107,8 @@ def admin_delete_rtc(rtc_id):
         proj = c.execute("SELECT project_status FROM projects WHERE project_id = %s", (project_id,)).fetchone()
         if proj and proj["project_status"] == "Placeholder":
             c.execute("DELETE FROM projects WHERE project_id = %s", (project_id,))
+    audit.record(audit.RTC_DELETED, rtc_id=rtc_id, rtc_description=was_desc,
+                 detail=f"{alloc_count} allocation row(s) removed", conn=conn)
     conn.commit()
     conn.close()
     summary_module.mark_dirty()
@@ -87,6 +142,41 @@ def admin_import_par():
                 f"{result.get('rows_processed',0)} rows processed, "
                 f"{result.get('rows_inserted',0)} inserted, {result.get('rows_updated',0)} updated")
     return jsonify(result)
+
+
+@admin_bp.route("/admin/audit")
+@require_admin
+def admin_audit():
+    """
+    The audit trail: who changed what, most recent first.
+
+    Optional filters: person (name substring), rtc (id), action, and a limit.
+    Kept separate from /admin/log, which is the diagnostic application log.
+    """
+    limit  = min(int(request.args.get("n", 200)), 1000)
+    person = (request.args.get("person") or "").strip()
+    rtc    = (request.args.get("rtc") or "").strip()
+    action = (request.args.get("action") or "").strip()
+
+    sql    = ["SELECT occurred_at, person_name, action, rtc_id, rtc_description, detail",
+              "FROM audit_log WHERE 1=1"]
+    params = []
+    if person:
+        sql.append("AND LOWER(person_name) LIKE %s"); params.append(f"%{person.lower()}%")
+    if rtc.isdigit():
+        sql.append("AND rtc_id = %s"); params.append(int(rtc))
+    if action:
+        sql.append("AND action = %s"); params.append(action)
+    sql.append("ORDER BY occurred_at DESC LIMIT %s"); params.append(limit)
+
+    conn = database.get_connection()
+    rows = conn.execute(" ".join(sql), tuple(params)).fetchall()
+    total = conn.execute("SELECT COUNT(*) AS n FROM audit_log").fetchone()["n"]
+    actions = [r["action"] for r in conn.execute(
+        "SELECT DISTINCT action FROM audit_log ORDER BY action").fetchall()]
+    conn.close()
+    return jsonify({"entries": [dict(r) for r in rows],
+                    "total": total, "actions": actions})
 
 
 @admin_bp.route("/admin/import-log")

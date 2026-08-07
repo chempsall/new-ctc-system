@@ -1678,6 +1678,17 @@ function resetFilters() {
 // ---------------------------------------------------------------------------
 
 
+// An RTC cannot start more than 12 months ahead (the server enforces the same
+// rule). The picker must not offer what would then be refused on save.
+const MAX_START_MONTHS_AHEAD = 12;
+
+function latestAllowedStart() {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + MAX_START_MONTHS_AHEAD);
+  return d;
+}
+
 let _rtcPickerYear  = new Date().getFullYear();
 let _rtcPickerMonth = null;
 
@@ -1804,17 +1815,27 @@ function closeRtcModal() {
 
 function renderMonthPicker() {
   document.getElementById("rtc-year-label").textContent = _rtcPickerYear;
+  // Show the range limits on the arrows rather than letting them look live.
+  const _prev = document.getElementById("rtc-year-prev");
+  const _next = document.getElementById("rtc-year-next");
+  if (_prev) _prev.disabled = _rtcPickerYear <= new Date().getFullYear();
+  if (_next) _next.disabled = _rtcPickerYear >= latestAllowedStart().getFullYear();
   const grid = document.getElementById("rtc-month-grid");
   if (!grid) return;
   const now         = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
+  const maxDate     = latestAllowedStart();
+  const maxYear     = maxDate.getFullYear();
+  const maxMonth    = maxDate.getMonth() + 1;
   grid.innerHTML = MONTH_ABBR.map((name, i) => {
     const month   = i + 1;
     const isPast  = _rtcPickerYear < currentYear ||
                     (_rtcPickerYear === currentYear && month < currentMonth);
+    const isTooFar = _rtcPickerYear > maxYear ||
+                     (_rtcPickerYear === maxYear && month > maxMonth);
     const sel     = month === _rtcPickerMonth ? "selected" : "";
-    const disabled = isPast ? "disabled" : "";
+    const disabled = (isPast || isTooFar) ? "disabled" : "";
     return `<button type="button" class="month-picker__btn ${sel}" data-month="${month}" ${disabled}>${name}</button>`;
   }).join("");
   grid.querySelectorAll(".month-picker__btn").forEach(btn => {
@@ -2264,7 +2285,10 @@ else if (state.activeView === "dept") renderDeptSummary();
     }
   });
   document.getElementById("rtc-year-next")?.addEventListener("click", () => {
-    _rtcPickerYear++; renderMonthPicker();
+    // Never page past the last year that contains a selectable month.
+    if (_rtcPickerYear < latestAllowedStart().getFullYear()) {
+      _rtcPickerYear++; renderMonthPicker();
+    }
   });
 }
 

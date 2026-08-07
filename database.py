@@ -295,6 +295,28 @@ def initialise_database():
     """)
 
     c.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            audit_id        SERIAL  PRIMARY KEY,
+            occurred_at     TEXT    NOT NULL,
+            person_name     TEXT,
+            person_number   TEXT,
+            action          TEXT    NOT NULL,
+            rtc_id          INTEGER,
+            -- The RTC's identity AS IT WAS when the event happened. Looking it
+            -- up later would relabel history after a conversion changes the
+            -- project number, quietly rewriting the past.
+            rtc_description TEXT,
+            detail          TEXT
+        )
+    """)
+    c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_audit_occurred ON audit_log(occurred_at DESC)
+    """)
+    c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_audit_rtc ON audit_log(rtc_id)
+    """)
+
+    c.execute("""
         CREATE TABLE IF NOT EXISTS summary_cache (
             cache_id        INTEGER PRIMARY KEY CHECK (cache_id = 1),
             generated_at    TEXT    NOT NULL,
