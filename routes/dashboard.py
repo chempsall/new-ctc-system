@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request, render_template, Response
 
+import config
 import database
 import summary as summary_module
 from services.special_rtcs import SPECIAL_PROJECT_NUMBERS
@@ -22,6 +23,7 @@ def index():
     # services/special_rtcs.py, and handed to the pages so the browser does not
     # keep its own copy of the same list.
     return render_template("index.html",
+                           app_version=config.APP_VERSION,
                            special_rtc_numbers=sorted(SPECIAL_PROJECT_NUMBERS))
 
 
@@ -29,6 +31,7 @@ def index():
 def rtc_editor(rtc_id):
     """Serves the RTC editing screen."""
     return render_template("rtc.html", rtc_id=rtc_id,
+                           app_version=config.APP_VERSION,
                            special_rtc_numbers=sorted(SPECIAL_PROJECT_NUMBERS))
 
 

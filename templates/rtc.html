@@ -20,6 +20,7 @@
     }
     .rtc-topbar img   { height: 22px; }
     .rtc-topbar .divider { width:1px; height:20px; background:var(--grey-700); }
+    .rtc-topbar .version { font-size:11px; color:var(--grey-500,#9aa0a6); margin-left:8px; }
     .rtc-topbar .title { font-size:13px; font-weight:500; color:var(--grey-200); }
     .rtc-topbar a.back {
       font-size:11px; color:var(--grey-400);
@@ -411,6 +412,7 @@
     <img src="/static/images/wsp-logo.png" alt="WSP">
     <span class="divider"></span>
     <span class="title">Resource Forecast — RTC Editor</span>
+    <span class="version">v{{ app_version }}</span>
     <span class="save-status" id="save-status"></span>
     <a href="#" class="back" id="btn-back" style="margin-left:auto;background:var(--wsp-red);border-color:var(--wsp-red);color:#fff">← Back to dashboard</a>
   </div>
