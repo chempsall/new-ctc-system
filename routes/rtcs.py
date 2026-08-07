@@ -615,9 +615,7 @@ def api_update_rtc(rtc_id):
     # Recorded on the same connection, before the commit, so the audit entry
     # and the change it describes land together or not at all.
     if alloc_changes:
-        audit.record(audit.ALLOCATIONS_EDITED, rtc_id=rtc_id,
-                     detail=audit.summarise_allocation_changes(alloc_changes),
-                     conn=conn)
+        audit.record_allocation_change(rtc_id, alloc_changes, conn)
 
     conn.commit()
     conn.close()

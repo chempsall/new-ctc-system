@@ -155,28 +155,40 @@ def admin_audit():
     """
     limit  = min(int(request.args.get("n", 200)), 1000)
     person = (request.args.get("person") or "").strip()
-    rtc    = (request.args.get("rtc") or "").strip()
+    project = (request.args.get("project") or "").strip()
     action = (request.args.get("action") or "").strip()
 
     sql    = ["SELECT occurred_at, person_name, action, rtc_id, rtc_description, detail",
               "FROM audit_log WHERE 1=1"]
     params = []
     if person:
-        sql.append("AND LOWER(person_name) LIKE %s"); params.append(f"%{person.lower()}%")
-    if rtc.isdigit():
-        sql.append("AND rtc_id = %s"); params.append(int(rtc))
+        sql.append("AND person_name = %s"); params.append(person)
+    if project:
+        # Matched on the description recorded at the time, so a project can be
+        # found by its number or name — the internal RTC id means nothing to
+        # the person reading this.
+        sql.append("AND LOWER(rtc_description) LIKE %s")
+        params.append(f"%{project.lower()}%")
     if action:
         sql.append("AND action = %s"); params.append(action)
     sql.append("ORDER BY occurred_at DESC LIMIT %s"); params.append(limit)
 
     conn = database.get_connection()
-    rows = conn.execute(" ".join(sql), tuple(params)).fetchall()
+    rows  = conn.execute(" ".join(sql), tuple(params)).fetchall()
     total = conn.execute("SELECT COUNT(*) AS n FROM audit_log").fetchone()["n"]
+    # Offer only values that actually appear, so the filters cannot be set to
+    # something that returns nothing.
+    people = [r["person_name"] for r in conn.execute(
+        "SELECT DISTINCT person_name FROM audit_log "
+        "WHERE person_name IS NOT NULL ORDER BY person_name").fetchall()]
+    projects = [r["rtc_description"] for r in conn.execute(
+        "SELECT DISTINCT rtc_description FROM audit_log "
+        "WHERE rtc_description IS NOT NULL ORDER BY rtc_description").fetchall()]
     actions = [r["action"] for r in conn.execute(
         "SELECT DISTINCT action FROM audit_log ORDER BY action").fetchall()]
     conn.close()
-    return jsonify({"entries": [dict(r) for r in rows],
-                    "total": total, "actions": actions})
+    return jsonify({"entries": [dict(r) for r in rows], "total": total,
+                    "people": people, "projects": projects, "actions": actions})
 
 
 @admin_bp.route("/admin/import-log")

@@ -13,8 +13,9 @@ is logged and swallowed. An audit trail that can take the app down is worse
 than one with an occasional gap.
 """
 
+import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import database
 from services.identity import get_current_user, get_current_person_number
@@ -34,6 +35,20 @@ RTC_DETAILS_EDITED = "Details edited"
 ALLOCATIONS_EDITED = "Allocations changed"
 NOTES_EDITED       = "Notes edited"
 ADMIN_ACTION       = "Admin action"
+
+# Every action, so the admin filter can offer them all rather than only the
+# ones that happen to have occurred so far.
+ALL_ACTIONS = [
+    RTC_CREATED, RTC_DELETED, RTC_ARCHIVED, RTC_RESTORED,
+    RTC_LINKED, RTC_CONVERTED, RTC_DETAILS_EDITED,
+    ALLOCATIONS_EDITED, NOTES_EDITED, ADMIN_ACTION,
+]
+
+# Editing a grid saves in batches as the user tabs between cells, so one
+# sitting produces several requests. Entries for the same person, RTC and
+# action within this window are merged, so the trail reads as "Alice changed
+# these allocations" rather than a stream of partial saves.
+MERGE_WINDOW_MINUTES = 30
 
 
 def describe_rtc(conn, rtc_id):
@@ -62,7 +77,8 @@ def describe_rtc(conn, rtc_id):
     return f"{number} — {name}".strip(" —") or None
 
 
-def record(action, rtc_id=None, rtc_description=None, detail=None, conn=None):
+def record(action, rtc_id=None, rtc_description=None, detail=None,
+           payload=None, conn=None):
     """
     Writes one audit entry.
 
@@ -79,11 +95,11 @@ def record(action, rtc_id=None, rtc_description=None, detail=None, conn=None):
         conn.execute("""
             INSERT INTO audit_log
                 (occurred_at, person_name, person_number, action,
-                 rtc_id, rtc_description, detail)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                 rtc_id, rtc_description, detail, payload)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (datetime.now(timezone.utc).isoformat(),
               get_current_user(), get_current_person_number(),
-              action, rtc_id, rtc_description, detail))
+              action, rtc_id, rtc_description, detail, payload))
         if own_conn:
             conn.commit()
     except Exception as e:
@@ -95,6 +111,67 @@ def record(action, rtc_id=None, rtc_description=None, detail=None, conn=None):
                 conn.close()
             except Exception:
                 pass
+
+
+def record_allocation_change(rtc_id, changes, conn):
+    """
+    Records an allocation edit, merging it into the person's recent entry for
+    the same RTC if there is one.
+
+    Merging works on the raw change set rather than the summary text: the same
+    person editing twice is still one person, and the same period touched
+    twice is still one period. Recombining the wording alone would double-count
+    both.
+    """
+    if not changes:
+        return
+    try:
+        now  = datetime.now(timezone.utc)
+        pnum = get_current_person_number()
+        cutoff = (now - timedelta(minutes=MERGE_WINDOW_MINUTES)).isoformat()
+        recent = conn.execute("""
+            SELECT audit_id, payload FROM audit_log
+            WHERE action = %s AND rtc_id = %s AND person_number = %s
+              AND occurred_at >= %s
+            ORDER BY occurred_at DESC LIMIT 1
+        """, (ALLOCATIONS_EDITED, rtc_id, pnum, cutoff)).fetchone()
+
+        people  = {c["person"] for c in changes}
+        periods = {c["period"] for c in changes}
+        net     = sum(c["days"] - c["was"] for c in changes)
+
+        if recent:
+            try:
+                prev = json.loads(recent["payload"] or "{}")
+            except (ValueError, TypeError):
+                prev = {}
+            people  |= set(prev.get("people", []))
+            periods |= set(prev.get("periods", []))
+            net     += float(prev.get("net", 0))
+            payload = json.dumps({"people": sorted(people),
+                                  "periods": sorted(periods),
+                                  "net": round(net, 2)})
+            conn.execute("""
+                UPDATE audit_log SET occurred_at = %s, detail = %s, payload = %s
+                WHERE audit_id = %s
+            """, (now.isoformat(), _summary(people, periods, net),
+                  payload, recent["audit_id"]))
+            return
+
+        payload = json.dumps({"people": sorted(people),
+                              "periods": sorted(periods),
+                              "net": round(net, 2)})
+        record(ALLOCATIONS_EDITED, rtc_id=rtc_id,
+               detail=_summary(people, periods, net), payload=payload, conn=conn)
+    except Exception as e:
+        logger.error(f"Failed to record allocation change: {e}")
+
+
+def _summary(people, periods, net):
+    sign = "+" if net >= 0 else ""
+    return (f"{len(people)} {'person' if len(people) == 1 else 'people'}, "
+            f"{len(periods)} {'period' if len(periods) == 1 else 'periods'}, "
+            f"net {sign}{round(net, 1)} days")
 
 
 def summarise_allocation_changes(changes):

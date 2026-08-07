@@ -306,7 +306,11 @@ def initialise_database():
             -- up later would relabel history after a conversion changes the
             -- project number, quietly rewriting the past.
             rtc_description TEXT,
-            detail          TEXT
+            detail          TEXT,
+            -- The raw change set, so consecutive edits in one sitting can be
+            -- merged into a single entry without double-counting the same
+            -- person or period twice.
+            payload         TEXT
         )
     """)
     c.execute("""
@@ -346,6 +350,7 @@ def initialise_database():
     _ensure_column(c, "staff", "line_manager",  "TEXT")
     _ensure_column(c, "rtcs", "last_edited_by", "TEXT")
     _ensure_column(c, "rtcs", "last_edited_at", "TEXT")
+    _ensure_column(c, "audit_log", "payload", "TEXT")
 
     # Bank holidays cache
     c.execute("""
